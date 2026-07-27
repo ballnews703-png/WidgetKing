@@ -536,6 +536,7 @@
 <section id="shortcutGuideSection" class="pane pane-install">
   <h2>⚡ Your Shortcut Guide</h2>
   <p class="hint">Auto-generated from the widgets you've saved: what each app button does on tap, and the exact Shortcuts to create for the few that need one. (Apple doesn't let any app install Shortcuts for you — this reads your designs so there's zero guesswork.)</p>
+  <p class="hint">⚡ <b>Zero-flash tip:</b> widget taps normally hop through Scriptable for a moment. For a widget that opens <b>one</b> app, skip that entirely: long-press the widget → <b>Edit Widget</b> → <b>When Interacting → Open URL</b> → paste the app's link (copy buttons below). iOS then opens the app directly — Scriptable never appears. Multi-icon launchers can't do per-icon direct taps (a Scriptable limit), so for a flash-free grid use the App Icon Maker above.</p>
   <div id="shortcutGuideList"></div>
   <a class="wiz-action" href="shortcuts://" style="margin-top:10px">🚀 Open the Shortcuts app</a>
 </section>
@@ -4984,8 +4985,19 @@ function renderShortcutGuide() {
       right.appendChild(setupBtn);
       needs.push({ label: app.label, name: shortcutName });
     } else if (app.url) {
-      right.textContent = "✓ opens instantly";
+      right.textContent = "✓ direct link ";
       right.style.color = "var(--accent)";
+      const copyBtn = document.createElement("button");
+      copyBtn.textContent = "📋 " + app.url.slice(0, 18) + (app.url.length > 18 ? "…" : "");
+      copyBtn.title = app.url;
+      copyBtn.style.cssText = "font-size:11px;padding:5px 9px;min-height:30px;margin-left:6px";
+      copyBtn.onclick = function () {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(app.url);
+        }
+        toast("Link copied — paste it into the widget's “When Interacting → Open URL” for a zero-flash tap");
+      };
+      right.appendChild(copyBtn);
     } else {
       right.textContent = "— no link set";
       right.style.color = "var(--muted)";
