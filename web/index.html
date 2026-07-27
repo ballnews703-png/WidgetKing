@@ -533,6 +533,13 @@
   </details>
 </section>
 
+<section id="shortcutGuideSection" class="pane pane-install">
+  <h2>⚡ Your Shortcut Guide</h2>
+  <p class="hint">Auto-generated from the widgets you've saved: what each app button does on tap, and the exact Shortcuts to create for the few that need one. (Apple doesn't let any app install Shortcuts for you — this reads your designs so there's zero guesswork.)</p>
+  <div id="shortcutGuideList"></div>
+  <a class="wiz-action" href="shortcuts://" style="margin-top:10px">🚀 Open the Shortcuts app</a>
+</section>
+
 <div id="setupWizard">
   <div id="wizardHead">
     <span class="title">🪄 Set up your iPhone</span>
@@ -3585,7 +3592,7 @@ function setupLauncherControls() {
     const apps = current.apps || [];
     if (apps.length === 0) { toast("Add some apps first 👇"); return; }
     iconMakerApps = apps.map(function (app) {
-      return { label: app.label || "App", emoji: app.emoji || "" };
+      return { label: app.label || "App", emoji: app.emoji || "", iconUrl: app.iconUrl || "" };
     });
     renderIconMaker();
     switchTab("install");
@@ -3959,6 +3966,7 @@ function renderControls() {
   }
 }
 function renderLibrary() {
+  renderShortcutGuide();
   const library = document.getElementById("library");
   library.innerHTML = "";
   if (designs.length === 0) {
@@ -4768,13 +4776,32 @@ document.getElementById("bAI").onclick = function () {
 };
 
 // ==================== Home Screen App Icon Maker ====================
-let iconMakerStyle = "pastel";
+let iconMakerStyle = "real";
 let iconMakerApps = [
   { label: "Messages", emoji: "💬" }, { label: "Phone", emoji: "📞" },
   { label: "Instagram", emoji: "📸" }, { label: "Spotify", emoji: "🎧" },
   { label: "YouTube", emoji: "▶️" }, { label: "Maps", emoji: "🗺" },
   { label: "Mail", emoji: "✉️" }, { label: "Camera", emoji: "📷" }
 ];
+// The "Real icon" style uses genuine App Store artwork — fetched lazily so
+// the saved shortcut icon is pixel-identical to the original app icon.
+let iconFetchQueue = false;
+async function fetchMakerIcons() {
+  if (iconFetchQueue) return;
+  iconFetchQueue = true;
+  for (const app of iconMakerApps) {
+    if (app.iconUrl || app.noIcon) continue;
+    try {
+      const data = await jsonp("https://itunes.apple.com/search?media=software&entity=software&limit=1&term=" + encodeURIComponent(app.label));
+      const result = data.results && data.results[0];
+      if (result) { app.iconUrl = result.artworkUrl512 || result.artworkUrl100 || ""; }
+      if (!app.iconUrl) app.noIcon = true;
+    } catch (e) { app.noIcon = true; }
+    await new Promise(function (r) { setTimeout(r, 300); });
+  }
+  iconFetchQueue = false;
+  renderIconMaker();
+}
 function drawHomeIcon(app, styleName, index) {
   const theme = ICON_THEMES[styleName];
   const S = 1024;
@@ -4804,13 +4831,14 @@ function drawHomeIcon(app, styleName, index) {
 function renderIconMaker() {
   const styleChips = document.getElementById("iconStyleChips");
   styleChips.innerHTML = "";
-  for (const id of Object.keys(ICON_THEMES)) {
+  for (const id of ["real"].concat(Object.keys(ICON_THEMES))) {
     const chip = document.createElement("button");
-    chip.textContent = ICON_THEMES[id].name;
+    chip.textContent = id === "real" ? "📱 Real icon" : ICON_THEMES[id].name;
     chip.className = iconMakerStyle === id ? "sel" : "";
     chip.onclick = function () { iconMakerStyle = id; renderIconMaker(); };
     styleChips.appendChild(chip);
   }
+  if (iconMakerStyle === "real") fetchMakerIcons();
   const appChips = document.getElementById("iconAppChips");
   appChips.innerHTML = "";
   iconMakerApps.forEach(function (app, index) {
@@ -4825,7 +4853,17 @@ function renderIconMaker() {
     const cell = document.createElement("div");
     cell.className = "im-cell";
     const img = document.createElement("img");
-    img.src = drawHomeIcon(app, iconMakerStyle, index);
+    if (iconMakerStyle === "real") {
+      if (app.iconUrl) {
+        img.src = app.iconUrl;
+      } else {
+        // Artwork still loading (or not found) — pastel placeholder for now.
+        img.src = drawHomeIcon(app, "pastel", index);
+        if (app.noIcon) cell.title = "Couldn't find this app's icon — check the spelling";
+      }
+    } else {
+      img.src = drawHomeIcon(app, iconMakerStyle, index);
+    }
     img.alt = app.label + " icon";
     const name = document.createElement("div");
     name.className = "im-name";
@@ -4841,10 +4879,82 @@ document.getElementById("iconAppAdd").onclick = function () {
   const name = document.getElementById("iconAppSearch").value.trim();
   if (!name) return;
   const presetKey = Object.keys(APP_PRESETS).find(function (k) { return name.toLowerCase().includes(k); });
-  iconMakerApps.push({ label: name.slice(0, 14), emoji: presetKey ? APP_PRESETS[presetKey].emoji : "" });
+  iconMakerApps.push({ label: name.slice(0, 20), emoji: presetKey ? APP_PRESETS[presetKey].emoji : "" });
   document.getElementById("iconAppSearch").value = "";
   renderIconMaker();
 };
+
+// ==================== Auto Shortcut Guide ====================
+// Reads every saved widget and lists what each app button does on tap, plus
+// the exact Shortcut names to create for the few that need one.
+function collectAllApps() {
+  const seen = {};
+  const list = [];
+  const sources = designs.concat(current ? [current] : []);
+  for (const design of sources) {
+    const apps = (design.apps || []).concat(
+      (design.canvasElements || []).filter(function (el) { return el.kind === "app"; })
+    );
+    for (const app of apps) {
+      const key = (app.label || "App").toLowerCase();
+      if (seen[key]) continue;
+      seen[key] = true;
+      list.push({ label: app.label || "App", emoji: app.emoji || "📱", url: app.url || "", iconUrl: app.iconUrl || "" });
+    }
+  }
+  return list;
+}
+function renderShortcutGuide() {
+  const container = document.getElementById("shortcutGuideList");
+  const apps = collectAllApps();
+  if (apps.length === 0) {
+    container.innerHTML = '<p class="hint">No app buttons in your widgets yet — add a launcher or app icons and this guide fills in automatically.</p>';
+    return;
+  }
+  container.innerHTML = "";
+  const needs = [];
+  for (const app of apps) {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.style.cssText = "justify-content:space-between;padding:9px 4px;border-bottom:1px solid var(--line)";
+    const left = document.createElement("span");
+    left.style.fontSize = "14px";
+    left.textContent = (app.emoji || "📱") + " " + app.label;
+    const right = document.createElement("span");
+    right.style.fontSize = "12px";
+    if ((app.url || "").indexOf("shortcuts://run-shortcut") === 0) {
+      let shortcutName = "Open " + app.label;
+      try {
+        const match = app.url.match(/name=([^&]+)/);
+        if (match) shortcutName = decodeURIComponent(match[1]);
+      } catch (e) {}
+      right.innerHTML = '⚠️ needs Shortcut: <b>' + esc(shortcutName) + '</b>';
+      right.style.color = "var(--muted)";
+      needs.push({ label: app.label, name: shortcutName });
+    } else if (app.url) {
+      right.textContent = "✓ opens instantly";
+      right.style.color = "var(--accent)";
+    } else {
+      right.textContent = "— no link set";
+      right.style.color = "var(--muted)";
+    }
+    row.append(left, right);
+    container.appendChild(row);
+  }
+  if (needs.length > 0) {
+    const steps = document.createElement("p");
+    steps.className = "hint";
+    steps.style.marginTop = "10px";
+    steps.innerHTML = "For each ⚠️ app (one minute each): <b>Shortcuts</b> app → <b>+</b> → add <b>“Open App”</b> → pick the app → tap the title → <b>Rename</b> to exactly the bold name above → <b>Done</b>. That's it — the widget finds it by name.";
+    container.appendChild(steps);
+  } else {
+    const done = document.createElement("p");
+    done.className = "hint";
+    done.style.marginTop = "10px";
+    done.textContent = "🎉 Every app button opens directly — no Shortcuts needed.";
+    container.appendChild(done);
+  }
+}
 document.getElementById("iconAppSearch").addEventListener("keydown", function (event) {
   if (event.key === "Enter") { event.preventDefault(); document.getElementById("iconAppAdd").onclick(); }
 });
@@ -4875,6 +4985,7 @@ document.getElementById("wizardCopyBtn").onclick = function () {
 setupLauncherControls();
 renderTemplates();
 renderIconMaker();
+renderShortcutGuide();
 renderLibrary();
 syncControls();
 renderAll();
