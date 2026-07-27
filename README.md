@@ -12,20 +12,22 @@ There are **two ways to use WidgetKing**:
 ## 🌐 No Mac? Use the web designer (100% free, no AI needed)
 
 Everything runs locally — no server, no accounts, no API keys, nothing uploaded.
+The designer is a small app with four tabs (Create · Editor · My Widgets ·
+Install), light & dark modes, and it can be added to your Home Screen like a
+real app (Safari → Share → Add to Home Screen).
 
-1. Open `web/index.html` in any browser (double-click it — it works offline).
-   You can do this on a Windows PC, a borrowed laptop, or host it anywhere.
-2. Design widgets: use the **Magic box** (type an idea in plain English — a
-   built-in parser handles it, no AI required), the regular editor, or the
-   **Freestyle drag-and-drop canvas**. Designs save in your browser.
-3. Tap **Copy Scriptable Script** (or Download it and send it to your phone
-   however you like — Notes, email, messages).
-4. On your iPhone: install the free **Scriptable** app, create a new script,
-   paste, and name it `WidgetKing`.
-5. Add a **Scriptable widget** to your Home Screen, long-press it → Edit
-   Widget → choose the `WidgetKing` script, and set **Parameter** to a
-   design's name. Add more widgets with different parameters — designs are
-   fully interchangeable.
+1. Open `web/index.html` in any browser (or the hosted copy). **Create** tab:
+   start from a template pack (Cute, Minimal, Zen, Sports, Work, Neon, Live),
+   answer the "Build it for me" quiz, or describe the widget in plain English.
+2. **Editor** tab: tweak everything — themes, 16 fonts, glass/clear/see-through
+   backgrounds, drag-and-drop Studio with photos, app icons, weather, calendar,
+   progress bars, and more. Launchers can use real App Store icons or themed
+   icon packs (Pastel, Line, Noir, Zen, Neon).
+3. **Install** tab: the step-by-step wizard copies your designs into the free
+   **Scriptable** app and onto your Home Screen. The **App Icon Maker** there
+   also restyles your real app icons (applied free via Shortcuts).
+4. Designs save in your browser; back them up, send them to another device as
+   a link, or share single designs with friends from **My Widgets**.
 
 That gets you real Home Screen widgets with no Mac, no developer account, and
 no ongoing costs. (One honest limitation: iOS refreshes Scriptable widgets on

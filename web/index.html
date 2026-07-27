@@ -19,54 +19,89 @@
     --text: #f2f2f5;
     --muted: #9a9aa5;
     --accent: #8f52fa;
+    --accent-text: #ffffff;
+    --border: #34343f;
+    --line: #26262e;
+    --stage-a: #1b1b22;
+    --stage-b: #17171d;
+    --shadow: rgba(0,0,0,.45);
     --radius: 16px;
+  }
+  body.light {
+    --bg: #f5f1ec;
+    --card: #ffffff;
+    --card2: #f3eef9;
+    --text: #322b3d;
+    --muted: #837b90;
+    --accent: #8f52fa;
+    --accent-text: #ffffff;
+    --border: #e4dcee;
+    --line: #eae3f2;
+    --stage-a: #eee8f5;
+    --stage-b: #e6dff0;
+    --shadow: rgba(90,60,140,.18);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: var(--bg); color: var(--text);
-    padding: 20px; max-width: 1080px; margin: 0 auto;
+    padding: 16px 16px calc(84px + env(safe-area-inset-bottom)); max-width: 1080px; margin: 0 auto;
+    transition: background .25s ease, color .25s ease;
   }
-  header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 20px; }
-  header h1 { font-size: 26px; }
-  header span { color: var(--muted); font-size: 14px; }
+  header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  header h1 { font-size: 22px; }
+  header .spacer { flex: 1; }
+  #appLogo { width: 34px; height: 34px; flex-shrink: 0; }
+  #modeToggle { font-size: 16px; min-height: 40px; min-width: 44px; border-radius: 12px; }
   section {
-    background: var(--card); border-radius: var(--radius);
-    padding: 18px; margin-bottom: 18px;
+    background: var(--card); border-radius: 20px;
+    padding: 18px; margin-bottom: 16px;
+    box-shadow: 0 1px 2px var(--shadow);
   }
-  h2 { font-size: 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
-  .step {
-    background: var(--accent); color: #fff; font-size: 12px; font-weight: 700;
-    width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
-    display: inline-flex; align-items: center; justify-content: center;
-  }
+  h2 { font-size: 17px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .step { display: none; }
   .hint { color: var(--muted); font-size: 13px; margin-bottom: 10px; line-height: 1.45; }
   textarea, input[type=text], input[type=password], input[type=date], select {
     width: 100%; background: var(--card2); color: var(--text);
-    border: 1px solid #34343f; border-radius: 10px;
-    padding: 10px 12px; font-size: 14px; font-family: inherit;
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 14px; font-size: 15px; font-family: inherit;
   }
   textarea { resize: vertical; min-height: 48px; }
   button {
-    background: var(--card2); color: var(--text); border: 1px solid #34343f;
-    border-radius: 10px; padding: 9px 14px; font-size: 13px;
-    cursor: pointer; font-family: inherit;
+    background: var(--card2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 12px; padding: 11px 16px; font-size: 14px; min-height: 44px;
+    cursor: pointer; font-family: inherit; font-weight: 500;
     transition: transform .12s ease, border-color .12s ease;
   }
   button:hover { border-color: var(--accent); }
   button:active { transform: scale(.96); }
-  button.primary { background: var(--accent); border-color: var(--accent); font-weight: 600; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 700; font-size: 15px; }
   button:disabled { opacity: .5; cursor: default; }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
-  .chips button { font-size: 12px; border-radius: 999px; padding: 6px 12px; }
+  .chips button { font-size: 13px; border-radius: 999px; padding: 9px 14px; min-height: 40px; }
   .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
   .editor-grid { display: grid; grid-template-columns: auto 1fr; gap: 22px; }
   @media (max-width: 760px) {
     .editor-grid { grid-template-columns: 1fr; }
-    button { padding: 12px 16px; font-size: 14px; min-height: 44px; }
-    .chips button { padding: 9px 14px; }
-    .swatch { width: 40px; height: 40px; }
+    .swatch { width: 42px; height: 42px; }
   }
+  #tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    display: flex; justify-content: space-around; align-items: stretch;
+    background: var(--card); border-top: 1px solid var(--line);
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    box-shadow: 0 -4px 20px var(--shadow);
+  }
+  #tabbar button {
+    flex: 1; max-width: 130px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    background: none; border: none; min-height: 52px; padding: 6px 4px;
+    font-size: 11px; font-weight: 600; color: var(--muted); border-radius: 14px;
+  }
+  #tabbar button .tab-ico { font-size: 21px; line-height: 1.15; }
+  #tabbar button.active { color: var(--accent); background: var(--card2); }
+  .pane { display: none; }
+  .pane.active { display: block; animation: paneIn .22s ease; }
+  @keyframes paneIn { from { opacity: .4; transform: translateY(6px); } to { opacity: 1; transform: none; } }
   .field { margin-bottom: 12px; }
   .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
   .kind-buttons button.active, .size-buttons button.active {
@@ -76,7 +111,7 @@
   .swatch { width: 34px; height: 34px; border-radius: 50%; cursor: pointer;
     border: 2px solid transparent; transition: transform .12s ease; }
   .swatch:hover { transform: scale(1.12); }
-  .swatch.active { border-color: #fff; }
+  .swatch.active { border-color: var(--text); }
   #canvasWrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
   #canvas {
     border-radius: 28px; overflow: hidden; position: relative;
@@ -96,21 +131,21 @@
     flex-direction: column; overscroll-behavior: contain; }
   #studio.open { display: flex; }
   #studioHead { display: flex; align-items: center; gap: 8px; padding: 10px 14px;
-    border-bottom: 1px solid #26262e; flex-wrap: wrap; }
+    border-bottom: 1px solid var(--line); flex-wrap: wrap; }
   #studioHead .title { font-weight: 700; font-size: 15px; margin-right: auto; }
   #studioStage { flex: 1; min-height: 120px; display: flex; align-items: center; justify-content: center;
     padding: 14px; overflow: hidden;
-    background: repeating-conic-gradient(#1b1b22 0% 25%, #17171d 0% 50%) 0 0 / 22px 22px; }
+    background: repeating-conic-gradient(var(--stage-a) 0% 25%, var(--stage-b) 0% 50%) 0 0 / 22px 22px; }
   #studioCanvas { border-radius: 22px; overflow: hidden; position: relative;
     box-shadow: 0 12px 36px rgba(0,0,0,.55); flex-shrink: 0;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     text-align: center; user-select: none; -webkit-user-select: none; }
   #studioPanel { max-height: 46vh; overflow-y: auto; padding: 10px 14px 18px;
-    border-top: 1px solid #26262e; -webkit-overflow-scrolling: touch; }
+    border-top: 1px solid var(--line); -webkit-overflow-scrolling: touch; }
   #studioLayers { display: flex; gap: 6px; overflow-x: auto; padding: 6px 0;
     -webkit-overflow-scrolling: touch; }
   .layer-chip { flex-shrink: 0; display: flex; align-items: center; gap: 5px; font-size: 12px;
-    background: var(--card2); border: 1px solid #34343f; border-radius: 999px; padding: 5px 11px; cursor: pointer; }
+    background: var(--card2); border: 1px solid var(--border); border-radius: 999px; padding: 5px 11px; cursor: pointer; }
   .layer-chip.active { border-color: var(--accent); background: var(--accent); font-weight: 600; }
   .layer-chip img { width: 16px; height: 16px; border-radius: 4px; object-fit: cover; }
   #studioInspector { background: var(--card2); border-radius: 12px; padding: 12px; margin-top: 8px; }
@@ -120,7 +155,7 @@
     flex-direction: column; overscroll-behavior: contain; }
   #setupWizard.open { display: flex; }
   #wizardHead { display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 16px; border-bottom: 1px solid #26262e; }
+    padding: 14px 16px; border-bottom: 1px solid var(--line); }
   #wizardHead .title { font-weight: 700; font-size: 17px; }
   #wizardBody { flex: 1; overflow-y: auto; padding: 16px; -webkit-overflow-scrolling: touch; }
   .wiz-card { display: flex; gap: 14px; background: var(--card); border-radius: 16px;
@@ -130,9 +165,26 @@
     font-weight: 800; font-size: 15px; }
   .wiz-text { flex: 1; }
   .wiz-text p { font-size: 14px; color: var(--muted); margin: 6px 0 10px; line-height: 1.5; }
-  .wiz-action { display: inline-block; background: var(--accent); color: var(--text);
+  .wiz-action { display: inline-block; background: var(--accent); color: var(--accent-text);
     border: none; border-radius: 10px; padding: 11px 16px; font-size: 14px; font-weight: 600;
     text-decoration: none; cursor: pointer; }
+  #builderModal { position: fixed; inset: 0; z-index: 60; background: var(--bg); display: none;
+    flex-direction: column; overscroll-behavior: contain; }
+  #builderModal.open { display: flex; }
+  .modal-head { display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .modal-head .title { font-weight: 700; font-size: 17px; }
+  #builderBody { flex: 1; overflow-y: auto; padding: 18px 16px calc(24px + env(safe-area-inset-bottom));
+    -webkit-overflow-scrolling: touch; max-width: 560px; margin: 0 auto; width: 100%; }
+  .b-q h3 { font-size: 15px; margin: 14px 0 4px; }
+  .chips button.sel { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 700; }
+  #bPreviewWrap { display: flex; justify-content: center; margin-top: 16px; }
+  #iconGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+    gap: 14px; margin-top: 14px; }
+  .im-cell { text-align: center; }
+  .im-cell img { width: 100%; max-width: 96px; border-radius: 22%;
+    box-shadow: 0 4px 12px var(--shadow); display: block; margin: 0 auto; }
+  .im-cell .im-name { font-size: 11px; color: var(--muted); margin-top: 5px; }
   /* Mirrors the Scriptable layout: rows distributed space-evenly, column
      centered with fixed 10px gaps, 12px padding — so preview == widget. */
   .launch-flex { display: flex; flex-direction: column; justify-content: center;
@@ -165,7 +217,7 @@
   .lib-item button { font-size: 12px; padding: 6px 10px; }
   .app-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
   .app-tag { display: flex; align-items: center; gap: 6px; background: var(--card2);
-    border: 1px solid #34343f; border-radius: 999px; padding: 4px 10px; font-size: 13px; }
+    border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: 13px; }
   .app-tag button { border: none; background: none; padding: 0 2px; font-size: 13px; color: var(--muted); min-height: 0; }
   details { margin-top: 10px; }
   summary { cursor: pointer; font-size: 13px; color: var(--muted); }
@@ -183,14 +235,28 @@
 </head>
 <body>
 
-<header><h1>👑 WidgetKing</h1><span>Designer</span></header>
+<header>
+  <svg id="appLogo" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="10" y="16" width="28" height="28" rx="7" stroke="currentColor" stroke-width="2.6"/>
+    <path d="M15 12.5 V8.5 L21.5 11 L24 5.5 L26.5 11 L33 8.5 V12.5 Z" stroke="#F2B83B" stroke-width="2.4" stroke-linejoin="round" fill="none"/>
+  </svg>
+  <h1>WidgetKing</h1>
+  <div class="spacer"></div>
+  <button id="modeToggle" title="Light / dark">🌓</button>
+</header>
 
-<section id="templatesSection">
-  <h2><span class="step">1</span> Start with a template…</h2>
+<section id="builderSection" class="pane pane-create">
+  <h2>Not sure what you want?</h2>
+  <button class="primary" id="builderBtn" style="width:100%;font-size:16px;padding:15px">✨ Build it for me — 3 quick questions</button>
+</section>
+
+<section id="templatesSection" class="pane pane-create">
+  <h2>Start with a template…</h2>
+  <div class="chips" id="packChips"></div>
   <div class="tpl-row" id="templateRow"></div>
 </section>
 
-<section id="magicSection">
+<section id="magicSection" class="pane pane-create">
   <h2>…or ✨ describe it</h2>
   <p class="hint" id="magicHint"></p>
   <textarea id="magicInput" placeholder="A launcher with Spotify, Instagram and YouTube"></textarea>
@@ -256,8 +322,8 @@
   </div>
 </div>
 
-<section id="editorSection">
-  <h2><span class="step">2</span> Make it yours</h2>
+<section id="editorSection" class="pane pane-editor">
+  <h2>Make it yours</h2>
   <div class="editor-grid">
     <div id="canvasWrap">
       <div id="canvas"></div>
@@ -321,6 +387,15 @@
           </select>
         </div>
         <div class="row" style="margin-top:6px">
+          <span style="font-size:12px;color:var(--muted)">Look</span>
+          <select id="iconTheme" style="width:130px">
+            <option value="real">📱 Real icons</option>
+            <option value="pastel">🌸 Pastel</option>
+            <option value="line">▫️ Line</option>
+            <option value="noir">⬛ Noir</option>
+            <option value="zen">🍃 Zen</option>
+            <option value="neon">⚡ Neon</option>
+          </select>
           <span style="font-size:12px;color:var(--muted)">Per row</span>
           <select id="iconColumns" style="width:90px">
             <option value="0">Auto</option>
@@ -398,8 +473,8 @@
   </div>
 </section>
 
-<section>
-  <h2><span class="step">3</span> Save &amp; export</h2>
+<section id="librarySection" class="pane pane-widgets">
+  <h2>My Widgets</h2>
   <div id="library"></div>
   <div class="row" style="margin-top:12px">
     <button class="primary" id="copyScriptBtn">📋 Copy Scriptable Script</button>
@@ -412,8 +487,8 @@
   </div>
 </section>
 
-<section>
-  <h2><span class="step">4</span> Put it on your iPhone (no Mac needed)</h2>
+<section id="installSection" class="pane pane-install">
+  <h2>Put it on your iPhone (no Mac needed)</h2>
   <button class="primary" id="wizardBtn" style="width:100%;font-size:16px;padding:14px">🪄 Set up my iPhone — step by step</button>
   <p class="hint" style="margin-top:8px">💡 Make this designer feel like an app: in Safari tap <b>Share → Add to Home Screen</b> — you'll get a WidgetKing 👑 icon that opens full-screen.</p>
   <details>
@@ -429,6 +504,32 @@
   </ol>
   </details>
   <p class="hint">iOS refreshes Scriptable widgets on its own schedule (every few minutes), so clock and battery values are close but not live to-the-second. Everything runs on your devices — nothing is uploaded anywhere.</p>
+</section>
+
+<section id="iconMakerSection" class="pane pane-install">
+  <h2>🎨 App Icon Maker</h2>
+  <p class="hint">Restyle your <b>real Home Screen app icons</b> to match your widgets — the thing other apps charge for, free here. Pick a style, pick your apps, save the icons, and apply them with Shortcuts (guide below).</p>
+  <label style="font-size:12px;color:var(--muted)">Icon style</label>
+  <div class="chips" id="iconStyleChips"></div>
+  <label style="font-size:12px;color:var(--muted);margin-top:6px;display:block">Your apps (tap to add — search works for any App Store app)</label>
+  <div class="row">
+    <input type="text" id="iconAppSearch" placeholder="Type an app name… (e.g. Instagram)" style="flex:1">
+    <button id="iconAppAdd">＋ Add</button>
+  </div>
+  <div class="chips" id="iconAppChips"></div>
+  <div id="iconGrid"></div>
+  <p class="hint" id="iconSaveHint" style="display:none"><b>Long-press each icon → “Add to Photos”.</b> Then follow the guide:</p>
+  <details id="iconHowTo" style="display:none">
+    <summary>📖 How to put these on your Home Screen (one-time per app)</summary>
+    <ol style="margin-top:8px">
+      <li>Open the <b>Shortcuts</b> app → tap <b>+</b>.</li>
+      <li>Add the action <b>“Open App”</b> → tap the pale word <b>App</b> → pick the app (e.g. Instagram).</li>
+      <li>Tap the share icon at the bottom → <b>Add to Home Screen</b>.</li>
+      <li>Tap the small icon next to the name → <b>Choose Photo</b> → pick your new icon.</li>
+      <li>Name it (just “Instagram”) → <b>Add</b>. Done! Repeat per app.</li>
+      <li>Optional: hide the original icon (long-press → Remove from Home Screen — it stays in your App Library).</li>
+    </ol>
+  </details>
 </section>
 
 <div id="setupWizard">
@@ -485,6 +586,52 @@
     <p class="hint" style="text-align:center;padding:0 0 20px">Changed a design later? Just do steps 2–3 again (paste over the old script). Everything else stays put. 👑</p>
   </div>
 </div>
+
+<div id="builderModal">
+  <div id="wizardHeadB" class="modal-head">
+    <span class="title">✨ Let's build your widget</span>
+    <button id="builderCloseBtn">✕</button>
+  </div>
+  <div id="builderBody">
+    <div class="b-q" data-q="use">
+      <h3>What's it for?</h3>
+      <div class="chips b-chips" id="bUse"></div>
+    </div>
+    <div class="b-q" data-q="vibe">
+      <h3>Pick a vibe</h3>
+      <div class="chips b-chips" id="bVibe"></div>
+    </div>
+    <div class="b-q" data-q="size">
+      <h3>Widget size?</h3>
+      <div class="chips b-chips" id="bSize"></div>
+    </div>
+    <div class="b-q" data-q="bg">
+      <h3>Background?</h3>
+      <div class="chips b-chips" id="bBg"></div>
+    </div>
+    <div id="bExtra" style="display:none">
+      <h3 id="bExtraTitle"></h3>
+      <input type="text" id="bExtraText" placeholder="What are we counting down to?" style="margin-bottom:8px">
+      <input type="date" id="bExtraDate">
+    </div>
+    <button class="primary" id="bGo" style="width:100%;font-size:16px;padding:15px;margin-top:14px" disabled>🎁 Show me my widget</button>
+    <div id="bResult" style="display:none">
+      <div id="bPreviewWrap"></div>
+      <div class="row" style="margin-top:14px;justify-content:center">
+        <button id="bAgain">🎲 Show me another</button>
+        <button class="primary" id="bKeep">💜 Perfect — let me tweak it</button>
+      </div>
+      <button id="bAI" style="width:100%;margin-top:10px;display:none">✨ Ask Claude for an even fancier one</button>
+    </div>
+  </div>
+</div>
+
+<nav id="tabbar">
+  <button data-tab="create" class="active"><span class="tab-ico">✨</span>Create</button>
+  <button data-tab="editor"><span class="tab-ico">🎨</span>Editor</button>
+  <button data-tab="widgets"><span class="tab-ico">👑</span>My Widgets</button>
+  <button data-tab="install"><span class="tab-ico">🚀</span>Install</button>
+</nav>
 
 <div id="toast"></div>
 
@@ -1040,15 +1187,21 @@ async function addFreestyleApps(w, design, family) {
       cell.layoutVertically();
       if (el.url) cell.url = el.url;
       const iconStack = cell.addStack();
+      const elTheme = el.iconTheme && ICON_THEMES[el.iconTheme] ? el.iconTheme : "real";
       let realIcon = null;
-      if (el.iconUrl) realIcon = await loadIcon(el.iconUrl);
-      if (realIcon) {
-        const img = iconStack.addImage(realIcon);
-        img.imageSize = new Size(pt, pt);
-        img.cornerRadius = el.shape === "circle" ? pt / 2 : Math.round(pt * 0.24);
+      if (elTheme !== "real") {
+        const tile = iconStack.addImage(themedIconTile(el, elTheme, apps.indexOf(el), pt));
+        tile.imageSize = new Size(pt, pt);
       } else {
-        const t = iconStack.addText(el.emoji || "📲");
-        t.font = Font.systemFont(Math.round(pt * 0.9));
+        if (el.iconUrl) realIcon = await loadIcon(el.iconUrl);
+        if (realIcon) {
+          const img = iconStack.addImage(realIcon);
+          img.imageSize = new Size(pt, pt);
+          img.cornerRadius = el.shape === "circle" ? pt / 2 : Math.round(pt * 0.24);
+        } else {
+          const t = iconStack.addText(el.emoji || "📲");
+          t.font = Font.systemFont(Math.round(pt * 0.9));
+        }
       }
       if (el.showLabel) {
         const labelStack = cell.addStack();
@@ -1072,6 +1225,52 @@ function hashString(s) {
   let h = 5381;
   for (let i = 0; i < s.length; i++) { h = ((h << 5) + h + s.charCodeAt(i)) >>> 0; }
   return h.toString(36);
+}
+// Themed launcher icon tiles, drawn locally (no network): colored rounded
+// square + the app's emoji or first letter. Must match ICON_THEMES in the
+// designer so the preview and the widget agree.
+const ICON_THEMES = {
+  pastel: { colors: ["#FADCE4", "#DCEBFA", "#E8DFF5", "#FDEFD8", "#DFF5E8"], glyph: "#6B5B7A", line: false },
+  line:   { colors: ["#FBFAF7"], glyph: "#33303B", line: true },
+  noir:   { colors: ["#111116"], glyph: "#F2F2F5", line: false },
+  zen:    { colors: ["#DDE5D6", "#E9E4D8", "#CDD9CE"], glyph: "#4A5A4E", line: false },
+  neon:   { colors: ["#14002E"], glyph: "#00F0FF", line: false, glyphCycle: ["#FF2079", "#00F0FF", "#39FF14", "#FFD300"] }
+};
+function iconGlyph(app) {
+  if (app.emoji && app.emoji !== "📱" && app.emoji !== "🌐" && app.emoji !== "📲") return app.emoji;
+  return (app.label || "A").trim().charAt(0).toUpperCase();
+}
+function themedIconTile(app, themeName, index, pt) {
+  const theme = ICON_THEMES[themeName];
+  const S = Math.round(pt * 3);
+  const ctx = new DrawContext();
+  ctx.size = new Size(S, S);
+  ctx.opaque = false;
+  ctx.respectScreenScale = false;
+  const r = Math.round(S * 0.24);
+  const rect = new Rect(0, 0, S, S);
+  const bg = theme.colors[index % theme.colors.length];
+  const path = new Path();
+  path.addRoundedRect(rect, r, r);
+  ctx.addPath(path);
+  ctx.setFillColor(new Color(bg));
+  ctx.fillPath();
+  if (theme.line) {
+    const inset = Math.max(2, Math.round(S * 0.035));
+    const inner = new Path();
+    inner.addRoundedRect(new Rect(inset, inset, S - 2 * inset, S - 2 * inset), r - inset, r - inset);
+    ctx.addPath(inner);
+    ctx.setStrokeColor(new Color(theme.glyph));
+    ctx.setLineWidth(Math.max(2, Math.round(S * 0.03)));
+    ctx.strokePath();
+  }
+  const glyph = iconGlyph(app);
+  const glyphColor = theme.glyphCycle ? theme.glyphCycle[index % theme.glyphCycle.length] : theme.glyph;
+  ctx.setTextColor(new Color(glyphColor));
+  ctx.setFont(Font.boldSystemFont(Math.round(S * 0.42)));
+  ctx.setTextAlignedCenter();
+  ctx.drawTextInRect(glyph, new Rect(0, S * 0.22, S, S * 0.62));
+  return ctx.getImage();
 }
 async function loadIcon(url) {
   try {
@@ -1133,16 +1332,22 @@ async function buildLauncher(w, design, family, tc, style) {
       cell.centerAlignContent();
       cell.size = new Size(iconPt, cellH);
       if (app.url) cell.url = app.url;
+      const iconTheme = ls.iconTheme && ICON_THEMES[ls.iconTheme] ? ls.iconTheme : "real";
       let realIcon = null;
-      if (app.iconUrl) realIcon = await loadIcon(app.iconUrl);
-      if (realIcon) {
-        const img = cell.addImage(realIcon);
-        img.imageSize = new Size(iconPt, iconPt);
-        img.cornerRadius = radius;
+      if (iconTheme !== "real") {
+        const tile = cell.addImage(themedIconTile(app, iconTheme, i + j, iconPt));
+        tile.imageSize = new Size(iconPt, iconPt);
       } else {
-        const icon = cell.addText(app.emoji || "🌐");
-        icon.font = Font.systemFont(Math.round(iconPt * 0.9));
-        icon.centerAlignText();
+        if (app.iconUrl) realIcon = await loadIcon(app.iconUrl);
+        if (realIcon) {
+          const img = cell.addImage(realIcon);
+          img.imageSize = new Size(iconPt, iconPt);
+          img.cornerRadius = radius;
+        } else {
+          const icon = cell.addText(app.emoji || "🌐");
+          icon.font = Font.systemFont(Math.round(iconPt * 0.9));
+          icon.centerAlignText();
+        }
       }
       if (showLabels) {
         cell.addSpacer(3);
@@ -1403,6 +1608,29 @@ const GLYPHS = ["★","☆","♥","♡","●","○","◆","◇","■","□","▲
   "☀","☾","☁","☂","❆","⚡","♪","♫","☕","✈","⚑","⌂","✉","☏","⚙","☮","☯","♻",
   "✓","✕","✚","→","←","↑","↓","⇄","∞","§","❝","❞"];
 const EMOJI_PICKS = ["⭐","❤️","⚡","🌙","☀️","☁️","🍃","🔥","✨","🎵","🐾","👑"];
+// Themed launcher-icon styles — must match ICON_THEMES in the Scriptable
+// template so preview and widget agree.
+const ICON_THEMES = {
+  pastel: { name: "🌸 Pastel", colors: ["#FADCE4", "#DCEBFA", "#E8DFF5", "#FDEFD8", "#DFF5E8"], glyph: "#6B5B7A", line: false },
+  line:   { name: "▫️ Line", colors: ["#FBFAF7"], glyph: "#33303B", line: true },
+  noir:   { name: "⬛ Noir", colors: ["#111116"], glyph: "#F2F2F5", line: false },
+  zen:    { name: "🍃 Zen", colors: ["#DDE5D6", "#E9E4D8", "#CDD9CE"], glyph: "#4A5A4E", line: false },
+  neon:   { name: "⚡ Neon", colors: ["#14002E"], glyph: "#00F0FF", line: false, glyphCycle: ["#FF2079", "#00F0FF", "#39FF14", "#FFD300"] }
+};
+function iconGlyph(app) {
+  if (app.emoji && app.emoji !== "📱" && app.emoji !== "🌐" && app.emoji !== "📲") return app.emoji;
+  return (app.label || "A").trim().charAt(0).toUpperCase();
+}
+// HTML tile for a themed launcher icon (mirrors themedIconTile in the template).
+function themedIconCss(themeName, index, sizePx) {
+  const theme = ICON_THEMES[themeName];
+  const bg = theme.colors[index % theme.colors.length];
+  const glyphColor = theme.glyphCycle ? theme.glyphCycle[index % theme.glyphCycle.length] : theme.glyph;
+  return "width:" + sizePx + "px;height:" + sizePx + "px;border-radius:24%;background:" + bg +
+    ";display:flex;align-items:center;justify-content:center;font-weight:700;color:" + glyphColor +
+    ";font-size:" + Math.round(sizePx * 0.44) + "px" +
+    (theme.line ? ";box-shadow:inset 0 0 0 " + Math.max(1, Math.round(sizePx * 0.045)) + "px " + theme.glyph : "");
+}
 const SYMBOL_EMOJI = {
   "star.fill": "⭐", "heart.fill": "❤️", "bolt.fill": "⚡",
   "moon.stars.fill": "🌙", "sun.max.fill": "☀️", "cloud.fill": "☁️",
@@ -1510,7 +1738,8 @@ function launcherStyleOf(design) {
     iconSize: Math.min(Math.max(Number(style.iconSize) || 30, 16), 120),
     shape: style.shape === "circle" ? "circle" : "rounded",
     labels: style.labels !== false,
-    columns: Math.min(Math.max(Math.round(Number(style.columns) || 0), 0), 6)
+    columns: Math.min(Math.max(Math.round(Number(style.columns) || 0), 0), 6),
+    iconTheme: ICON_THEMES[style.iconTheme] ? style.iconTheme : "real"
   };
 }
 function themeOf(design) {
@@ -1598,6 +1827,7 @@ function normalizeDesign(design) {
         const scheme = schemeForName(el.label);
         if (scheme) el.url = scheme;
       }
+      if (el.iconTheme != null && !ICON_THEMES[el.iconTheme]) delete el.iconTheme;
     }
     if (el.font != null && !FONT_CSS[el.font]) delete el.font;
     if (el.kind === "text") {
@@ -2207,12 +2437,20 @@ function designPreviewHTML(design, sizeKey) {
     let grid = '<div class="launch-flex">';
     for (let i = 0; i < list.length; i += perRow) {
       grid += '<div class="launch-row">';
+      let j = i;
       for (const app of list.slice(i, i + perRow)) {
-        const inner = app.iconUrl
-          ? '<img src="' + esc(app.iconUrl) + '" alt="">'
-          : esc(app.emoji || "🌐");
-        grid += '<div class="launch-cell" style="width:' + style.iconSize + 'px"><div class="launch-icon" style="' + iconCss + '">' + inner + '</div>' +
+        let cellIcon;
+        if (style.iconTheme !== "real") {
+          cellIcon = '<div style="' + themedIconCss(style.iconTheme, j, style.iconSize) + '">' + esc(iconGlyph(app)) + '</div>';
+        } else {
+          const inner = app.iconUrl
+            ? '<img src="' + esc(app.iconUrl) + '" alt="">'
+            : esc(app.emoji || "🌐");
+          cellIcon = '<div class="launch-icon" style="' + iconCss + '">' + inner + '</div>';
+        }
+        grid += '<div class="launch-cell" style="width:' + style.iconSize + 'px">' + cellIcon +
                 (style.labels ? '<div class="launch-label">' + esc(app.label || "App") + '</div>' : '') + '</div>';
+        j++;
       }
       grid += '</div>';
     }
@@ -2280,17 +2518,23 @@ function renderFreestyleInto(node, design, w, h, interactive) {
     } else if (el.kind === "app") {
       const pt = (el.size || 40) * scale;
       const iconBox = document.createElement("div");
-      iconBox.style.cssText = "width:" + pt + "px;height:" + pt + "px;overflow:hidden;margin:0 auto;" +
-        "border-radius:" + (el.shape === "circle" ? "50%" : Math.round(pt * 0.24) + "px") + ";" +
-        "display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.15);" +
-        "font-size:" + Math.round(pt * 0.6) + "px";
-      if (el.iconUrl) {
-        const img = document.createElement("img");
-        img.src = el.iconUrl;
-        img.style.cssText = "width:100%;height:100%;object-fit:cover;pointer-events:none;display:block";
-        iconBox.appendChild(img);
+      if (el.iconTheme && ICON_THEMES[el.iconTheme]) {
+        const idx = design.canvasElements.filter(function (e) { return e.kind === "app"; }).indexOf(el);
+        iconBox.style.cssText = themedIconCss(el.iconTheme, Math.max(0, idx), pt) + ";margin:0 auto;pointer-events:none";
+        iconBox.textContent = iconGlyph(el);
       } else {
-        iconBox.textContent = el.emoji || "📲";
+        iconBox.style.cssText = "width:" + pt + "px;height:" + pt + "px;overflow:hidden;margin:0 auto;" +
+          "border-radius:" + (el.shape === "circle" ? "50%" : Math.round(pt * 0.24) + "px") + ";" +
+          "display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.15);" +
+          "font-size:" + Math.round(pt * 0.6) + "px";
+        if (el.iconUrl) {
+          const img = document.createElement("img");
+          img.src = el.iconUrl;
+          img.style.cssText = "width:100%;height:100%;object-fit:cover;pointer-events:none;display:block";
+          iconBox.appendChild(img);
+        } else {
+          iconBox.textContent = el.emoji || "📲";
+        }
       }
       div.appendChild(iconBox);
       if (el.showLabel) {
@@ -2773,7 +3017,21 @@ function buildInspectorContent(inspector) {
     labelCheck.checked = el.showLabel === true;
     labelCheck.onchange = function () { el.showLabel = labelCheck.checked; refreshCanvases(); };
     labelToggle.append(labelCheck, document.createTextNode("Label"));
-    optRow.append(shapeSelect, labelToggle);
+    const themeSel = document.createElement("select");
+    const realOpt = document.createElement("option");
+    realOpt.value = "real"; realOpt.textContent = "📱 Real icon";
+    themeSel.appendChild(realOpt);
+    for (const id of Object.keys(ICON_THEMES)) {
+      const option = document.createElement("option");
+      option.value = id; option.textContent = ICON_THEMES[id].name;
+      themeSel.appendChild(option);
+    }
+    themeSel.value = el.iconTheme && ICON_THEMES[el.iconTheme] ? el.iconTheme : "real";
+    themeSel.onchange = function () {
+      if (themeSel.value === "real") { delete el.iconTheme; } else { el.iconTheme = themeSel.value; }
+      refreshCanvases();
+    };
+    optRow.append(shapeSelect, labelToggle, themeSel);
     inspector.appendChild(optRow);
     const tapHint = document.createElement("p");
     tapHint.className = "hint";
@@ -2950,6 +3208,10 @@ function buildInspectorContent(inspector) {
       inspector.appendChild(rotHint);
     } else {
       inspector.appendChild(rotRow);
+      const gifHint = document.createElement("p");
+      gifHint.className = "hint";
+      gifHint.textContent = "GIFs can't animate on iOS widgets (Apple limit for every app) — add up to 5 photos and shuffle instead.";
+      inspector.appendChild(gifHint);
     }
   } else if (el.kind === "app") {
     sliderRow("Size", 16, 96, el.size, function (v) { el.size = v; });
@@ -3247,6 +3509,7 @@ function renderLauncherUI() {
   document.getElementById("iconShape").value = style.shape;
   document.getElementById("showLabels").checked = style.labels;
   document.getElementById("iconColumns").value = String(style.columns);
+  document.getElementById("iconTheme").value = style.iconTheme || "real";
 
   const shortcutApps = (current.apps || []).filter(function (app) {
     return (app.url || "").indexOf("shortcuts://run-shortcut") === 0;
@@ -3332,6 +3595,11 @@ function setupLauncherControls() {
     current.launcherStyle.columns = Number(e.target.value);
     renderPreview();
   };
+  document.getElementById("iconTheme").onchange = function (e) {
+    current.launcherStyle = launcherStyleOf(current);
+    current.launcherStyle.iconTheme = e.target.value;
+    renderPreview();
+  };
   document.getElementById("iconShape").onchange = function (e) {
     current.launcherStyle = launcherStyleOf(current);
     current.launcherStyle.shape = e.target.value;
@@ -3381,30 +3649,73 @@ function setupLauncherControls() {
 // ==================== Templates ====================
 function buildTemplates() {
   return [
-    { category: "Live", design: { name: "Weather Glass", kind: "freestyle", background: "glass", glassTint: "dark", themeID: "navy", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
+    { category: "Live", pack: "Live", design: { name: "Weather Glass", kind: "freestyle", background: "glass", glassTint: "dark", themeID: "navy", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
       { kind: "weather", x: 0.5, y: 0.4, size: 30, colorHex: "#FFFFFF", opacity: 1, unit: "f" },
       { kind: "date", x: 0.5, y: 0.63, size: 12, colorHex: "#FFFFFF", opacity: 0.85 }
     ] } },
-    { category: "Live", design: { name: "Morning Brief", kind: "freestyle", themeID: "navy", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
+    { category: "Live", pack: "Live", design: { name: "Morning Brief", kind: "freestyle", themeID: "navy", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
       { kind: "weather", x: 0.5, y: 0.22, size: 24, colorHex: "#FFFFFF", opacity: 1, unit: "f" },
       { kind: "calendar", x: 0.5, y: 0.5, size: 11, colorHex: "#D7E3F4", opacity: 0.95 },
       { kind: "progress", source: "day", x: 0.5, y: 0.74, size: 7, w: 0.66, colorHex: "#8FD3FE", opacity: 1 },
       { kind: "text", text: "today", x: 0.5, y: 0.87, size: 9, colorHex: "#FFFFFF", opacity: 0.6, w: 0, align: "center", bold: false }
     ] } },
-    { category: "Live", design: { name: "Year Progress", kind: "freestyle", themeID: "cosmos", fontStyle: "mono", textColorHex: "#FFFFFF", canvasElements: [
+    { category: "Live", pack: "Live", design: { name: "Year Progress", kind: "freestyle", themeID: "cosmos", fontStyle: "mono", textColorHex: "#FFFFFF", canvasElements: [
       { kind: "text", text: "2026", x: 0.5, y: 0.32, size: 30, colorHex: "#FFFFFF", opacity: 1, w: 0, align: "center", bold: true },
       { kind: "progress", source: "year", x: 0.5, y: 0.58, size: 9, w: 0.72, colorHex: "#C7A6FF", opacity: 1 },
       { kind: "text", text: "loading…", x: 0.5, y: 0.75, size: 10, colorHex: "#B9A8D8", opacity: 0.85, w: 0, align: "center", bold: false }
     ] } },
-    { category: "Photos", design: { name: "Polaroid", kind: "freestyle", themeID: "paper", fontStyle: "noteworthy", textColorHex: "#333333", canvasElements: [
+    { category: "Photos", pack: "Cute", design: { name: "Polaroid", kind: "freestyle", themeID: "paper", fontStyle: "noteworthy", textColorHex: "#333333", canvasElements: [
       { kind: "shape", shape: "rect", w: 0.74, h: 0.8, x: 0.5, y: 0.5, size: 0, colorHex: "#FFFFFF", opacity: 1 },
       { kind: "photo", x: 0.5, y: 0.43, w: 0.62, shape: "rect", size: 18, opacity: 1, aspect: 1 },
       { kind: "text", text: "our story 🤍", x: 0.5, y: 0.78, size: 12, colorHex: "#4A4A4A", opacity: 1, w: 0, align: "center", bold: true }
     ] } },
-    { category: "Quotes", design: { name: "Daily Quote", kind: "quote", themeID: "lavender", fontStyle: "script", textColorHex: "#FFFFFF", primaryText: "Dream big\nOne day at a time\nChoose joy\nMake it count" } },
-    { category: "Clocks", design: { name: "Rose Clock", kind: "clock", themeID: "rosegold", fontStyle: "didot", textColorHex: "#FFF6F2" } },
-    { category: "Dates", design: { name: "Sage Days", kind: "date", themeID: "sage", fontStyle: "serif", textColorHex: "#F3F8F2" } },
-    { category: "Live", design: { name: "Cozy Battery", kind: "battery", themeID: "mocha", fontStyle: "rounded", textColorHex: "#F5EBE0" } },
+    { category: "Quotes", pack: "Zen", design: { name: "Daily Quote", kind: "quote", themeID: "lavender", fontStyle: "script", textColorHex: "#FFFFFF", primaryText: "Dream big\nOne day at a time\nChoose joy\nMake it count" } },
+    { category: "Clocks", pack: "Cute", design: { name: "Rose Clock", kind: "clock", themeID: "rosegold", fontStyle: "didot", textColorHex: "#FFF6F2" } },
+    { category: "Dates", pack: "Zen", design: { name: "Sage Days", kind: "date", themeID: "sage", fontStyle: "serif", textColorHex: "#F3F8F2" } },
+    { category: "Live", pack: "Live", design: { name: "Cozy Battery", kind: "battery", themeID: "mocha", fontStyle: "rounded", textColorHex: "#F5EBE0" } },
+    { category: "Sports", pack: "Sports", design: { name: "Game Day", kind: "freestyle", themeID: "lava", fontStyle: "futura", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "text", text: "GAME DAY", x: 0.5, y: 0.22, size: 15, colorHex: "#FFD75E", opacity: 1, w: 0, align: "center", bold: true },
+      { kind: "countdown", x: 0.5, y: 0.5, size: 42, colorHex: "#FFFFFF", opacity: 1, dateISO: "" },
+      { kind: "text", text: "days to kickoff", x: 0.5, y: 0.72, size: 10, colorHex: "#FFFFFF", opacity: 0.75, w: 0, align: "center", bold: false },
+      { kind: "emoji", text: "🏈", x: 0.85, y: 0.14, size: 17, colorHex: "#FFFFFF", opacity: 1 }
+    ] } },
+    { category: "Sports", pack: "Sports", design: { name: "Score Check", kind: "launcher", themeID: "navy", fontStyle: "futura", textColorHex: "#FFFFFF", launcherStyle: { iconSize: 40, shape: "rounded", labels: true, columns: 0, iconTheme: "noir" }, apps: [
+      { emoji: "🏈", label: "ESPN", url: "sportscenter://" },
+      { emoji: "📺", label: "YouTube", url: "youtube://" },
+      { emoji: "🎮", label: "Twitch", url: "twitch://" },
+      { emoji: "👽", label: "Reddit", url: "reddit://" }
+    ] } },
+    { category: "Sports", pack: "Sports", design: { name: "Stadium Clock", kind: "clock", themeID: "custom", customColors: ["#0B4D2C", "#062B18"], fontStyle: "mono", textColorHex: "#E8F5E9" } },
+    { category: "Work", pack: "Work", design: { name: "Focus Brief", kind: "freestyle", themeID: "navy", fontStyle: "avenir", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "text", text: "DEEP WORK", x: 0.5, y: 0.2, size: 12, colorHex: "#8FD3FE", opacity: 0.9, w: 0, align: "center", bold: true },
+      { kind: "calendar", x: 0.5, y: 0.46, size: 12, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "progress", source: "day", x: 0.5, y: 0.7, size: 7, w: 0.68, colorHex: "#8FD3FE", opacity: 1 }
+    ] } },
+    { category: "Work", pack: "Work", design: { name: "Work Launcher", kind: "launcher", themeID: "mist", fontStyle: "avenir", textColorHex: "#FFFFFF", launcherStyle: { iconSize: 38, shape: "rounded", labels: true, columns: 0, iconTheme: "line" }, apps: [
+      { emoji: "💬", label: "Slack", url: "slack://" },
+      { emoji: "🎥", label: "Zoom", url: "zoomus://" },
+      { emoji: "📮", label: "Gmail", url: "googlegmail://" },
+      { emoji: "🗓", label: "Calendar", url: "calshow://" }
+    ] } },
+    { category: "Work", pack: "Work", design: { name: "Deadline", kind: "countdown", themeID: "cosmos", fontStyle: "serif", textColorHex: "#FFFFFF", primaryText: "Big deadline" } },
+    { category: "Zen", pack: "Zen", design: { name: "Breathe", kind: "freestyle", themeID: "sage", fontStyle: "script", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "shape", shape: "circle", w: 0.62, x: 0.5, y: 0.46, size: 0, colorHex: "#FFFFFF", opacity: 0.14 },
+      { kind: "text", text: "breathe", x: 0.5, y: 0.46, size: 22, colorHex: "#FFFFFF", opacity: 1, w: 0, align: "center", bold: true },
+      { kind: "progress", source: "day", x: 0.5, y: 0.82, size: 4, w: 0.5, colorHex: "#EAF3E7", opacity: 0.8 }
+    ] } },
+    { category: "Zen", pack: "Zen", design: { name: "Zen Quote", kind: "quote", themeID: "sage", fontStyle: "noteworthy", textColorHex: "#F3F8F2", primaryText: "Inhale calm\nExhale worry\nBe here now\nLet it be easy" } },
+    { category: "Zen", pack: "Zen", design: { name: "Still Water", kind: "clock", themeID: "mist", fontStyle: "optima", textColorHex: "#EAF0F5" } },
+    { category: "Cute", pack: "Cute", design: { name: "Love Count", kind: "freestyle", themeID: "blush", fontStyle: "chalkboard", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "emoji", text: "💕", x: 0.5, y: 0.18, size: 22, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "countdown", x: 0.5, y: 0.47, size: 40, colorHex: "#FFFFFF", opacity: 1, dateISO: "" },
+      { kind: "text", text: "days till date night", x: 0.5, y: 0.7, size: 10, colorHex: "#FFE3EC", opacity: 0.95, w: 0, align: "center", bold: false }
+    ] } },
+    { category: "Cute", pack: "Cute", design: { name: "Pastel Clock", kind: "clock", themeID: "lavender", fontStyle: "chalkboard", textColorHex: "#FFF9FE" } },
+    { category: "Cute", pack: "Cute", design: { name: "Bestie Photo", kind: "freestyle", themeID: "lavender", fontStyle: "noteworthy", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "photo", x: 0.5, y: 0.42, w: 0.52, shape: "circle", size: 18, opacity: 1, aspect: 1 },
+      { kind: "emoji", text: "✨", x: 0.82, y: 0.18, size: 15, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "text", text: "us 💜", x: 0.5, y: 0.78, size: 13, colorHex: "#FFFFFF", opacity: 1, w: 0, align: "center", bold: true }
+    ] } },
     { category: "Clocks", design: { name: "Midnight Moon", kind: "freestyle", themeID: "midnight", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
       { kind: "shape", shape: "pill", w: 0.84, h: 0.44, x: 0.5, y: 0.5, size: 0, colorHex: "#FFFFFF", opacity: 0.15 },
       { kind: "clock", x: 0.5, y: 0.45, size: 32, colorHex: "#FFFFFF", opacity: 1 },
@@ -3412,13 +3723,13 @@ function buildTemplates() {
       { kind: "emoji", text: "🌙", x: 0.83, y: 0.15, size: 20, colorHex: "#FFFFFF", opacity: 1 },
       { kind: "emoji", text: "✨", x: 0.16, y: 0.19, size: 13, colorHex: "#FFFFFF", opacity: 1 }
     ] } },
-    { category: "Clocks", design: { name: "Paper Minimal", kind: "clock", themeID: "paper", fontStyle: "classic", textColorHex: "#333333" } },
-    { category: "Clocks", design: { name: "Frosted Clock", kind: "clock", background: "glass", glassTint: "dark", fontStyle: "rounded", textColorHex: "#FFFFFF" } },
+    { category: "Clocks", pack: "Minimal", design: { name: "Paper Minimal", kind: "clock", themeID: "paper", fontStyle: "classic", textColorHex: "#333333" } },
+    { category: "Clocks", pack: "Minimal", design: { name: "Frosted Clock", kind: "clock", background: "glass", glassTint: "dark", fontStyle: "rounded", textColorHex: "#FFFFFF" } },
     { category: "Launchers", design: { name: "Ghost Launcher", kind: "launcher", background: "clear", fontStyle: "rounded", textColorHex: "#FFFFFF", launcherStyle: { iconSize: 32, shape: "rounded", labels: false }, apps: [
       Object.assign({}, APP_PRESETS.phone), Object.assign({}, APP_PRESETS.messages),
       Object.assign({}, APP_PRESETS.instagram), Object.assign({}, APP_PRESETS.spotify)
     ] } },
-    { category: "Clocks", design: { name: "Neon Time", kind: "freestyle", themeID: "custom", customColors: ["#0F0C29", "#F72585"], gradientDir: "vertical", fontStyle: "mono", textColorHex: "#FFFFFF", canvasElements: [
+    { category: "Clocks", pack: "Neon", design: { name: "Neon Time", kind: "freestyle", themeID: "custom", customColors: ["#0F0C29", "#F72585"], gradientDir: "vertical", fontStyle: "mono", textColorHex: "#FFFFFF", canvasElements: [
       { kind: "clock", x: 0.5, y: 0.44, size: 34, colorHex: "#FFFFFF", opacity: 1 },
       { kind: "text", text: "N E O N", x: 0.5, y: 0.63, size: 10, colorHex: "#FF8FAB", opacity: 1 },
       { kind: "emoji", text: "⚡", x: 0.85, y: 0.14, size: 17, colorHex: "#FFFFFF", opacity: 1 }
@@ -3461,10 +3772,24 @@ function buildTemplates() {
     ] } }
   ];
 }
+let activePack = "all";
+const PACK_CHIPS = [["all", "✨ All"], ["Cute", "🌸 Cute"], ["Minimal", "▫️ Minimal"],
+  ["Zen", "🍃 Zen"], ["Sports", "🏈 Sports"], ["Work", "💼 Work"],
+  ["Neon", "⚡ Neon"], ["Live", "🌤 Live"]];
 function renderTemplates() {
+  const chipRow = document.getElementById("packChips");
+  chipRow.innerHTML = "";
+  for (const pair of PACK_CHIPS) {
+    const chip = document.createElement("button");
+    chip.textContent = pair[1];
+    chip.className = activePack === pair[0] ? "sel" : "";
+    chip.onclick = function () { activePack = pair[0]; renderTemplates(); };
+    chipRow.appendChild(chip);
+  }
   const row = document.getElementById("templateRow");
   row.innerHTML = "";
   for (const template of buildTemplates()) {
+    if (activePack !== "all" && template.pack !== activePack) continue;
     const card = document.createElement("div");
     card.className = "tpl-card";
     const design = normalizeDesign(JSON.parse(JSON.stringify(template.design)));
@@ -3480,7 +3805,7 @@ function renderTemplates() {
       const copy = normalizeDesign(JSON.parse(JSON.stringify(template.design)));
       copy.id = uid();
       loadIntoEditor(copy);
-      document.getElementById("editorSection").scrollIntoView({ behavior: "smooth" });
+      switchTab("editor");
       popCanvas();
       toast("Template loaded — make it yours ✨");
     };
@@ -3641,7 +3966,7 @@ function renderLibrary() {
     editButton.textContent = "Edit";
     editButton.onclick = function () {
       loadIntoEditor(design);
-      document.getElementById("editorSection").scrollIntoView({ behavior: "smooth" });
+      switchTab("editor");
       popCanvas();
     };
     const dupButton = document.createElement("button");
@@ -3831,7 +4156,7 @@ document.getElementById("magicBtn").onclick = async function () {
     toast("Built! Tweak it below, then Save.");
   }
   loadIntoEditor(design);
-  document.getElementById("editorSection").scrollIntoView({ behavior: "smooth" });
+  switchTab("editor");
   popCanvas();
   if (current.kind === "launcher" && current.apps.some(function (a) { return !a.iconUrl; })) {
     toast("Fetching real app icons…");
@@ -4187,7 +4512,7 @@ async function receiveSharedDesign() {
     loadIntoEditor(design);
     history.replaceState(null, "", location.pathname + location.search);
     toast("🎁 Shared design “" + design.name + "” added to My Widgets!");
-    document.getElementById("editorSection").scrollIntoView({ behavior: "smooth" });
+    switchTab("editor");
   } catch (e) {
     toast("That share link couldn't be read");
   }
@@ -4197,6 +4522,320 @@ async function receiveSharedDesign() {
 setInterval(function () {
   if (current.kind === "clock" || current.kind === "freestyle") renderPreview();
 }, 30000);
+
+// ==================== App shell: tabs + appearance ====================
+function switchTab(name) {
+  if (!["create", "editor", "widgets", "install"].includes(name)) name = "create";
+  localStorage.setItem("widgetking.tab", name);
+  document.querySelectorAll(".pane").forEach(function (pane) {
+    pane.classList.toggle("active", pane.classList.contains("pane-" + name));
+  });
+  document.querySelectorAll("#tabbar button").forEach(function (b) {
+    b.classList.toggle("active", b.dataset.tab === name);
+  });
+  window.scrollTo({ top: 0 });
+}
+document.querySelectorAll("#tabbar button").forEach(function (b) {
+  b.onclick = function () { switchTab(b.dataset.tab); };
+});
+
+function applyAppearance(mode) {
+  document.body.classList.toggle("light", mode === "light");
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = mode === "light" ? "#f5f1ec" : "#131318";
+}
+let appearance = localStorage.getItem("widgetking.appearance");
+if (!appearance) {
+  appearance = (window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches) ? "light" : "dark";
+}
+applyAppearance(appearance);
+document.getElementById("modeToggle").onclick = function () {
+  appearance = appearance === "light" ? "dark" : "light";
+  localStorage.setItem("widgetking.appearance", appearance);
+  applyAppearance(appearance);
+  toast(appearance === "light" ? "☀️ Light and lovely" : "🌙 Back to dark");
+};
+
+// ==================== Guided builder ====================
+const B_USES = [["time", "🕐 Tell time"], ["photos", "🖼 Show my photos"], ["apps", "🚀 Launch my apps"],
+  ["countdown", "⏳ Count down to something"], ["quote", "💬 Motivate me"],
+  ["day", "🌤 My day at a glance"], ["surprise", "🎲 Surprise me"]];
+const B_VIBES = [["cute", "🌸 Cute"], ["minimal", "▫️ Minimal"], ["zen", "🍃 Zen"],
+  ["sports", "🏈 Sports"], ["work", "💼 Work"], ["neon", "⚡ Neon"], ["any", "🎲 Any vibe"]];
+const B_SIZES = [["small", "◻️ Small"], ["medium", "▭ Medium"], ["large", "⬜ Large"]];
+const B_BGS = [["gradient", "🎨 Colors"], ["glass", "🧊 Frosted glass"], ["clear", "🫥 Invisible"], ["any", "🎲 Dealer's choice"]];
+const VIBE_THEMES = {
+  cute: ["rosegold", "blush", "lavender", "candy"], minimal: ["midnight", "mist", "paper", "navy"],
+  zen: ["sage", "mist", "forest", "paper"], sports: ["lava", "navy", "forest", "royal"],
+  work: ["navy", "mist", "midnight", "cosmos"], neon: ["cosmos", "berry", "candy", "ocean"]
+};
+const VIBE_FONTS = {
+  cute: ["rounded", "chalkboard", "noteworthy", "script"], minimal: ["classic", "avenir", "optima", "mono"],
+  zen: ["optima", "serif", "noteworthy", "palatino"], sports: ["futura", "mono", "classic", "typewriter"],
+  work: ["avenir", "classic", "optima", "serif"], neon: ["mono", "futura", "rounded", "didot"]
+};
+const VIBE_QUOTES = {
+  cute: "You've got this 💕\nBe someone's sunshine\nToday is a good day\nSparkle on ✨",
+  minimal: "Less, but better\nOne thing at a time\nSimplify\nBreathe and begin",
+  zen: "Inhale calm\nExhale worry\nBe here now\nLet it be easy",
+  sports: "Leave it all out there\nHard work wins\nNext play\nEarn it every day",
+  work: "Deep work, big wins\nDone beats perfect\nOne task at a time\nShip it",
+  neon: "Stay electric\nMake some noise\nBurn bright\nNo brakes tonight"
+};
+const VIBE_APPS = {
+  cute: [{ emoji: "💬", label: "Messages", url: "sms://" }, { emoji: "📸", label: "Instagram", url: "instagram://" }, { emoji: "🖼", label: "Photos", url: "photos-redirect://" }, { emoji: "🎵", label: "Music", url: "music://" }],
+  minimal: [{ emoji: "📞", label: "Phone", url: "tel://" }, { emoji: "💬", label: "Messages", url: "sms://" }, { emoji: "✉️", label: "Mail", url: "mailto:" }, { emoji: "🗺", label: "Maps", url: "maps://" }],
+  zen: [{ emoji: "🎧", label: "Podcasts", url: "podcasts://" }, { emoji: "📒", label: "Notes", url: "mobilenotes://" }, { emoji: "📚", label: "Books", url: "ibooks://" }, { emoji: "🌤", label: "Weather", url: "weather://" }],
+  sports: [{ emoji: "🏈", label: "ESPN", url: "sportscenter://" }, { emoji: "📺", label: "YouTube", url: "youtube://" }, { emoji: "🎮", label: "Twitch", url: "twitch://" }, { emoji: "👽", label: "Reddit", url: "reddit://" }],
+  work: [{ emoji: "💬", label: "Slack", url: "slack://" }, { emoji: "🎥", label: "Zoom", url: "zoomus://" }, { emoji: "📮", label: "Gmail", url: "googlegmail://" }, { emoji: "🗓", label: "Calendar", url: "calshow://" }],
+  neon: [{ emoji: "🎧", label: "Spotify", url: "spotify://" }, { emoji: "🎬", label: "TikTok", url: "tiktok://" }, { emoji: "🎮", label: "Discord", url: "discord://" }, { emoji: "👻", label: "Snapchat", url: "snapchat://" }]
+};
+const VIBE_ICON_THEME = { cute: "pastel", minimal: "line", zen: "zen", sports: "noir", work: "line", neon: "neon" };
+
+const builder = { use: null, vibe: null, size: null, bg: null };
+let builderDesign = null;
+
+function bPick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function buildBuilderChips(containerId, options, key) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
+  for (const pair of options) {
+    const chip = document.createElement("button");
+    chip.textContent = pair[1];
+    chip.className = builder[key] === pair[0] ? "sel" : "";
+    chip.onclick = function () {
+      builder[key] = pair[0];
+      renderBuilderUI();
+    };
+    container.appendChild(chip);
+  }
+}
+function renderBuilderUI() {
+  buildBuilderChips("bUse", B_USES, "use");
+  buildBuilderChips("bVibe", B_VIBES, "vibe");
+  buildBuilderChips("bSize", B_SIZES, "size");
+  buildBuilderChips("bBg", B_BGS, "bg");
+  const needsExtra = builder.use === "countdown";
+  document.getElementById("bExtra").style.display = needsExtra ? "block" : "none";
+  if (needsExtra) document.getElementById("bExtraTitle").textContent = "What are we counting down to?";
+  document.getElementById("bGo").disabled = !(builder.use && builder.vibe && builder.size && builder.bg);
+}
+function composeFromBuilder() {
+  const vibe = builder.vibe === "any" ? bPick(Object.keys(VIBE_THEMES)) : builder.vibe;
+  const use = builder.use === "surprise" ? bPick(["time", "photos", "apps", "countdown", "quote", "day"]) : builder.use;
+  let bg = builder.bg === "any" ? bPick(["gradient", "gradient", "glass", "clear"]) : builder.bg;
+  const theme = bPick(VIBE_THEMES[vibe]);
+  const font = bPick(VIBE_FONTS[vibe]);
+  const design = newDesign();
+  design.themeID = theme;
+  design.fontStyle = font;
+  design.background = bg;
+  design.glassTint = bPick(["dark", "dark", "light"]);
+  design.gradientDir = bPick(["diagonal", "vertical", "horizontal"]);
+  design.textColorHex = theme === "paper" ? "#333333" : "#FFFFFF";
+  const tc = design.textColorHex;
+  const accent = bPick(["#FFD75E", "#8FD3FE", "#FFC2D4", "#B9FBC0", "#FFFFFF"]);
+  function el(extra) {
+    return Object.assign({ id: uid(), kind: "text", text: "", symbolName: "star.fill",
+      x: 0.5, y: 0.5, size: 18, colorHex: tc, opacity: 1 }, extra);
+  }
+  if (use === "time") {
+    design.name = bPick(["My Clock", "Tick Tock", "The Time", "O'Clock"]);
+    design.kind = "freestyle";
+    const variant = bPick(["card", "plain", "icony"]);
+    if (variant === "card" && bg === "gradient") {
+      design.canvasElements = [
+        el({ kind: "shape", shape: "pill", w: 0.84, h: 0.46, size: 0, colorHex: tc === "#333333" ? "#FFFFFF" : "#FFFFFF", opacity: 0.16 }),
+        el({ kind: "clock", y: 0.45, size: 33 }),
+        el({ kind: "date", y: 0.63, size: 11, opacity: 0.85 })
+      ];
+    } else if (variant === "icony") {
+      design.canvasElements = [
+        el({ kind: "clock", y: 0.44, size: 34 }),
+        el({ kind: "date", y: 0.62, size: 11, opacity: 0.85 }),
+        el({ kind: "icon", text: bPick(["☾", "★", "✦", "♥", "⚡"]), x: bPick([0.15, 0.84]), y: 0.16, size: 17, colorHex: accent })
+      ];
+    } else {
+      design.canvasElements = [
+        el({ kind: "clock", y: 0.46, size: 36 }),
+        el({ kind: "date", y: 0.65, size: 12, opacity: 0.85 })
+      ];
+    }
+  } else if (use === "photos") {
+    design.name = bPick(["My People", "Memories", "Us", "Favorites"]);
+    design.kind = "freestyle";
+    design.canvasElements = [
+      el({ kind: "photo", y: 0.44, w: bPick([0.52, 0.6]), shape: bPick(["circle", "rounded"]), aspect: 1 }),
+      el({ kind: "text", text: bPick(["us 💜", "my favorites", "memories", "the crew"]), y: 0.8, size: 12, bold: true, w: 0, align: "center" })
+    ];
+  } else if (use === "apps") {
+    design.name = bPick(["My Launcher", "Quick Apps", "Go To", "One Tap"]);
+    design.kind = "launcher";
+    design.apps = JSON.parse(JSON.stringify(VIBE_APPS[vibe]));
+    design.launcherStyle = { iconSize: bPick([38, 44, 50]), shape: bPick(["rounded", "circle"]),
+      labels: bPick([true, false]), columns: 0, iconTheme: bPick([VIBE_ICON_THEME[vibe], "real"]) };
+  } else if (use === "countdown") {
+    const title = document.getElementById("bExtraText").value.trim() || "Something great";
+    const date = document.getElementById("bExtraDate").value || isoInDays(30);
+    design.name = title.slice(0, 20);
+    design.kind = "freestyle";
+    design.canvasElements = [
+      el({ kind: "text", text: title, y: 0.2, size: 13, colorHex: accent, bold: true, w: 0.86, align: "center" }),
+      el({ kind: "countdown", dateISO: date, y: 0.5, size: 42 }),
+      el({ kind: "text", text: "days to go", y: 0.72, size: 10, opacity: 0.8, bold: false, w: 0, align: "center" }),
+      el({ kind: "progress", source: "countdown", dateISO: date, startISO: isoInDays(0), y: 0.86, size: 5, w: 0.6, colorHex: accent })
+    ];
+  } else if (use === "quote") {
+    design.name = bPick(["Daily Boost", "Words", "Motivation", "Mantra"]);
+    design.kind = "quote";
+    design.primaryText = VIBE_QUOTES[vibe];
+  } else if (use === "day") {
+    design.name = bPick(["My Day", "Today", "The Brief", "Glance"]);
+    design.kind = "freestyle";
+    design.canvasElements = [
+      el({ kind: "weather", y: 0.22, size: 24, unit: "f" }),
+      el({ kind: "calendar", y: 0.5, size: 11 }),
+      el({ kind: "progress", source: "day", y: 0.74, size: 6, w: 0.66, colorHex: accent })
+    ];
+  }
+  return normalizeDesign(design);
+}
+function showBuilderResult() {
+  builderDesign = composeFromBuilder();
+  const wrap = document.getElementById("bPreviewWrap");
+  wrap.innerHTML = "";
+  const dims = SIZES[builder.size] || SIZES.small;
+  const node = document.createElement("div");
+  node.style.cssText = "width:" + dims[0] + "px;height:" + dims[1] + "px;border-radius:28px;overflow:hidden;" +
+    "position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;" +
+    "text-align:center;box-shadow:0 12px 32px var(--shadow)";
+  applyDesignBackground(node, builderDesign);
+  if (builderDesign.kind === "freestyle") {
+    renderFreestyleInto(node, builderDesign, dims[0], dims[1], false);
+  } else {
+    node.innerHTML = designPreviewHTML(builderDesign, builder.size);
+  }
+  wrap.appendChild(node);
+  document.getElementById("bResult").style.display = "block";
+  document.getElementById("bAI").style.display = getApiKey() ? "block" : "none";
+  document.getElementById("bGo").textContent = "🎁 Show me my widget";
+}
+document.getElementById("builderBtn").onclick = function () {
+  document.getElementById("builderModal").classList.add("open");
+  document.body.style.overflow = "hidden";
+  document.getElementById("bResult").style.display = "none";
+  renderBuilderUI();
+};
+function closeBuilder() {
+  document.getElementById("builderModal").classList.remove("open");
+  document.body.style.overflow = "";
+}
+document.getElementById("builderCloseBtn").onclick = closeBuilder;
+document.getElementById("bGo").onclick = showBuilderResult;
+document.getElementById("bAgain").onclick = showBuilderResult;
+document.getElementById("bKeep").onclick = function () {
+  if (!builderDesign) return;
+  previewSize = builder.size || "small";
+  loadIntoEditor(builderDesign);
+  closeBuilder();
+  switchTab("editor");
+  popCanvas();
+  toast("It's yours — tweak anything, then Save 💜");
+  if (builderDesign.kind === "launcher") fetchIconsForApps(current);
+};
+document.getElementById("bAI").onclick = function () {
+  const useLabel = (B_USES.find(function (u) { return u[0] === builder.use; }) || ["", "a widget"])[1];
+  const vibeLabel = builder.vibe === "any" ? "any vibe" : builder.vibe;
+  const idea = "A " + builder.size + " " + vibeLabel + "-style widget to " + useLabel.replace(/^[^ ]+ /, "") +
+    (builder.bg === "glass" ? ", frosted glass background" : builder.bg === "clear" ? ", transparent background" : "") +
+    ". Make it beautiful and polished.";
+  closeBuilder();
+  switchTab("create");
+  document.getElementById("magicInput").value = idea;
+  document.getElementById("magicBtn").onclick();
+};
+
+// ==================== Home Screen App Icon Maker ====================
+let iconMakerStyle = "pastel";
+let iconMakerApps = [
+  { label: "Messages", emoji: "💬" }, { label: "Phone", emoji: "📞" },
+  { label: "Instagram", emoji: "📸" }, { label: "Spotify", emoji: "🎧" },
+  { label: "YouTube", emoji: "▶️" }, { label: "Maps", emoji: "🗺" },
+  { label: "Mail", emoji: "✉️" }, { label: "Camera", emoji: "📷" }
+];
+function drawHomeIcon(app, styleName, index) {
+  const theme = ICON_THEMES[styleName];
+  const S = 1024;
+  const c = document.createElement("canvas");
+  c.width = S; c.height = S;
+  const x = c.getContext("2d");
+  x.fillStyle = theme.colors[index % theme.colors.length];
+  x.fillRect(0, 0, S, S);
+  if (theme.line) {
+    x.strokeStyle = theme.glyph;
+    x.lineWidth = S * 0.028;
+    const inset = S * 0.09, r = S * 0.16;
+    x.beginPath();
+    if (x.roundRect) x.roundRect(inset, inset, S - 2 * inset, S - 2 * inset, r);
+    else x.rect(inset, inset, S - 2 * inset, S - 2 * inset);
+    x.stroke();
+  }
+  const glyph = iconGlyph(app);
+  const glyphColor = theme.glyphCycle ? theme.glyphCycle[index % theme.glyphCycle.length] : theme.glyph;
+  x.fillStyle = glyphColor;
+  x.font = "700 " + Math.round(S * 0.42) + "px -apple-system, 'Segoe UI Emoji', sans-serif";
+  x.textAlign = "center";
+  x.textBaseline = "middle";
+  x.fillText(glyph, S / 2, S * 0.54);
+  return c.toDataURL("image/png");
+}
+function renderIconMaker() {
+  const styleChips = document.getElementById("iconStyleChips");
+  styleChips.innerHTML = "";
+  for (const id of Object.keys(ICON_THEMES)) {
+    const chip = document.createElement("button");
+    chip.textContent = ICON_THEMES[id].name;
+    chip.className = iconMakerStyle === id ? "sel" : "";
+    chip.onclick = function () { iconMakerStyle = id; renderIconMaker(); };
+    styleChips.appendChild(chip);
+  }
+  const appChips = document.getElementById("iconAppChips");
+  appChips.innerHTML = "";
+  iconMakerApps.forEach(function (app, index) {
+    const chip = document.createElement("button");
+    chip.textContent = (app.emoji || "🔤") + " " + app.label + " ✕";
+    chip.onclick = function () { iconMakerApps.splice(index, 1); renderIconMaker(); };
+    appChips.appendChild(chip);
+  });
+  const grid = document.getElementById("iconGrid");
+  grid.innerHTML = "";
+  iconMakerApps.forEach(function (app, index) {
+    const cell = document.createElement("div");
+    cell.className = "im-cell";
+    const img = document.createElement("img");
+    img.src = drawHomeIcon(app, iconMakerStyle, index);
+    img.alt = app.label + " icon";
+    const name = document.createElement("div");
+    name.className = "im-name";
+    name.textContent = app.label;
+    cell.append(img, name);
+    grid.appendChild(cell);
+  });
+  const has = iconMakerApps.length > 0;
+  document.getElementById("iconSaveHint").style.display = has ? "block" : "none";
+  document.getElementById("iconHowTo").style.display = has ? "block" : "none";
+}
+document.getElementById("iconAppAdd").onclick = function () {
+  const name = document.getElementById("iconAppSearch").value.trim();
+  if (!name) return;
+  const presetKey = Object.keys(APP_PRESETS).find(function (k) { return name.toLowerCase().includes(k); });
+  iconMakerApps.push({ label: name.slice(0, 14), emoji: presetKey ? APP_PRESETS[presetKey].emoji : "" });
+  document.getElementById("iconAppSearch").value = "";
+  renderIconMaker();
+};
+document.getElementById("iconAppSearch").addEventListener("keydown", function (event) {
+  if (event.key === "Enter") { event.preventDefault(); document.getElementById("iconAppAdd").onclick(); }
+});
 
 (function buildFontSelect() {
   const select = document.getElementById("fontSelect");
@@ -4223,10 +4862,12 @@ document.getElementById("wizardCopyBtn").onclick = function () {
 };
 setupLauncherControls();
 renderTemplates();
+renderIconMaker();
 renderLibrary();
 syncControls();
 renderAll();
 updateSpendUI();
+switchTab(localStorage.getItem("widgetking.tab") || "create");
 receiveSharedDesign();
 </script>
 </body>
