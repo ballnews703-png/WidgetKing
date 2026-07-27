@@ -81,6 +81,20 @@ struct WidgetRenderView: View {
                 .font(styled(20, .bold))
                 .minimumScaleFactor(0.4)
                 .padding(.horizontal, 4)
+
+        case .freestyle:
+            GeometryReader { geo in
+                let scale = min(geo.size.width, geo.size.height) / 158
+                ForEach(design.canvasElements) { element in
+                    CanvasElementContent(
+                        element: element,
+                        fontDesign: design.fontStyle.design,
+                        date: date,
+                        scale: scale
+                    )
+                    .position(x: element.x * geo.size.width, y: element.y * geo.size.height)
+                }
+            }
         }
     }
 
@@ -97,5 +111,36 @@ struct WidgetRenderView: View {
 
     private func styled(_ size: CGFloat, _ weight: Font.Weight) -> Font {
         .system(size: size, weight: weight, design: design.fontStyle.design)
+    }
+}
+
+/// Renders a single Freestyle canvas element. Shared between the Home Screen
+/// widget and the in-app drag-and-drop editor so both look identical.
+struct CanvasElementContent: View {
+    let element: CanvasElement
+    let fontDesign: Font.Design
+    let date: Date
+    let scale: CGFloat
+
+    var body: some View {
+        content
+            .font(.system(size: element.size * scale, weight: .semibold, design: fontDesign))
+            .foregroundStyle(Color(hex: element.colorHex))
+            .lineLimit(2)
+            .fixedSize()
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch element.kind {
+        case .text, .emoji:
+            Text(element.text.isEmpty ? "Text" : element.text)
+        case .clock:
+            Text(date, style: .time)
+        case .date:
+            Text(date, format: .dateTime.weekday(.abbreviated).month(.abbreviated).day())
+        case .symbol:
+            Image(systemName: element.symbolName)
+        }
     }
 }

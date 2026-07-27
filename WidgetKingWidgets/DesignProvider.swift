@@ -20,8 +20,10 @@ struct DesignProvider: AppIntentTimelineProvider {
         let now = Date()
         let calendar = Calendar.current
 
-        switch design.kind {
-        case .clock:
+        let showsLiveClock = design.kind == .clock
+            || (design.kind == .freestyle && design.canvasElements.contains { $0.kind == .clock })
+
+        if showsLiveClock {
             // One entry per minute for the next hour so the time stays fresh.
             let start = calendar.nextDate(
                 after: now,
@@ -34,13 +36,15 @@ struct DesignProvider: AppIntentTimelineProvider {
                 entries.append(DesignEntry(date: entryDate, design: design))
             }
             return Timeline(entries: entries, policy: .atEnd)
+        }
 
-        case .date, .countdown:
+        switch design.kind {
+        case .date, .countdown, .freestyle:
             // Refresh just after midnight so the day rolls over correctly.
             let midnight = calendar.startOfDay(for: now).addingTimeInterval(60 * 60 * 24)
             return Timeline(entries: [DesignEntry(date: now, design: design)], policy: .after(midnight))
 
-        case .quote, .note:
+        case .quote, .note, .clock:
             let nextHour = now.addingTimeInterval(60 * 60)
             return Timeline(entries: [DesignEntry(date: now, design: design)], policy: .after(nextHour))
         }

@@ -10,6 +10,12 @@
 		000000000000000000000201 /* WidgetKingApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000101 /* WidgetKingApp.swift */; };
 		000000000000000000000202 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000102 /* ContentView.swift */; };
 		000000000000000000000203 /* DesignEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000103 /* DesignEditorView.swift */; };
+		000000000000000000000231 /* MagicView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000131 /* MagicView.swift */; };
+		000000000000000000000232 /* MagicComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000132 /* MagicComposer.swift */; };
+		000000000000000000000233 /* ClaudeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000133 /* ClaudeService.swift */; };
+		000000000000000000000234 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000134 /* SettingsView.swift */; };
+		000000000000000000000235 /* CanvasEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000135 /* CanvasEditorView.swift */; };
+		000000000000000000000236 /* DesignShare.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000136 /* DesignShare.swift */; };
 		000000000000000000000204 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000104 /* Assets.xcassets */; };
 		000000000000000000000211 /* WidgetDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000111 /* WidgetDesign.swift */; };
 		000000000000000000000212 /* DesignStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000112 /* DesignStore.swift */; };
@@ -57,6 +63,12 @@
 		000000000000000000000103 /* DesignEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignEditorView.swift; sourceTree = "<group>"; };
 		000000000000000000000104 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		000000000000000000000105 /* WidgetKing.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WidgetKing.entitlements; sourceTree = "<group>"; };
+		000000000000000000000131 /* MagicView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MagicView.swift; sourceTree = "<group>"; };
+		000000000000000000000132 /* MagicComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MagicComposer.swift; sourceTree = "<group>"; };
+		000000000000000000000133 /* ClaudeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeService.swift; sourceTree = "<group>"; };
+		000000000000000000000134 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		000000000000000000000135 /* CanvasEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasEditorView.swift; sourceTree = "<group>"; };
+		000000000000000000000136 /* DesignShare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignShare.swift; sourceTree = "<group>"; };
 		000000000000000000000111 /* WidgetDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetDesign.swift; sourceTree = "<group>"; };
 		000000000000000000000112 /* DesignStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignStore.swift; sourceTree = "<group>"; };
 		000000000000000000000113 /* WidgetTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetTheme.swift; sourceTree = "<group>"; };
@@ -111,6 +123,12 @@
 				000000000000000000000101 /* WidgetKingApp.swift */,
 				000000000000000000000102 /* ContentView.swift */,
 				000000000000000000000103 /* DesignEditorView.swift */,
+				000000000000000000000135 /* CanvasEditorView.swift */,
+				000000000000000000000131 /* MagicView.swift */,
+				000000000000000000000132 /* MagicComposer.swift */,
+				000000000000000000000133 /* ClaudeService.swift */,
+				000000000000000000000134 /* SettingsView.swift */,
+				000000000000000000000136 /* DesignShare.swift */,
 				000000000000000000000104 /* Assets.xcassets */,
 				000000000000000000000105 /* WidgetKing.entitlements */,
 			);
@@ -242,6 +260,12 @@
 				000000000000000000000201 /* WidgetKingApp.swift in Sources */,
 				000000000000000000000202 /* ContentView.swift in Sources */,
 				000000000000000000000203 /* DesignEditorView.swift in Sources */,
+				000000000000000000000235 /* CanvasEditorView.swift in Sources */,
+				000000000000000000000231 /* MagicView.swift in Sources */,
+				000000000000000000000232 /* MagicComposer.swift in Sources */,
+				000000000000000000000233 /* ClaudeService.swift in Sources */,
+				000000000000000000000234 /* SettingsView.swift in Sources */,
+				000000000000000000000236 /* DesignShare.swift in Sources */,
 				000000000000000000000211 /* WidgetDesign.swift in Sources */,
 				000000000000000000000212 /* DesignStore.swift in Sources */,
 				000000000000000000000213 /* WidgetTheme.swift in Sources */,

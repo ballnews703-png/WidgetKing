@@ -5,6 +5,15 @@ Built with SwiftUI + WidgetKit for iOS 17 and later (great on iPhone 17 Pro).
 
 ## What it does
 
+- **✨ Magic tab — type an idea, get a widget.** Describe what you want in
+  plain English ("countdown to my birthday on October 12, sunset colors") and
+  it's auto-built. With a Claude API key set in Settings, Claude designs the
+  widget; without one, a fast on-device parser handles it, so the feature
+  always works.
+- **🖐️ Freestyle drag-and-drop canvas.** Pick the Freestyle type and drop
+  clocks, dates, text, emoji, and symbols anywhere on the widget — drag to
+  position, tap to resize/recolor. What you build is exactly what renders on
+  the Home Screen.
 - **Create widgets in the app** — pick a widget type, then customize it with a
   live preview that matches exactly what will appear on your Home Screen:
   - 🕐 **Clock** — time plus the date
@@ -12,11 +21,14 @@ Built with SwiftUI + WidgetKit for iOS 17 and later (great on iPhone 17 Pro).
   - ⏳ **Countdown** — days until (or since) any event
   - 💬 **Quote** — a quote with an optional author
   - 📝 **Note** — any short text, front and center
+  - 🎨 **Freestyle** — the drag-and-drop canvas
 - **12 gradient themes**, 4 font styles (Classic / Rounded / Serif / Mono), and
   a free-form text color picker.
 - **Small, Medium, and Large** widget sizes, previewable in the editor.
-- Make as many designs as you like. On the Home Screen, long-press the widget →
-  **Edit Widget** to choose which design it shows.
+- **Interchangeable everywhere.** Make as many designs as you like; on the
+  Home Screen, long-press the widget → **Edit Widget** to swap which design it
+  shows. Long-press a design in My Widgets to **share it as a .widgetking
+  file**, and import designs from friends via the import button.
 
 ## Project layout
 
@@ -30,6 +42,11 @@ Designs are stored as JSON in an App Group (`group.com.widgetking.shared`) so
 the app and the widget extension share them. The widget uses an
 `AppIntentConfiguration`, so each placed widget can be pointed at a different
 saved design.
+
+The Magic tab's AI mode calls the Anthropic Messages API directly from the
+device (`claude-opus-5`, with structured outputs so the reply is guaranteed
+valid JSON). The API key is optional, entered in Settings, and stored only on
+the device.
 
 ## Getting it running
 

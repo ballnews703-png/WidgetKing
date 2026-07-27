@@ -18,7 +18,12 @@ struct DesignEditorView: View {
     var body: some View {
         Form {
             Section {
-                preview
+                if draft.kind == .freestyle {
+                    CanvasEditorView(draft: $draft, canvasSize: previewSize.dimensions)
+                        .listRowBackground(Color.clear)
+                } else {
+                    preview
+                }
                 Picker("Preview size", selection: $previewSize) {
                     ForEach(PreviewSize.allCases) { size in
                         Text(size.rawValue).tag(size)
@@ -71,6 +76,11 @@ struct DesignEditorView: View {
         }
         .navigationTitle(isNew ? "New Widget" : "Edit Widget")
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: draft.kind) { _, newKind in
+            if newKind == .freestyle && draft.canvasElements.isEmpty {
+                draft.canvasElements = CanvasElement.starterElements
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
@@ -106,7 +116,7 @@ struct DesignEditorView: View {
     @ViewBuilder
     private var kindFields: some View {
         switch draft.kind {
-        case .clock, .date:
+        case .clock, .date, .freestyle:
             EmptyView()
         case .countdown:
             Section("Countdown") {
