@@ -109,7 +109,11 @@
   #studioInspector { background: var(--card2); border-radius: 12px; padding: 12px; margin-top: 8px; }
   #studioInspector .row { margin-bottom: 8px; }
   .align-buttons button.active { background: var(--accent); border-color: var(--accent); }
-  .launch-grid { display: grid; gap: 10px; padding: 10px; }
+  /* Mirrors the Scriptable layout: rows distributed space-evenly, column
+     centered with fixed 10px gaps, 12px padding — so preview == widget. */
+  .launch-flex { display: flex; flex-direction: column; justify-content: center;
+    gap: 10px; width: 100%; height: 100%; padding: 12px; }
+  .launch-row { display: flex; justify-content: space-evenly; align-items: flex-start; width: 100%; }
   .launch-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
   .launch-icon { border-radius: 12px; background: rgba(255,255,255,.18);
     display: flex; align-items: center; justify-content: center; overflow: hidden; }
@@ -392,8 +396,27 @@ const SYMBOL_EMOJI = {
   "music.note": "🎵", "pawprint.fill": "🐾", "crown.fill": "👑"
 };
 
+// iOS built-in font names for each style id: [regular, bold].
+const FONT_NAMES = {
+  serif: ["Georgia", "Georgia-Bold"],
+  avenir: ["AvenirNext-Regular", "AvenirNext-Bold"],
+  futura: ["Futura-Medium", "Futura-Bold"],
+  didot: ["Didot", "Didot-Bold"],
+  baskerville: ["Baskerville", "Baskerville-Bold"],
+  typewriter: ["AmericanTypewriter", "AmericanTypewriter-Bold"],
+  marker: ["MarkerFelt-Thin", "MarkerFelt-Wide"],
+  chalkboard: ["ChalkboardSE-Regular", "ChalkboardSE-Bold"],
+  noteworthy: ["Noteworthy-Light", "Noteworthy-Bold"],
+  script: ["SnellRoundhand", "SnellRoundhand-Bold"],
+  copperplate: ["Copperplate", "Copperplate-Bold"],
+  optima: ["Optima-Regular", "Optima-Bold"],
+  palatino: ["Palatino-Roman", "Palatino-Bold"]
+};
 function fontFor(style, size, bold) {
-  if (style === "serif") return new Font(bold ? "Georgia-Bold" : "Georgia", size);
+  const names = FONT_NAMES[style];
+  if (names) {
+    try { return new Font(bold ? names[1] : names[0], size); } catch (e) {}
+  }
   if (style === "mono") return bold ? Font.boldMonospacedSystemFont(size) : Font.regularMonospacedSystemFont(size);
   if (style === "classic") return bold ? Font.boldSystemFont(size) : Font.systemFont(size);
   return bold ? Font.boldRoundedSystemFont(size) : Font.regularRoundedSystemFont(size);
@@ -509,7 +532,13 @@ function widgetRect(imgW, imgH, family, position) {
   }
   y = rows[row] != null ? rows[row] : rows.top;
   if (family === "large" && row === "bottom") y = rows.middle;
+  // User-tuned fine alignment from the in-app "Nudge" menu.
+  const prefs = loadPrefs();
+  y += Number(prefs.offsetY) || 0;
+  x += Number(prefs.offsetX) || 0;
+  x = Math.min(Math.max(0, x), Math.max(0, imgW - w));
   if (y + h > imgH) y = Math.max(0, imgH - h);
+  if (y < 0) y = 0;
   return new Rect(x, y, w, h);
 }
 function cropImage(img, rect) {
@@ -630,15 +659,17 @@ function drawFreestyle(design, family, bgImg) {
       }
       continue;
     }
+    if (el.kind === "app") continue; // apps render as tappable overlay stacks
     let text;
     if (el.kind === "clock") { const df = new DateFormatter(); df.useShortTimeStyle(); text = df.string(new Date()); }
     else if (el.kind === "date") { const df = new DateFormatter(); df.dateFormat = "EEE MMM d"; text = df.string(new Date()); }
     else if (el.kind === "battery") { text = Math.round(Device.batteryLevel() * 100) + "%"; }
     else if (el.kind === "countdown") { text = String(Math.abs(daysUntil(el.dateISO))); }
     else if (el.kind === "symbol") { text = SYMBOL_EMOJI[el.symbolName] || "⭐"; }
+    else if (el.kind === "icon") { text = el.text || "★"; }
     else { text = el.text || "Text"; }
     const isBold = el.kind !== "text" || el.bold !== false;
-    ctx.setFont(fontFor(design.fontStyle, fs, isBold));
+    ctx.setFont(fontFor(el.font || design.fontStyle, fs, isBold));
     ctx.setTextColor(new Color(el.colorHex || "#FFFFFF", el.kind === "emoji" ? 1 : op));
     if (el.kind === "text" && el.w > 0) {
       // Text box: fixed width, wraps, top-anchored — mirrors the designer.
@@ -653,6 +684,77 @@ function drawFreestyle(design, family, bgImg) {
     }
   }
   return ctx.getImage();
+}
+// App elements in freestyle designs are laid over the drawn background as
+// real stacks, so they get crisp rounded icons AND per-icon tap targets
+// (iOS allows multiple tap targets on medium/large widgets only).
+async function addFreestyleApps(w, design, family) {
+  const apps = (design.canvasElements || []).filter(function (el) { return el.kind === "app"; });
+  if (apps.length === 0) return;
+  const PT = { small: [155, 155], medium: [329, 155], large: [329, 345] };
+  const dims = PT[family] || PT.small;
+  const W = dims[0], H = dims[1];
+  if (family === "small" && !w.url && apps[0].url) w.url = apps[0].url;
+  // Group into rows: elements whose vertical centers overlap share a row.
+  const sorted = apps.slice().sort(function (a, b) { return a.y - b.y; });
+  const rows = [];
+  for (const el of sorted) {
+    const pt = Math.min(Math.max(Number(el.size) || 40, 16), 120);
+    const top = el.y * H - pt / 2;
+    const last = rows[rows.length - 1];
+    if (last && top < last.bottom) {
+      last.items.push(el);
+      last.bottom = Math.max(last.bottom, top + pt + (el.showLabel ? 13 : 0));
+    } else {
+      rows.push({ top: Math.max(0, top), bottom: top + pt + (el.showLabel ? 13 : 0), items: [el] });
+    }
+  }
+  const root = w.addStack();
+  root.layoutVertically();
+  root.size = new Size(W, H);
+  let cursorY = 0;
+  for (const row of rows) {
+    if (row.top > cursorY) root.addSpacer(row.top - cursorY);
+    const rowStack = root.addStack();
+    rowStack.layoutHorizontally();
+    rowStack.topAlignContent();
+    let cursorX = 0;
+    row.items.sort(function (a, b) { return a.x - b.x; });
+    for (const el of row.items) {
+      const pt = Math.min(Math.max(Number(el.size) || 40, 16), 120);
+      const left = Math.max(0, el.x * W - pt / 2);
+      if (left > cursorX) rowStack.addSpacer(left - cursorX);
+      const cell = rowStack.addStack();
+      cell.layoutVertically();
+      if (el.url) cell.url = el.url;
+      const iconStack = cell.addStack();
+      let realIcon = null;
+      if (el.iconUrl) realIcon = await loadIcon(el.iconUrl);
+      if (realIcon) {
+        const img = iconStack.addImage(realIcon);
+        img.imageSize = new Size(pt, pt);
+        img.cornerRadius = el.shape === "circle" ? pt / 2 : Math.round(pt * 0.24);
+      } else {
+        const t = iconStack.addText(el.emoji || "📲");
+        t.font = Font.systemFont(Math.round(pt * 0.9));
+      }
+      if (el.showLabel) {
+        const labelStack = cell.addStack();
+        labelStack.layoutHorizontally();
+        labelStack.addSpacer();
+        const label = labelStack.addText(el.label || "App");
+        label.font = fontFor(design.fontStyle, 9, false);
+        label.textColor = new Color(design.textColorHex || "#FFFFFF");
+        label.textOpacity = 0.85;
+        label.lineLimit = 1;
+        labelStack.addSpacer();
+      }
+      cursorX = left + pt;
+    }
+    rowStack.addSpacer();
+    cursorY = row.bottom;
+  }
+  root.addSpacer();
 }
 function hashString(s) {
   let h = 5381;
@@ -748,6 +850,7 @@ async function buildWidget(design, position) {
   if (design.kind === "freestyle") {
     w.setPadding(0, 0, 0, 0);
     w.backgroundImage = drawFreestyle(design, family, bgImg);
+    await addFreestyleApps(w, design, family);
     w.refreshAfterDate = new Date(Date.now() + 5 * 60 * 1000);
     return w;
   }
@@ -822,6 +925,7 @@ if (config.runsInApp) {
   menu.message = "Glass and Clear widgets show your wallpaper. One-time setup: long-press the Home Screen, swipe to the last empty page, screenshot it — then pick that screenshot here.";
   menu.addAction("Preview a widget");
   menu.addAction("Set wallpaper photo…");
+  menu.addAction("Nudge Clear alignment…");
   menu.addAction("Icon labels on Home Screen: " + (labelsShown ? "Shown" : "Hidden"));
   menu.addCancelAction("Cancel");
   const choice = await menu.presentAlert();
@@ -832,11 +936,54 @@ if (config.runsInApp) {
       FileManager.local().writeImage(wallpaperPath(), img);
       const done = new Alert();
       done.title = "Wallpaper saved ✓";
-      done.message = "Glass and Clear widgets will now use it. For pixel-perfect Clear widgets, set each widget's Parameter to: Design Name | position (e.g. My Clock | top-left).";
+      // A photo that isn't a true screenshot of THIS iPhone is the #1 cause
+      // of misaligned/off-color Clear widgets — catch it right away.
+      const expW = Math.round(Device.screenSize().width * Device.screenScale());
+      const expH = Math.round(Device.screenSize().height * Device.screenScale());
+      if (Math.round(img.size.width) !== expW || Math.round(img.size.height) !== expH) {
+        done.title = "Saved — but check this ⚠️";
+        done.message = "That image is " + Math.round(img.size.width) + "x" + Math.round(img.size.height) +
+          ", but a screenshot of this iPhone is " + expW + "x" + expH +
+          ". For perfect Clear widgets: swipe to an empty Home Screen page, take a fresh screenshot, and pick THAT (not the original photo — iOS shades the wallpaper, so the screenshot matches what's really on screen).";
+      } else {
+        done.message = "Glass and Clear widgets will now use it. For pixel-perfect Clear widgets, set each widget's Parameter to: Design Name | position (e.g. My Clock | top-left). If it's a touch off, use Nudge Clear alignment in this menu.";
+      }
       done.addAction("OK");
       await done.presentAlert();
     } catch (e) {}
   } else if (choice === 2) {
+    runPreview = false;
+    const nudge = new Alert();
+    nudge.title = "Nudge Clear alignment";
+    nudge.message = "Shifts which wallpaper slice Clear/Glass widgets show. Current: " +
+      (Number(prefs.offsetY) || 0) + "px vertical, " + (Number(prefs.offsetX) || 0) + "px horizontal.";
+    nudge.addAction("⬆︎ Move picture up 10");
+    nudge.addAction("⬆︎ Move picture up 30");
+    nudge.addAction("⬇︎ Move picture down 10");
+    nudge.addAction("⬇︎ Move picture down 30");
+    nudge.addAction("⬅︎ Move picture left 10");
+    nudge.addAction("➡︎ Move picture right 10");
+    nudge.addAction("Reset to 0");
+    nudge.addCancelAction("Cancel");
+    const pick = await nudge.presentAlert();
+    if (pick >= 0) {
+      // Moving the picture up means sampling a lower slice (+y), and so on.
+      if (pick === 0) prefs.offsetY = (Number(prefs.offsetY) || 0) + 10;
+      if (pick === 1) prefs.offsetY = (Number(prefs.offsetY) || 0) + 30;
+      if (pick === 2) prefs.offsetY = (Number(prefs.offsetY) || 0) - 10;
+      if (pick === 3) prefs.offsetY = (Number(prefs.offsetY) || 0) - 30;
+      if (pick === 4) prefs.offsetX = (Number(prefs.offsetX) || 0) + 10;
+      if (pick === 5) prefs.offsetX = (Number(prefs.offsetX) || 0) - 10;
+      if (pick === 6) { prefs.offsetY = 0; prefs.offsetX = 0; }
+      savePrefs(prefs);
+      const done = new Alert();
+      done.title = "Alignment nudged ✓";
+      done.message = "Now " + (Number(prefs.offsetY) || 0) + "px vertical, " + (Number(prefs.offsetX) || 0) +
+        "px horizontal. Widgets update within a few minutes (or tap Preview a widget to check now).";
+      done.addAction("OK");
+      await done.presentAlert();
+    }
+  } else if (choice === 3) {
     runPreview = false;
     prefs.iconLabels = !labelsShown;
     savePrefs(prefs);
@@ -885,12 +1032,39 @@ const KINDS = [
 ];
 const KIND_ICONS = { clock: "🕐", date: "📅", countdown: "⏳", quote: "💬", note: "📝", launcher: "🚀", battery: "🔋", freestyle: "🎨" };
 const SIZES = { small: [158, 158], medium: [338, 158], large: [338, 354] };
+// Font ids map to iOS built-in fonts in the Scriptable renderer and CSS
+// stacks here (exact on iPhone Safari; close fallbacks elsewhere).
 const FONT_CSS = {
   classic: "-apple-system, 'Segoe UI', sans-serif",
   rounded: "ui-rounded, 'SF Pro Rounded', 'Nunito', -apple-system, sans-serif",
   serif: "Georgia, 'Times New Roman', serif",
-  mono: "ui-monospace, Menlo, Consolas, monospace"
+  mono: "ui-monospace, Menlo, Consolas, monospace",
+  avenir: "'Avenir Next', Avenir, 'Segoe UI', sans-serif",
+  futura: "Futura, 'Century Gothic', sans-serif",
+  didot: "Didot, 'Bodoni MT', 'Playfair Display', serif",
+  baskerville: "Baskerville, 'Libre Baskerville', 'Times New Roman', serif",
+  typewriter: "'American Typewriter', 'Courier New', serif",
+  marker: "'Marker Felt', 'Comic Sans MS', cursive",
+  chalkboard: "'Chalkboard SE', 'Comic Sans MS', cursive",
+  noteworthy: "Noteworthy, 'Segoe Print', cursive",
+  script: "'Snell Roundhand', 'Brush Script MT', cursive",
+  copperplate: "Copperplate, 'Trajan Pro', serif",
+  optima: "Optima, Candara, 'Segoe UI', sans-serif",
+  palatino: "Palatino, 'Palatino Linotype', 'Book Antiqua', serif"
 };
+const FONT_LABELS = {
+  classic: "Classic (SF)", rounded: "Rounded", serif: "Serif (Georgia)", mono: "Mono",
+  avenir: "Avenir — modern", futura: "Futura — geometric", didot: "Didot — fashion",
+  baskerville: "Baskerville — book", typewriter: "Typewriter", marker: "Marker Felt",
+  chalkboard: "Chalkboard", noteworthy: "Noteworthy — handwritten",
+  script: "Script — calligraphy", copperplate: "Copperplate — engraved",
+  optima: "Optima — elegant", palatino: "Palatino — classic serif"
+};
+// Monochrome glyphs for the "clean icon" element — unlike emoji these tint
+// to any color in both the preview and the Scriptable renderer.
+const GLYPHS = ["★","☆","♥","♡","●","○","◆","◇","■","□","▲","△","✦","✧","❋","✿","❀","☘",
+  "☀","☾","☁","☂","❆","⚡","♪","♫","☕","✈","⚑","⌂","✉","☏","⚙","☮","☯","♻",
+  "✓","✕","✚","→","←","↑","↓","⇄","∞","§","❝","❞"];
 const EMOJI_PICKS = ["⭐","❤️","⚡","🌙","☀️","☁️","🍃","🔥","✨","🎵","🐾","👑"];
 const SYMBOL_EMOJI = {
   "star.fill": "⭐", "heart.fill": "❤️", "bolt.fill": "⚡",
@@ -986,7 +1160,7 @@ function normalizeDesign(design) {
   if (!design.name) design.name = "My Widget";
   if (!design.kind) design.kind = "clock";
   if (!design.themeID) design.themeID = "midnight";
-  if (!design.fontStyle) design.fontStyle = "rounded";
+  if (!FONT_CSS[design.fontStyle]) design.fontStyle = "rounded";
   if (!design.textColorHex) design.textColorHex = "#FFFFFF";
   if (design.primaryText == null) design.primaryText = "";
   if (design.secondaryText == null) design.secondaryText = "";
@@ -1022,6 +1196,17 @@ function normalizeDesign(design) {
       if (typeof el.w !== "number" || el.w <= 0) el.w = 0.55;
       if (typeof el.aspect !== "number" || el.aspect <= 0) el.aspect = 1;
     }
+    if (el.kind === "icon" && !el.text) el.text = "★";
+    if (el.kind === "app") {
+      if (typeof el.label !== "string") el.label = "App";
+      if (typeof el.url !== "string") el.url = "";
+      if (typeof el.iconUrl !== "string") el.iconUrl = "";
+      if (typeof el.emoji !== "string" || !el.emoji) el.emoji = "📲";
+      if (typeof el.size !== "number" || el.size < 16) el.size = 40;
+      if (!["rounded", "circle"].includes(el.shape)) el.shape = "rounded";
+      if (typeof el.showLabel !== "boolean") el.showLabel = false;
+    }
+    if (el.font != null && !FONT_CSS[el.font]) delete el.font;
     if (el.kind === "text") {
       if (typeof el.w !== "number" || el.w < 0 || el.w > 1) el.w = 0;
       if (!["left", "center", "right"].includes(el.align)) el.align = "center";
@@ -1300,7 +1485,7 @@ const AI_SCHEMA = {
     name: { type: "string", description: "Short widget name, max 24 characters" },
     kind: { type: "string", "enum": ["clock", "date", "countdown", "quote", "note", "launcher", "battery", "freestyle"] },
     themeID: { type: "string", "enum": Object.keys(THEMES) },
-    fontStyle: { type: "string", "enum": ["classic", "rounded", "serif", "mono"] },
+    fontStyle: { type: "string", "enum": Object.keys(FONT_CSS) },
     textColorHex: { type: "string", description: "#RRGGBB text color readable on the theme" },
     primaryText: { type: "string", description: "Quote/note text or countdown title; empty if unused" },
     secondaryText: { type: "string", description: "Quote author; empty if unused" },
@@ -1333,8 +1518,11 @@ const AI_SCHEMA = {
       items: {
         type: "object",
         properties: {
-          kind: { type: "string", "enum": ["text", "clock", "date", "emoji", "shape", "battery", "countdown"] },
-          text: { type: "string", description: "Text or emoji content; empty for other kinds" },
+          kind: { type: "string", "enum": ["text", "clock", "date", "emoji", "icon", "shape", "battery", "countdown", "app"] },
+          text: { type: "string", description: "Text or emoji content; for kind=icon a single glyph like ★ ♥ ● ▲ ☾ ⚡ ✈ ⚙ →; empty for other kinds" },
+          label: { type: "string", description: "App name for kind=app; empty otherwise" },
+          url: { type: "string", description: "URL scheme to open for kind=app (e.g. spotify://); empty otherwise" },
+          font: { type: "string", "enum": [""].concat(Object.keys(FONT_CSS)), description: "Per-element font override; empty = the design's fontStyle" },
           x: { type: "number" },
           y: { type: "number" },
           size: { type: "number", description: "Font size in points; 0 for shapes" },
@@ -1347,7 +1535,7 @@ const AI_SCHEMA = {
           bold: { type: "boolean", description: "For kind=text: false for lighter body text; true otherwise" },
           dateISO: { type: "string", description: "yyyy-MM-dd for countdown elements; empty otherwise" }
         },
-        required: ["kind", "text", "x", "y", "size", "colorHex", "opacity", "shape", "w", "h", "align", "bold", "dateISO"],
+        required: ["kind", "text", "label", "url", "font", "x", "y", "size", "colorHex", "opacity", "shape", "w", "h", "align", "bold", "dateISO"],
         additionalProperties: false
       }
     }
@@ -1362,11 +1550,11 @@ const AI_EXAMPLE = {
   background: "gradient", glassTint: "dark",
   backgroundColors: [], tapUrl: "", apps: [],
   canvasElements: [
-    { kind: "shape", text: "", x: 0.5, y: 0.5, size: 0, colorHex: "#FFFFFF", opacity: 0.16, shape: "pill", w: 0.84, h: 0.46, align: "", bold: true, dateISO: "" },
-    { kind: "clock", text: "", x: 0.5, y: 0.44, size: 34, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, dateISO: "" },
-    { kind: "text", text: "sweet dreams", x: 0.5, y: 0.62, size: 11, colorHex: "#D8CFFF", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, dateISO: "" },
-    { kind: "emoji", text: "🌙", x: 0.83, y: 0.15, size: 20, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, dateISO: "" },
-    { kind: "emoji", text: "✨", x: 0.15, y: 0.2, size: 13, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, dateISO: "" }
+    { kind: "shape", text: "", label: "", url: "", font: "", x: 0.5, y: 0.5, size: 0, colorHex: "#FFFFFF", opacity: 0.16, shape: "pill", w: 0.84, h: 0.46, align: "", bold: true, dateISO: "" },
+    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.5, y: 0.44, size: 34, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, dateISO: "" },
+    { kind: "text", text: "sweet dreams", label: "", url: "", font: "script", x: 0.5, y: 0.62, size: 11, colorHex: "#D8CFFF", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, dateISO: "" },
+    { kind: "icon", text: "☾", label: "", url: "", font: "", x: 0.83, y: 0.15, size: 20, colorHex: "#F5E9C9", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, dateISO: "" },
+    { kind: "emoji", text: "✨", label: "", url: "", font: "", x: 0.15, y: 0.2, size: 13, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, dateISO: "" }
   ]
 };
 
@@ -1376,6 +1564,10 @@ function aiSystemPrompt() {
     "Kinds: clock (time+date), date (big day), countdown (days until an event), quote, note (short text), " +
     "launcher (grid of tappable app icons with iOS URL schemes), battery (device battery level), " +
     "freestyle (compose elements on a canvas — prefer it for creative or decorated requests).\n" +
+    "Fonts (fontStyle, or per-element font override): " + Object.keys(FONT_CSS).join(", ") +
+    " — didot/baskerville for elegance, script/noteworthy for handwritten, marker/chalkboard for playful, futura/avenir for modern, typewriter for retro.\n" +
+    "Freestyle elements: kind=icon is a clean monochrome glyph (set text to one glyph: ★ ☆ ♥ ♡ ● ◆ ▲ ✦ ❀ ☀ ☾ ☁ ⚡ ♪ ☕ ✈ ⌂ ✉ ⚙ ✓ → ∞) tinted via colorHex — prefer it over emoji for minimal/elegant looks. " +
+    "kind=app is a tappable app icon: set label and url (the real icon is fetched automatically); space them like a launcher grid.\n" +
     "Themes: " + Object.keys(THEMES).join(", ") + ". 'paper' is light (use dark text like #333333); the rest are dark (use light text). " +
     "If the requested colors don't match a preset, set backgroundColors to two #RRGGBB colors for a custom gradient. " +
     "Backgrounds: background=glass gives a frosted blurred wallpaper look (choose glassTint dark or light); background=clear makes the widget fully transparent against the wallpaper — use these when the user says transparent, see-through, frosted, glass, or wants it to blend with their wallpaper; otherwise background=gradient. " +
@@ -1429,7 +1621,7 @@ function specToDesign(spec) {
   design.name = (spec.name || "My Widget").slice(0, 24);
   design.kind = ["clock","date","countdown","quote","note","launcher","battery","freestyle"].includes(spec.kind) ? spec.kind : "note";
   if (THEMES[spec.themeID]) design.themeID = spec.themeID;
-  if (["classic","rounded","serif","mono"].includes(spec.fontStyle)) design.fontStyle = spec.fontStyle;
+  if (FONT_CSS[spec.fontStyle]) design.fontStyle = spec.fontStyle;
   if (/^#[0-9a-fA-F]{6}$/.test(spec.textColorHex || "")) design.textColorHex = spec.textColorHex.toUpperCase();
   design.primaryText = spec.primaryText || "";
   design.secondaryText = spec.secondaryText || "";
@@ -1446,7 +1638,7 @@ function specToDesign(spec) {
     return { emoji: app.emoji || "🌐", label: (app.label || "App").slice(0, 12), url: app.url || "" };
   });
   design.canvasElements = (spec.canvasElements || []).slice(0, 12).map(function (el) {
-    const kind = ["text","clock","date","emoji","shape","battery","countdown"].includes(el.kind) ? el.kind : "text";
+    const kind = ["text","clock","date","emoji","icon","shape","battery","countdown","app"].includes(el.kind) ? el.kind : "text";
     const rawW = Number(el.w) || 0;
     const out = {
       id: uid(),
@@ -1470,6 +1662,16 @@ function specToDesign(spec) {
       out.align = ["left","center","right"].includes(el.align) ? el.align : "center";
       out.bold = el.bold !== false;
     }
+    if (kind === "app") {
+      out.label = (el.label || el.text || "App").slice(0, 12);
+      out.url = (el.url || "").trim() ||
+        ("shortcuts://run-shortcut?name=" + encodeURIComponent("Open " + out.label));
+      out.iconUrl = ""; out.emoji = "📲";
+      out.size = Math.min(Math.max(Number(el.size) || 40, 16), 96);
+      out.shape = "rounded"; out.showLabel = false;
+    }
+    if (kind === "icon" && !out.text) out.text = "★";
+    if (el.font && FONT_CSS[el.font]) out.font = el.font;
     return out;
   });
   return normalizeDesign(design);
@@ -1478,7 +1680,9 @@ function specToDesign(spec) {
 // Fill in real App Store icons for launcher apps the AI (or parser) produced.
 // Sequential with spacing to stay under iTunes' rate limit; non-fatal per app.
 async function fetchIconsForApps(design) {
-  const apps = design.apps || [];
+  const apps = (design.apps || []).concat(
+    (design.canvasElements || []).filter(function (el) { return el.kind === "app"; })
+  );
   let changed = false;
   for (const app of apps) {
     if (app.iconUrl) continue;
@@ -1498,7 +1702,7 @@ async function fetchIconsForApps(design) {
   }
   if (changed && design === current) {
     renderLauncherUI();
-    renderPreview();
+    refreshCanvases();
   }
 }
 
@@ -1567,13 +1771,18 @@ function designPreviewHTML(design, sizeKey) {
     const iconCss = "width:" + style.iconSize + "px;height:" + style.iconSize + "px;border-radius:" + radius +
       ";font-size:" + Math.round(style.iconSize * 0.6) + "px";
     const perRow = style.columns > 0 ? style.columns : (sizeKey === "small" ? 2 : 4);
-    let grid = '<div class="launch-grid" style="grid-template-columns:repeat(' + perRow + ',1fr)">';
-    for (const app of apps.slice(0, 12)) {
-      const inner = app.iconUrl
-        ? '<img src="' + esc(app.iconUrl) + '" alt="">'
-        : esc(app.emoji || "🌐");
-      grid += '<div class="launch-cell"><div class="launch-icon" style="' + iconCss + '">' + inner + '</div>' +
-              (style.labels ? '<div class="launch-label">' + esc(app.label || "App") + '</div>' : '') + '</div>';
+    const list = apps.slice(0, 12);
+    let grid = '<div class="launch-flex">';
+    for (let i = 0; i < list.length; i += perRow) {
+      grid += '<div class="launch-row">';
+      for (const app of list.slice(i, i + perRow)) {
+        const inner = app.iconUrl
+          ? '<img src="' + esc(app.iconUrl) + '" alt="">'
+          : esc(app.emoji || "🌐");
+        grid += '<div class="launch-cell"><div class="launch-icon" style="' + iconCss + '">' + inner + '</div>' +
+                (style.labels ? '<div class="launch-label">' + esc(app.label || "App") + '</div>' : '') + '</div>';
+      }
+      grid += '</div>';
     }
     grid += '</div>';
     return grid;
@@ -1621,10 +1830,35 @@ function renderFreestyleInto(node, design, w, h, interactive) {
         div.style.background = "rgba(255,255,255,.15)";
         div.textContent = "🖼";
       }
+    } else if (el.kind === "app") {
+      const pt = (el.size || 40) * scale;
+      const iconBox = document.createElement("div");
+      iconBox.style.cssText = "width:" + pt + "px;height:" + pt + "px;overflow:hidden;margin:0 auto;" +
+        "border-radius:" + (el.shape === "circle" ? "50%" : Math.round(pt * 0.24) + "px") + ";" +
+        "display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.15);" +
+        "font-size:" + Math.round(pt * 0.6) + "px";
+      if (el.iconUrl) {
+        const img = document.createElement("img");
+        img.src = el.iconUrl;
+        img.style.cssText = "width:100%;height:100%;object-fit:cover;pointer-events:none;display:block";
+        iconBox.appendChild(img);
+      } else {
+        iconBox.textContent = el.emoji || "📲";
+      }
+      div.appendChild(iconBox);
+      if (el.showLabel) {
+        const label = document.createElement("div");
+        label.textContent = el.label || "App";
+        label.style.cssText = "font-size:" + Math.max(7, 9 * scale) + "px;opacity:.85;margin-top:2px;color:" +
+          (design.textColorHex || "#FFFFFF");
+        div.appendChild(label);
+      }
+      div.style.opacity = el.opacity;
     } else {
       div.style.fontSize = (el.size * scale) + "px";
       div.style.fontWeight = (el.kind === "text" && el.bold === false) ? "400" : "600";
       div.style.color = el.colorHex;
+      if (el.font && FONT_CSS[el.font]) div.style.fontFamily = FONT_CSS[el.font];
       if (el.kind !== "emoji") div.style.opacity = el.opacity;
       if (el.kind === "text" && el.w > 0) {
         // Text box: fixed width, wraps, top-anchored at its y position.
@@ -1639,6 +1873,7 @@ function renderFreestyleInto(node, design, w, h, interactive) {
       else if (el.kind === "battery") div.textContent = "82%";
       else if (el.kind === "countdown") div.textContent = String(Math.abs(daysFromISO(el.dateISO)));
       else if (el.kind === "symbol") div.textContent = SYMBOL_EMOJI[el.symbolName] || "⭐";
+      else if (el.kind === "icon") div.textContent = el.text || "★";
       else div.textContent = el.text || "Text";
     }
     if (interactive) attachDrag(div, el);
@@ -1727,9 +1962,9 @@ function attachDrag(div, el) {
 }
 
 // ==================== Freestyle palette & inspector ====================
-const ELEMENT_PALETTE = [["text", "Text"], ["photo", "🖼 Photo"], ["clock", "🕐 Clock"],
-  ["date", "📅 Date"], ["emoji", "✨ Emoji"], ["shape", "▢ Shape"],
-  ["battery", "🔋 Battery"], ["countdown", "⏳ Countdown"]];
+const ELEMENT_PALETTE = [["text", "Text"], ["photo", "🖼 Photo"], ["app", "📲 App icon"],
+  ["clock", "🕐 Clock"], ["date", "📅 Date"], ["icon", "◆ Icon"], ["emoji", "✨ Emoji"],
+  ["shape", "▢ Shape"], ["battery", "🔋 Battery"], ["countdown", "⏳ Countdown"]];
 
 let pendingPhoto = null; // {mode:"new"} or {mode:"replace", el}
 
@@ -1740,18 +1975,25 @@ function addElement(kind) {
     return;
   }
   const el = {
-    id: uid(), kind: kind, text: kind === "emoji" ? "✨" : "Your text",
+    id: uid(), kind: kind,
+    text: kind === "emoji" ? "✨" : kind === "icon" ? "★" : "Your text",
     symbolName: "star.fill", x: 0.5, y: 0.5,
     size: kind === "clock" ? 34 : kind === "emoji" ? 30 : kind === "date" ? 14
-      : kind === "battery" ? 30 : kind === "countdown" ? 34 : kind === "shape" ? 0 : 18,
+      : kind === "battery" ? 30 : kind === "countdown" ? 34 : kind === "shape" ? 0
+      : kind === "icon" ? 26 : kind === "app" ? 40 : 18,
     colorHex: "#FFFFFF", opacity: kind === "shape" ? 0.25 : 1
   };
   if (kind === "shape") { el.shape = "rect"; el.w = 0.5; el.h = 0.25; }
   if (kind === "text") { el.w = 0; el.align = "center"; el.bold = true; }
   if (kind === "countdown") { el.dateISO = isoInDays(30); }
+  if (kind === "app") {
+    el.label = "App"; el.url = ""; el.iconUrl = ""; el.emoji = "📲";
+    el.shape = "rounded"; el.showLabel = false;
+  }
   current.canvasElements.push(el);
   selectedElId = el.id;
   refreshEditors();
+  if (kind === "app") toast("Search the App Store in the panel to pick which app 📲");
 }
 
 document.getElementById("photoInput").onchange = function (event) {
@@ -1796,6 +2038,8 @@ document.getElementById("photoInput").onchange = function (event) {
 function labelForElement(el) {
   if (el.kind === "text") return "🅃 " + (el.text || "Text").slice(0, 10);
   if (el.kind === "photo") return "🖼 Photo";
+  if (el.kind === "app") return "📲 " + (el.label || "App");
+  if (el.kind === "icon") return "◆ " + (el.text || "★");
   if (el.kind === "clock") return "🕐 Clock";
   if (el.kind === "date") return "📅 Date";
   if (el.kind === "emoji") return el.text || "✨";
@@ -1884,12 +2128,132 @@ function buildInspectorContent(inspector) {
     inspector.appendChild(alignRow);
   }
 
+  if (el.kind === "icon") {
+    const grid = document.createElement("div");
+    grid.className = "chips";
+    for (const glyph of GLYPHS) {
+      const button = document.createElement("button");
+      button.textContent = glyph;
+      button.style.minWidth = "38px";
+      if (el.text === glyph) button.style.borderColor = "var(--accent)";
+      button.onclick = function () { el.text = glyph; refreshEditors(); };
+      grid.appendChild(button);
+    }
+    inspector.appendChild(grid);
+  }
+
+  if (el.kind === "app") {
+    const searchRow = document.createElement("div");
+    searchRow.className = "row";
+    const searchInput = document.createElement("input");
+    searchInput.type = "text";
+    searchInput.placeholder = "Search the App Store… (e.g. Spotify)";
+    searchInput.style.flex = "1";
+    const searchBtn = document.createElement("button");
+    searchBtn.textContent = "🔍";
+    const results = document.createElement("div");
+    results.className = "chips";
+    async function runSearch() {
+      const term = searchInput.value.trim();
+      if (!term) return;
+      results.innerHTML = '<span class="hint">Searching…</span>';
+      try {
+        const data = await jsonp("https://itunes.apple.com/search?media=software&entity=software&limit=6&term=" + encodeURIComponent(term));
+        results.innerHTML = "";
+        if (!data.results || data.results.length === 0) {
+          results.innerHTML = '<span class="hint">No apps found.</span>';
+          return;
+        }
+        for (const result of data.results) {
+          const pick = document.createElement("button");
+          const img = document.createElement("img");
+          img.src = result.artworkUrl100 || result.artworkUrl60 || "";
+          img.style.cssText = "width:22px;height:22px;border-radius:6px";
+          const label = (result.trackName || "App").split(/[–—:|-]/)[0].trim().slice(0, 14);
+          pick.append(img, document.createTextNode(" " + label));
+          pick.onclick = function () {
+            el.label = label;
+            el.iconUrl = result.artworkUrl512 || result.artworkUrl100 || "";
+            el.url = schemeForName(result.trackName || "") ||
+              ("shortcuts://run-shortcut?name=" + encodeURIComponent("Open " + label));
+            refreshEditors();
+            toast(label + " linked ✓");
+          };
+          results.appendChild(pick);
+        }
+      } catch (e) { results.innerHTML = '<span class="hint">Search failed — check your connection.</span>'; }
+    }
+    searchBtn.onclick = runSearch;
+    searchInput.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") { event.preventDefault(); runSearch(); }
+    });
+    searchRow.append(searchInput, searchBtn);
+    inspector.append(searchRow, results);
+    const urlInput = document.createElement("input");
+    urlInput.type = "text";
+    urlInput.placeholder = "URL or app scheme (e.g. spotify://)";
+    urlInput.value = el.url || "";
+    urlInput.oninput = function () { el.url = urlInput.value.trim(); };
+    inspector.appendChild(urlInput);
+    const optRow = document.createElement("div");
+    optRow.className = "row";
+    optRow.style.marginTop = "8px";
+    const shapeSelect = document.createElement("select");
+    for (const [value, label] of [["rounded", "▢ Rounded"], ["circle", "◯ Circle"]]) {
+      const option = document.createElement("option");
+      option.value = value; option.textContent = label;
+      shapeSelect.appendChild(option);
+    }
+    shapeSelect.value = el.shape || "rounded";
+    shapeSelect.onchange = function () { el.shape = shapeSelect.value; refreshCanvases(); };
+    const labelToggle = document.createElement("label");
+    labelToggle.style.cssText = "font-size:12px;display:flex;align-items:center;gap:4px";
+    const labelCheck = document.createElement("input");
+    labelCheck.type = "checkbox";
+    labelCheck.checked = el.showLabel === true;
+    labelCheck.onchange = function () { el.showLabel = labelCheck.checked; refreshCanvases(); };
+    labelToggle.append(labelCheck, document.createTextNode("Label"));
+    optRow.append(shapeSelect, labelToggle);
+    inspector.appendChild(optRow);
+    const tapHint = document.createElement("p");
+    tapHint.className = "hint";
+    tapHint.innerHTML = "Tappable on <b>Medium/Large</b> widgets; a Small widget opens its first app. shortcuts:// links need the one-time Shortcut setup (see the Launcher section).";
+    inspector.appendChild(tapHint);
+  }
+
   if (el.kind === "countdown") {
     const dateInput = document.createElement("input");
     dateInput.type = "date";
     dateInput.value = el.dateISO || "";
     dateInput.onchange = function () { el.dateISO = dateInput.value; refreshCanvases(); };
     inspector.appendChild(dateInput);
+  }
+
+  if (["text", "clock", "date", "countdown", "battery", "icon"].includes(el.kind)) {
+    const fontRow = document.createElement("div");
+    fontRow.className = "row";
+    const fontLabel = document.createElement("span");
+    fontLabel.textContent = "Font";
+    fontLabel.style.cssText = "font-size:12px;color:var(--muted);width:52px";
+    const fontSel = document.createElement("select");
+    const defaultOpt = document.createElement("option");
+    defaultOpt.value = "";
+    defaultOpt.textContent = "Design font (" + (FONT_LABELS[current.fontStyle] || "Rounded") + ")";
+    fontSel.appendChild(defaultOpt);
+    for (const id of Object.keys(FONT_CSS)) {
+      const option = document.createElement("option");
+      option.value = id;
+      option.textContent = FONT_LABELS[id] || id;
+      option.style.fontFamily = FONT_CSS[id];
+      fontSel.appendChild(option);
+    }
+    fontSel.value = el.font && FONT_CSS[el.font] ? el.font : "";
+    fontSel.onchange = function () {
+      if (fontSel.value) { el.font = fontSel.value; } else { delete el.font; }
+      refreshCanvases();
+    };
+    fontRow.append(fontLabel, fontSel);
+    inspector.appendChild(fontRow);
   }
 
   if (el.kind === "shape") {
@@ -1931,11 +2295,13 @@ function buildInspectorContent(inspector) {
     shapeRow.append(shapeSelect, replaceBtn);
     inspector.appendChild(shapeRow);
     sliderRow("Width", 5, 100, Math.round((el.w || 0.55) * 100), function (v) { el.w = v / 100; });
+  } else if (el.kind === "app") {
+    sliderRow("Size", 16, 96, el.size, function (v) { el.size = v; });
   } else {
     sliderRow("Size", 8, 80, el.size, function (v) { el.size = v; });
   }
 
-  if (el.kind !== "emoji" && el.kind !== "photo") {
+  if (el.kind !== "emoji" && el.kind !== "photo" && el.kind !== "app") {
     const colorRow = document.createElement("div");
     colorRow.className = "row";
     const colorLabel = document.createElement("span");
@@ -2096,6 +2462,21 @@ function convertToFreestyle(design) {
     if (design.secondaryText) add({ text: "— " + design.secondaryText, y: 0.72, size: 11, opacity: 0.75 });
   } else if (design.kind === "battery") {
     add({ kind: "battery", y: 0.5, size: 38 });
+  } else if (design.kind === "launcher") {
+    const apps = (design.apps || []).slice(0, 12);
+    const ls = launcherStyleOf(design);
+    const perRow = ls.columns > 0 ? ls.columns : Math.min(4, Math.max(2, apps.length));
+    const rows = Math.max(1, Math.ceil(apps.length / perRow));
+    apps.forEach(function (app, i) {
+      const r = Math.floor(i / perRow);
+      const inRow = (r === rows - 1) ? apps.length - r * perRow : perRow;
+      const c = i % perRow;
+      els.push({ id: uid(), kind: "app", label: app.label || "App", url: app.url || "",
+        iconUrl: app.iconUrl || "", emoji: app.emoji || "📲",
+        x: (c + 1) / (inRow + 1), y: (r + 1) / (rows + 1),
+        size: ls.iconSize, shape: ls.shape === "circle" ? "circle" : "rounded",
+        showLabel: ls.labels, opacity: 1, text: "", symbolName: "star.fill", colorHex: "#FFFFFF" });
+    });
   } else {
     add({ text: design.primaryText || design.name || "Your text", y: 0.5, size: 18, w: 0.84, align: "center", bold: true });
   }
@@ -2105,10 +2486,6 @@ function convertToFreestyle(design) {
 }
 
 function openStudio() {
-  if (current.kind === "launcher") {
-    toast("Launchers have their own editor below — Studio is for freestyle designs");
-    return;
-  }
   const converted = convertToFreestyle(current);
   studioOpen = true;
   studioSize = previewSize;
@@ -2608,7 +2985,6 @@ function renderAll() {
   renderLauncherUI();
   renderPreview();
   updateMagicHint();
-  document.getElementById("openStudioBtn").style.display = current.kind === "launcher" ? "none" : "block";
 }
 function updateMagicHint() {
   document.getElementById("magicHint").textContent = getApiKey()
@@ -2897,6 +3273,18 @@ setInterval(function () {
   if (current.kind === "clock" || current.kind === "freestyle") renderPreview();
 }, 30000);
 
+(function buildFontSelect() {
+  const select = document.getElementById("fontSelect");
+  select.innerHTML = "";
+  for (const id of Object.keys(FONT_CSS)) {
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = FONT_LABELS[id] || id;
+    option.style.fontFamily = FONT_CSS[id];
+    if (id === "rounded") option.selected = true;
+    select.appendChild(option);
+  }
+})();
 setupLauncherControls();
 renderTemplates();
 renderLibrary();
