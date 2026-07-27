@@ -142,6 +142,45 @@ function drawFreestyle(design, family) {
   return ctx.getImage();
 }
 
+function buildLauncher(w, design, family, tc, style) {
+  const apps = (design.apps || []).slice(0, 12);
+  if (apps.length === 0) { centeredText(w, "Add apps in the designer", fontFor(style, 13, true), tc); return; }
+  const perRow = family === "small" ? 2 : 4;
+  // iOS allows only one tap target on small widgets — the whole widget opens
+  // the first app there; medium/large get per-icon tap targets.
+  if (family === "small" && apps[0].url) w.url = apps[0].url;
+  w.addSpacer();
+  for (let i = 0; i < apps.length; i += perRow) {
+    const row = w.addStack();
+    row.layoutHorizontally();
+    row.addSpacer();
+    for (const app of apps.slice(i, i + perRow)) {
+      const cell = row.addStack();
+      cell.layoutVertically();
+      cell.centerAlignContent();
+      if (app.url) cell.url = app.url;
+      const iconRow = cell.addStack();
+      iconRow.layoutHorizontally();
+      iconRow.addSpacer();
+      const icon = iconRow.addText(app.emoji || "🌐");
+      icon.font = Font.systemFont(family === "small" ? 26 : 30);
+      iconRow.addSpacer();
+      const labelRow = cell.addStack();
+      labelRow.layoutHorizontally();
+      labelRow.addSpacer();
+      const label = labelRow.addText(app.label || "App");
+      label.font = fontFor(style, 9, false);
+      label.textColor = tc;
+      label.textOpacity = 0.85;
+      label.lineLimit = 1;
+      labelRow.addSpacer();
+      row.addSpacer();
+    }
+    if (i + perRow < apps.length) w.addSpacer(10);
+  }
+  w.addSpacer();
+}
+
 function buildWidget(design) {
   const family = config.widgetFamily || "small";
   const w = new ListWidget();
@@ -160,6 +199,11 @@ function buildWidget(design) {
     w.setPadding(0, 0, 0, 0);
     w.backgroundImage = drawFreestyle(design, family);
     w.refreshAfterDate = new Date(Date.now() + 5 * 60 * 1000);
+    return w;
+  }
+
+  if (design.kind === "launcher") {
+    buildLauncher(w, design, family, tc, style);
     return w;
   }
 
@@ -205,6 +249,13 @@ function buildWidget(design) {
       if (design.secondaryText) {
         centeredText(w, "— " + design.secondaryText, fontFor(style, 11, false), tc).textOpacity = 0.75;
       }
+      break;
+    }
+    case "battery": {
+      const level = Math.round(Device.batteryLevel() * 100);
+      centeredText(w, "🔋", Font.systemFont(22), tc);
+      centeredText(w, level + "%", fontFor(style, 40, true), tc);
+      centeredText(w, Device.isCharging() ? "charging" : "battery", fontFor(style, 11, false), tc).textOpacity = 0.75;
       break;
     }
     default: {

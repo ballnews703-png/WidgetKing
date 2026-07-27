@@ -29,7 +29,7 @@
   }
   h2 { font-size: 16px; margin-bottom: 10px; }
   .hint { color: var(--muted); font-size: 13px; margin-bottom: 10px; line-height: 1.45; }
-  textarea, input[type=text], input[type=date], select {
+  textarea, input[type=text], input[type=password], input[type=date], select {
     width: 100%; background: var(--card2); color: var(--text);
     border: 1px solid #34343f; border-radius: 10px;
     padding: 10px 12px; font-size: 14px; font-family: inherit;
@@ -42,6 +42,7 @@
   }
   button:hover { border-color: var(--accent); }
   button.primary { background: var(--accent); border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: .5; cursor: default; }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
   .chips button { font-size: 12px; border-radius: 999px; padding: 6px 12px; }
   .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -53,10 +54,7 @@
     background: var(--accent); border-color: var(--accent); font-weight: 600;
   }
   .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
-  .swatch {
-    width: 34px; height: 34px; border-radius: 50%; cursor: pointer;
-    border: 2px solid transparent;
-  }
+  .swatch { width: 34px; height: 34px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
   .swatch.active { border-color: #fff; }
   #canvasWrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
   #canvas {
@@ -68,20 +66,28 @@
   #canvas .cel { position: absolute; transform: translate(-50%, -50%); cursor: grab;
     white-space: nowrap; line-height: 1.1; touch-action: none; }
   #canvas .cel.selected { outline: 1.5px dashed rgba(255,255,255,.9); outline-offset: 3px; border-radius: 6px; }
+  .launch-grid { display: grid; gap: 10px; padding: 10px; }
+  .launch-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .launch-icon { width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,.18);
+    display: flex; align-items: center; justify-content: center; font-size: 22px; }
+  .launch-label { font-size: 9px; opacity: .85; }
   #inspector { background: var(--card2); border-radius: 12px; padding: 12px; margin-top: 10px; }
-  #inspector .row { margin-bottom: 8px; }
   input[type=range] { flex: 1; }
   input[type=color] { width: 44px; height: 32px; border: none; background: none; padding: 0; cursor: pointer; }
-  .lib-item {
-    display: flex; align-items: center; gap: 12px; padding: 10px;
-    border-radius: 12px; background: var(--card2); margin-bottom: 8px;
-  }
+  .lib-item { display: flex; align-items: center; gap: 12px; padding: 10px;
+    border-radius: 12px; background: var(--card2); margin-bottom: 8px; }
   .lib-thumb { width: 46px; height: 46px; border-radius: 12px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center; font-size: 20px; }
   .lib-item .name { font-weight: 600; font-size: 14px; }
   .lib-item .kind { color: var(--muted); font-size: 12px; }
   .lib-item .spacer { flex: 1; }
   .lib-item button { font-size: 12px; padding: 6px 10px; }
+  .app-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .app-tag { display: flex; align-items: center; gap: 6px; background: var(--card2);
+    border: 1px solid #34343f; border-radius: 999px; padding: 4px 10px; font-size: 13px; }
+  .app-tag button { border: none; background: none; padding: 0 2px; font-size: 13px; color: var(--muted); }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   ol { padding-left: 20px; }
   ol li { margin-bottom: 6px; font-size: 14px; color: var(--muted); line-height: 1.5; }
   ol li b { color: var(--text); }
@@ -89,19 +95,32 @@
     position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
     background: var(--accent); padding: 10px 18px; border-radius: 999px;
     font-size: 14px; font-weight: 600; opacity: 0; transition: opacity .25s; pointer-events: none;
+    max-width: 90vw; text-align: center; z-index: 10;
   }
 </style>
 </head>
 <body>
 
-<header><h1>👑 WidgetKing</h1><span>Designer — no Mac, no AI, no cost</span></header>
+<header><h1>👑 WidgetKing</h1><span>Designer</span></header>
 
 <section id="magicSection">
   <h2>✨ Magic — type an idea</h2>
-  <p class="hint">Describe the widget you want and it's built instantly, entirely in your browser. No AI, no network.</p>
-  <textarea id="magicInput" placeholder="Countdown to my birthday on October 12, sunset colors"></textarea>
+  <p class="hint" id="magicHint"></p>
+  <textarea id="magicInput" placeholder="A launcher with Spotify, Instagram and YouTube"></textarea>
   <div class="chips" id="magicChips"></div>
   <button class="primary" id="magicBtn">Build it ✨</button>
+  <details>
+    <summary>🤖 Optional: use Claude AI for smarter results</summary>
+    <p class="hint" style="margin-top:8px">
+      Paste an Anthropic API key and the Magic box sends your idea straight from
+      this browser to Claude, which designs the whole widget — layout, colors,
+      apps, dates, everything. <b>This is the only paid thing in WidgetKing</b>:
+      API keys are pay-per-use (roughly a few cents per widget). Leave it empty
+      and the free built-in parser is used. The key is stored only in this
+      browser.
+    </p>
+    <input type="password" id="apiKeyInput" placeholder="sk-ant-…" autocomplete="off">
+  </details>
 </section>
 
 <section>
@@ -133,6 +152,21 @@
         <label>Note</label>
         <input type="text" id="noteText" placeholder="Your text">
       </div>
+      <div class="field" id="fLauncher" style="display:none">
+        <label>Apps (tap a widget icon to open the app)</label>
+        <div class="app-list" id="appList"></div>
+        <div class="row" style="margin-bottom:8px">
+          <select id="appPreset" style="flex:1"></select>
+          <button id="addPresetApp">Add</button>
+        </div>
+        <div class="row">
+          <input type="text" id="customEmoji" placeholder="🌐" style="width:56px">
+          <input type="text" id="customLabel" placeholder="Label" style="flex:1">
+          <input type="text" id="customUrl" placeholder="URL or app scheme (e.g. spotify://)" style="flex:2">
+          <button id="addCustomApp">Add</button>
+        </div>
+        <p class="hint" style="margin-top:6px">Heads-up: iOS only allows multiple tap targets on <b>Medium and Large</b> widgets. On a Small widget, tapping anywhere opens the first app.</p>
+      </div>
       <div class="field"><label>Theme</label><div class="swatches" id="themeSwatches"></div></div>
       <div class="field"><label>Font</label><select id="fontSelect">
         <option value="classic">Classic</option><option value="rounded" selected>Rounded</option>
@@ -163,13 +197,13 @@
   <h2>📱 Put it on your iPhone (no Mac needed)</h2>
   <ol>
     <li>Install the free <b>Scriptable</b> app from the App Store.</li>
-    <li>Design your widgets above, then tap <b>Copy Scriptable Script</b> (or Download it and send it to your phone via Notes, email, or messages).</li>
-    <li>In Scriptable, tap <b>+</b>, paste the script, and name it <b>WidgetKing</b>.</li>
-    <li>Long-press your Home Screen → <b>Edit → Add Widget</b> → search <b>Scriptable</b> → add a widget.</li>
-    <li>Long-press the new widget → <b>Edit Widget</b> → set Script to <b>WidgetKing</b>, and set <b>Parameter</b> to a design's name to choose which one it shows. Add more widgets with different parameters — designs are fully interchangeable.</li>
-    <li>Changed your designs? Copy the script again and paste over the old one in Scriptable.</li>
+    <li>Design widgets above, then tap <b>Copy Scriptable Script</b>.</li>
+    <li>In Scriptable, tap <b>+</b>, paste, and name it <b>WidgetKing</b>.</li>
+    <li>Long-press your Home Screen → <b>Edit → Add Widget</b> → search <b>Scriptable</b> → add a widget (use <b>Medium/Large</b> for launchers so every icon is tappable).</li>
+    <li>Long-press the widget → <b>Edit Widget</b> → Script: <b>WidgetKing</b>, and set <b>Parameter</b> to a design's name. Different widgets can show different designs.</li>
+    <li>Changed your designs? Copy the script again and paste over the old one.</li>
   </ol>
-  <p class="hint">Note: iOS refreshes Scriptable widgets on its own schedule (every few minutes), so clock widgets are close but not to-the-second. Everything runs on your devices — nothing is uploaded anywhere.</p>
+  <p class="hint">iOS refreshes Scriptable widgets on its own schedule (every few minutes), so clock and battery values are close but not live to-the-second. Everything runs on your devices — nothing is uploaded anywhere.</p>
 </section>
 
 <div id="toast"></div>
@@ -255,6 +289,42 @@ function drawFreestyle(design, family) {
   }
   return ctx.getImage();
 }
+function buildLauncher(w, design, family, tc, style) {
+  const apps = (design.apps || []).slice(0, 12);
+  if (apps.length === 0) { centeredText(w, "Add apps in the designer", fontFor(style, 13, true), tc); return; }
+  const perRow = family === "small" ? 2 : 4;
+  if (family === "small" && apps[0].url) w.url = apps[0].url;
+  w.addSpacer();
+  for (let i = 0; i < apps.length; i += perRow) {
+    const row = w.addStack();
+    row.layoutHorizontally();
+    row.addSpacer();
+    for (const app of apps.slice(i, i + perRow)) {
+      const cell = row.addStack();
+      cell.layoutVertically();
+      cell.centerAlignContent();
+      if (app.url) cell.url = app.url;
+      const iconRow = cell.addStack();
+      iconRow.layoutHorizontally();
+      iconRow.addSpacer();
+      const icon = iconRow.addText(app.emoji || "🌐");
+      icon.font = Font.systemFont(family === "small" ? 26 : 30);
+      iconRow.addSpacer();
+      const labelRow = cell.addStack();
+      labelRow.layoutHorizontally();
+      labelRow.addSpacer();
+      const label = labelRow.addText(app.label || "App");
+      label.font = fontFor(style, 9, false);
+      label.textColor = tc;
+      label.textOpacity = 0.85;
+      label.lineLimit = 1;
+      labelRow.addSpacer();
+      row.addSpacer();
+    }
+    if (i + perRow < apps.length) w.addSpacer(10);
+  }
+  w.addSpacer();
+}
 function buildWidget(design) {
   const family = config.widgetFamily || "small";
   const w = new ListWidget();
@@ -270,6 +340,10 @@ function buildWidget(design) {
     w.setPadding(0, 0, 0, 0);
     w.backgroundImage = drawFreestyle(design, family);
     w.refreshAfterDate = new Date(Date.now() + 5 * 60 * 1000);
+    return w;
+  }
+  if (design.kind === "launcher") {
+    buildLauncher(w, design, family, tc, style);
     return w;
   }
   w.addSpacer();
@@ -307,6 +381,13 @@ function buildWidget(design) {
       }
       break;
     }
+    case "battery": {
+      const level = Math.round(Device.batteryLevel() * 100);
+      centeredText(w, "🔋", Font.systemFont(22), tc);
+      centeredText(w, level + "%", fontFor(style, 40, true), tc);
+      centeredText(w, Device.isCharging() ? "charging" : "battery", fontFor(style, 11, false), tc).textOpacity = 0.75;
+      break;
+    }
     default: {
       centeredText(w, design.primaryText || design.name || "WidgetKing", fontFor(style, 18, true), tc);
     }
@@ -324,7 +405,7 @@ if (!design) {
   if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentSmall(); }
 } else {
   const w = buildWidget(design);
-  if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentSmall(); }
+  if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentMedium(); }
 }
 Script.complete();
 </script>
@@ -342,8 +423,10 @@ const THEMES = {
 };
 const KINDS = [
   ["clock", "🕐 Clock"], ["date", "📅 Date"], ["countdown", "⏳ Countdown"],
-  ["quote", "💬 Quote"], ["note", "📝 Note"], ["freestyle", "🎨 Freestyle"]
+  ["quote", "💬 Quote"], ["note", "📝 Note"], ["launcher", "🚀 Launcher"],
+  ["battery", "🔋 Battery"], ["freestyle", "🎨 Freestyle"]
 ];
+const KIND_ICONS = { clock: "🕐", date: "📅", countdown: "⏳", quote: "💬", note: "📝", launcher: "🚀", battery: "🔋", freestyle: "🎨" };
 const SIZES = { small: [158, 158], medium: [338, 158], large: [338, 354] };
 const FONT_CSS = {
   classic: "-apple-system, 'Segoe UI', sans-serif",
@@ -358,19 +441,62 @@ const SYMBOL_EMOJI = {
   "leaf.fill": "🍃", "flame.fill": "🔥", "sparkles": "✨",
   "music.note": "🎵", "pawprint.fill": "🐾", "crown.fill": "👑"
 };
+
+// App presets for launcher widgets. Keys are also used by the Magic parser
+// to spot app names inside ideas.
+const APP_PRESETS = {
+  "phone":     { emoji: "📞", label: "Phone",     url: "tel://" },
+  "messages":  { emoji: "💬", label: "Messages",  url: "sms://" },
+  "mail":      { emoji: "✉️", label: "Mail",      url: "mailto:" },
+  "safari":    { emoji: "🧭", label: "Safari",    url: "https://www.google.com" },
+  "photos":    { emoji: "🖼", label: "Photos",    url: "photos-redirect://" },
+  "camera":    { emoji: "📷", label: "Camera",    url: "camera://" },
+  "maps":      { emoji: "🗺", label: "Maps",      url: "maps://" },
+  "calendar":  { emoji: "🗓", label: "Calendar",  url: "calshow://" },
+  "notes":     { emoji: "📒", label: "Notes",     url: "mobilenotes://" },
+  "music":     { emoji: "🎵", label: "Music",     url: "music://" },
+  "shortcuts": { emoji: "⚙️", label: "Shortcuts", url: "shortcuts://" },
+  "instagram": { emoji: "📸", label: "Instagram", url: "instagram://" },
+  "spotify":   { emoji: "🎧", label: "Spotify",   url: "spotify://" },
+  "youtube":   { emoji: "▶️", label: "YouTube",   url: "youtube://" },
+  "tiktok":    { emoji: "🎬", label: "TikTok",    url: "tiktok://" },
+  "snapchat":  { emoji: "👻", label: "Snapchat",  url: "snapchat://" },
+  "whatsapp":  { emoji: "🟢", label: "WhatsApp",  url: "whatsapp://" },
+  "twitter":   { emoji: "🐦", label: "X",         url: "twitter://" },
+  "x":         { emoji: "🐦", label: "X",         url: "twitter://" },
+  "facebook":  { emoji: "📘", label: "Facebook",  url: "fb://" },
+  "reddit":    { emoji: "👽", label: "Reddit",    url: "reddit://" },
+  "netflix":   { emoji: "🎥", label: "Netflix",   url: "nflx://" },
+  "gmail":     { emoji: "📮", label: "Gmail",     url: "googlegmail://" },
+  "chrome":    { emoji: "🌐", label: "Chrome",    url: "googlechrome://" }
+};
+
+// Words the Magic parser can turn into freestyle decorations.
+const DECOR_EMOJI = {
+  moon: "🌙", star: "⭐", stars: "✨", sparkle: "✨", sparkles: "✨",
+  heart: "❤️", hearts: "❤️", fire: "🔥", flame: "🔥", sun: "☀️",
+  cloud: "☁️", clouds: "☁️", leaf: "🍃", flower: "🌸", flowers: "🌸",
+  music: "🎵", dog: "🐾", cat: "🐾", paw: "🐾", crown: "👑",
+  coffee: "☕", book: "📚", plane: "✈️", wave: "🌊", bolt: "⚡",
+  lightning: "⚡", rainbow: "🌈", skull: "💀", ghost: "👻", cherry: "🍒"
+};
+
 const EXAMPLES = [
+  "A launcher with Spotify, Instagram and YouTube",
   "Countdown to my birthday on October 12",
-  'A sunset quote widget: "Dream big" — Mom',
-  "Minimal dark clock with a serif font",
-  "Note that says Drink water! in mint green"
+  "Dark clock with a moon and stars",
+  "Battery widget in mint green",
+  'Note that says Drink water! with a sunset theme'
 ];
 
+function uid() {
+  return crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
+}
 function newDesign() {
   return {
-    id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random())),
-    name: "My Widget", kind: "clock", themeID: "midnight", fontStyle: "rounded",
-    textColorHex: "#FFFFFF", primaryText: "", secondaryText: "",
-    targetDate: "", canvasElements: []
+    id: uid(), name: "My Widget", kind: "clock", themeID: "midnight",
+    fontStyle: "rounded", textColorHex: "#FFFFFF", primaryText: "",
+    secondaryText: "", targetDate: "", canvasElements: [], apps: []
   };
 }
 
@@ -383,26 +509,26 @@ function loadDesigns() {
   try { return JSON.parse(localStorage.getItem("widgetking.designs") || "[]"); }
   catch (e) { return []; }
 }
-function persist() {
-  localStorage.setItem("widgetking.designs", JSON.stringify(designs));
-}
+function persist() { localStorage.setItem("widgetking.designs", JSON.stringify(designs)); }
 function toast(message) {
   const el = document.getElementById("toast");
   el.textContent = message;
   el.style.opacity = 1;
-  setTimeout(function () { el.style.opacity = 0; }, 2200);
+  setTimeout(function () { el.style.opacity = 0; }, 2600);
 }
+function getApiKey() { return (localStorage.getItem("widgetking.apikey") || "").trim(); }
 
-// ---------- Magic parser (pure JS, no AI) ----------
+// ==================== Magic: local parser ====================
 function parseIdea(idea) {
   const lower = idea.toLowerCase();
   const design = newDesign();
 
+  // Theme from color/mood keywords.
   const themeWords = [
     ["sunset", ["sunset", "orange", "warm"]], ["ocean", ["ocean", "sea", "blue", "water"]],
     ["forest", ["forest", "green", "nature"]], ["midnight", ["dark", "black", "midnight", "night"]],
     ["royal", ["purple", "royal"]], ["candy", ["pink", "candy", "cute"]],
-    ["lava", ["red", "lava", "fire"]], ["gold", ["gold", "yellow"]],
+    ["lava", ["red", "lava"]], ["gold", ["gold", "yellow"]],
     ["berry", ["berry", "violet"]], ["mist", ["gray", "grey", "mist", "slate"]],
     ["mint", ["mint", "teal", "aqua"]], ["paper", ["white", "light", "paper", "cream", "minimal"]]
   ];
@@ -412,38 +538,139 @@ function parseIdea(idea) {
   if (design.themeID === "paper") design.textColorHex = "#333333";
 
   if (/serif|elegant|fancy/.test(lower)) design.fontStyle = "serif";
-  else if (/mono|code|terminal/.test(lower)) design.fontStyle = "mono";
+  else if (/\bmono\b|code|terminal/.test(lower)) design.fontStyle = "mono";
   else if (/classic/.test(lower)) design.fontStyle = "classic";
 
-  const quoteMatch = idea.match(/"([^"]+)"/) || idea.match(/“([^”]+)”/) || idea.match(/'([^']+)'/);
+  const quoteMatch = idea.match(/"([^"]+)"/) || idea.match(/“([^”]+)”/) || idea.match(/'([^']{2,})'/);
   const quoted = quoteMatch ? quoteMatch[1].trim() : null;
   const authorMatch = idea.match(/(?:—|–|\s-\s|\bby\s)\s*([A-Za-z][A-Za-z .'-]{1,38})\s*$/);
   const author = authorMatch ? authorMatch[1].trim() : null;
   const date = findDate(idea, lower);
+  const saysText = extractSaysText(idea, lower);
+  const foundApps = findApps(lower);
+  const decorations = findDecorations(lower);
+  const wantsClock = /clock|the time\b|show.*time/.test(lower);
+  const wantsDate = /\bdate\b|calendar|today/.test(lower);
 
-  if (/countdown|days until|until/.test(lower) || (date && !/clock/.test(lower))) design.kind = "countdown";
-  else if (/quote/.test(lower) || (quoted && author)) design.kind = "quote";
-  else if (/clock|time/.test(lower)) design.kind = "clock";
-  else if (/\bdate\b|calendar|today/.test(lower)) design.kind = "date";
-  else design.kind = "note";
-
-  if (design.kind === "countdown") {
+  // Decide the widget kind, most specific first.
+  if (foundApps.length >= 2 || (/launcher|shortcuts?|app icons|open apps|quick launch/.test(lower) && foundApps.length >= 1)) {
+    design.kind = "launcher";
+    design.apps = foundApps.length ? foundApps : defaultApps();
+    design.name = "Launcher";
+  } else if (/battery|charge\b|charging/.test(lower)) {
+    design.kind = "battery";
+    design.name = "Battery";
+  } else if (/countdown|days until|days to|\buntil\b/.test(lower) || (date && !wantsClock)) {
+    design.kind = "countdown";
     design.targetDate = date || isoInDays(30);
     design.primaryText = eventTitle(idea);
     design.name = design.primaryText || "Countdown";
-  } else if (design.kind === "quote") {
-    design.primaryText = quoted || idea.slice(0, 80);
+  } else if (/quote/.test(lower) || (quoted && author)) {
+    design.kind = "quote";
+    design.primaryText = quoted || saysText || cleanedIdeaText(idea, 80);
     design.secondaryText = author || "";
     design.name = "Quote";
-  } else if (design.kind === "note") {
-    design.primaryText = quoted || idea.slice(0, 60);
+  } else if ((wantsClock || wantsDate) && decorations.length > 0) {
+    // "clock with moon and stars" → a composed freestyle layout.
+    design.kind = "freestyle";
+    design.canvasElements = composeFreestyle(wantsClock, wantsDate, saysText || quoted, decorations, design.textColorHex);
+    design.name = wantsClock ? "Clock" : "Date";
+  } else if (wantsClock) {
+    design.kind = "clock"; design.name = "Clock";
+  } else if (wantsDate) {
+    design.kind = "date"; design.name = "Date";
+  } else if (saysText || quoted) {
+    design.kind = "note";
+    design.primaryText = saysText || quoted;
     design.name = "Note";
+  } else if (decorations.length > 0) {
+    // Pure decoration idea → freestyle with the emoji + any leftover words.
+    design.kind = "freestyle";
+    design.canvasElements = composeFreestyle(false, false, cleanedIdeaText(idea, 24), decorations, design.textColorHex);
+    design.name = "Freestyle";
   } else {
-    design.name = design.kind === "clock" ? "Clock" : "Date";
+    design.kind = "note";
+    design.primaryText = cleanedIdeaText(idea, 60);
+    design.name = "Note";
   }
   return design;
 }
 
+function extractSaysText(idea, lower) {
+  const markers = ["that says", "which says", "saying", "that reads", "with the text", "with text", "says"];
+  for (const marker of markers) {
+    const index = lower.indexOf(marker);
+    if (index >= 0) {
+      let text = idea.slice(index + marker.length);
+      // Stop at style descriptors so "says Drink water! with a sunset theme" keeps only the note.
+      const stop = text.search(/\b(in|with|on|using)\s+(a\s+)?[a-z]+\s*(green|blue|red|pink|purple|gold|theme|colors?|font|background)/i);
+      if (stop > 0) text = text.slice(0, stop);
+      text = text.replace(/^[\s:,"'“”]+|[\s"'“”]+$/g, "");
+      if (text) return text;
+    }
+  }
+  return null;
+}
+function cleanedIdeaText(idea, limit) {
+  let text = idea
+    .replace(/^(please\s+)?(make|create|build|design|give)\s*(me\s*)?(a|an)?\s*/i, "")
+    .replace(/\bwidget\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  if (!text) text = idea.trim();
+  if (text.length > limit) text = text.slice(0, limit).trim() + "…";
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+function findApps(lower) {
+  const found = [];
+  const seen = new Set();
+  for (const key of Object.keys(APP_PRESETS)) {
+    if (lower.includes(key)) {
+      const app = APP_PRESETS[key];
+      if (!seen.has(app.label)) { seen.add(app.label); found.push(Object.assign({}, app)); }
+    }
+  }
+  return found;
+}
+function defaultApps() {
+  return ["phone", "messages", "camera", "maps"].map(function (k) { return Object.assign({}, APP_PRESETS[k]); });
+}
+function findDecorations(lower) {
+  const found = [];
+  const seen = new Set();
+  for (const word of Object.keys(DECOR_EMOJI)) {
+    if (new RegExp("\\b" + word + "s?\\b").test(lower)) {
+      const emoji = DECOR_EMOJI[word];
+      if (!seen.has(emoji)) { seen.add(emoji); found.push(emoji); }
+    }
+    if (found.length >= 4) break;
+  }
+  return found;
+}
+function composeFreestyle(wantsClock, wantsDate, text, decorations, colorHex) {
+  const elements = [];
+  const spots = [[0.18, 0.16], [0.84, 0.2], [0.16, 0.84], [0.85, 0.8]];
+  decorations.slice(0, 4).forEach(function (emoji, index) {
+    elements.push({ id: uid(), kind: "emoji", text: emoji, symbolName: "star.fill",
+      x: spots[index][0], y: spots[index][1], size: 22, colorHex: "#FFFFFF" });
+  });
+  if (wantsClock) {
+    elements.push({ id: uid(), kind: "clock", text: "", symbolName: "star.fill",
+      x: 0.5, y: 0.44, size: 34, colorHex: colorHex });
+  }
+  if (wantsDate) {
+    elements.push({ id: uid(), kind: "date", text: "", symbolName: "star.fill",
+      x: 0.5, y: wantsClock ? 0.66 : 0.48, size: 14, colorHex: colorHex });
+  }
+  if (text && !wantsClock && !wantsDate) {
+    elements.push({ id: uid(), kind: "text", text: text, symbolName: "star.fill",
+      x: 0.5, y: 0.5, size: 20, colorHex: colorHex });
+  } else if (text) {
+    elements.push({ id: uid(), kind: "text", text: text, symbolName: "star.fill",
+      x: 0.5, y: 0.82, size: 12, colorHex: colorHex });
+  }
+  return elements;
+}
 function isoInDays(days) {
   const d = new Date(Date.now() + days * 86400000);
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
@@ -492,7 +719,122 @@ function eventTitle(idea) {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
 }
 
-// ---------- Preview rendering ----------
+// ==================== Magic: optional Claude AI ====================
+const AI_SCHEMA = {
+  type: "object",
+  properties: {
+    name: { type: "string", description: "Short widget name, max 24 characters" },
+    kind: { type: "string", "enum": ["clock", "date", "countdown", "quote", "note", "launcher", "battery", "freestyle"] },
+    themeID: { type: "string", "enum": Object.keys(THEMES) },
+    fontStyle: { type: "string", "enum": ["classic", "rounded", "serif", "mono"] },
+    textColorHex: { type: "string", description: "#RRGGBB text color readable on the theme" },
+    primaryText: { type: "string", description: "Quote/note text or countdown title; empty if unused" },
+    secondaryText: { type: "string", description: "Quote author; empty if unused" },
+    targetDate: { type: "string", description: "yyyy-MM-dd for countdowns; empty otherwise" },
+    apps: {
+      type: "array",
+      description: "For launcher widgets only, max 8; empty otherwise",
+      items: {
+        type: "object",
+        properties: {
+          emoji: { type: "string" },
+          label: { type: "string" },
+          url: { type: "string", description: "iOS URL scheme, e.g. spotify://, instagram://, tel://, sms://, youtube://, maps://, or an https:// URL" }
+        },
+        required: ["emoji", "label", "url"],
+        additionalProperties: false
+      }
+    },
+    canvasElements: {
+      type: "array",
+      description: "For freestyle widgets only, max 8; empty otherwise. Position is normalized 0-1 from top-left; size is point size on a 158pt canvas.",
+      items: {
+        type: "object",
+        properties: {
+          kind: { type: "string", "enum": ["text", "clock", "date", "emoji"] },
+          text: { type: "string" },
+          x: { type: "number" },
+          y: { type: "number" },
+          size: { type: "number" },
+          colorHex: { type: "string" }
+        },
+        required: ["kind", "text", "x", "y", "size", "colorHex"],
+        additionalProperties: false
+      }
+    }
+  },
+  required: ["name", "kind", "themeID", "fontStyle", "textColorHex", "primaryText", "secondaryText", "targetDate", "apps", "canvasElements"],
+  additionalProperties: false
+};
+
+function aiSystemPrompt() {
+  const today = new Date().toISOString().slice(0, 10);
+  return "You design iPhone Home Screen widgets for WidgetKing. The user describes a widget; return a spec.\n" +
+    "Kinds: clock (time+date), date (big day), countdown (days until an event), quote, note (short text), " +
+    "launcher (grid of tappable app icons with iOS URL schemes), battery (device battery level), " +
+    "freestyle (compose elements on a canvas — use it for creative/decorated requests, placing elements thoughtfully with normalized 0-1 coordinates).\n" +
+    "Themes: " + Object.keys(THEMES).join(", ") + ". 'paper' is light (use dark text like #333333); the rest are dark (use light text).\n" +
+    "Common app URL schemes: instagram://, spotify://, youtube://, tiktok://, twitter://, snapchat://, whatsapp://, fb://, reddit://, googlegmail://, googlechrome://, nflx://, music://, maps://, calshow://, mobilenotes://, shortcuts://, tel://, sms://, mailto:, photos-redirect://, camera://.\n" +
+    "Today is " + today + ". Resolve relative dates to yyyy-MM-dd. Keep names under 24 chars. Fill unused fields with empty strings or empty arrays.";
+}
+
+async function callClaude(idea, key) {
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    body: JSON.stringify({
+      model: "claude-opus-5",
+      max_tokens: 16000,
+      system: aiSystemPrompt(),
+      output_config: { format: { type: "json_schema", schema: AI_SCHEMA } },
+      messages: [{ role: "user", content: idea }]
+    })
+  });
+  if (!response.ok) {
+    let message = "Claude API error " + response.status;
+    try { const j = await response.json(); if (j.error && j.error.message) message = j.error.message; } catch (e) {}
+    throw new Error(message);
+  }
+  const data = await response.json();
+  if (data.stop_reason === "refusal") throw new Error("Claude declined this request");
+  const block = (data.content || []).find(function (b) { return b.type === "text"; });
+  if (!block) throw new Error("Empty response from Claude");
+  return specToDesign(JSON.parse(block.text));
+}
+
+function specToDesign(spec) {
+  const design = newDesign();
+  design.name = (spec.name || "My Widget").slice(0, 24);
+  design.kind = ["clock","date","countdown","quote","note","launcher","battery","freestyle"].includes(spec.kind) ? spec.kind : "note";
+  if (THEMES[spec.themeID]) design.themeID = spec.themeID;
+  if (["classic","rounded","serif","mono"].includes(spec.fontStyle)) design.fontStyle = spec.fontStyle;
+  if (/^#[0-9a-fA-F]{6}$/.test(spec.textColorHex || "")) design.textColorHex = spec.textColorHex.toUpperCase();
+  design.primaryText = spec.primaryText || "";
+  design.secondaryText = spec.secondaryText || "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(spec.targetDate || "")) design.targetDate = spec.targetDate;
+  design.apps = (spec.apps || []).slice(0, 8).map(function (app) {
+    return { emoji: app.emoji || "🌐", label: (app.label || "App").slice(0, 12), url: app.url || "" };
+  });
+  design.canvasElements = (spec.canvasElements || []).slice(0, 8).map(function (el) {
+    return {
+      id: uid(),
+      kind: ["text","clock","date","emoji"].includes(el.kind) ? el.kind : "text",
+      text: el.text || "", symbolName: "star.fill",
+      x: Math.min(Math.max(Number(el.x) || 0.5, 0), 1),
+      y: Math.min(Math.max(Number(el.y) || 0.5, 0), 1),
+      size: Math.min(Math.max(Number(el.size) || 18, 6), 90),
+      colorHex: /^#[0-9a-fA-F]{6}$/.test(el.colorHex || "") ? el.colorHex.toUpperCase() : "#FFFFFF"
+    };
+  });
+  return design;
+}
+
+// ==================== Preview rendering ====================
 function esc(str) {
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -506,7 +848,7 @@ function renderPreview() {
   canvas.style.color = current.textColorHex;
   canvas.style.fontFamily = FONT_CSS[current.fontStyle] || FONT_CSS.rounded;
 
-  if (current.kind === "freestyle") { renderFreestyle(canvas, w, h); return; }
+  if (current.kind === "freestyle") { renderFreestyleCanvas(canvas, w, h); return; }
 
   const now = new Date();
   let html = "";
@@ -536,13 +878,31 @@ function renderPreview() {
     html = '<div style="font-size:16px;opacity:.6">“</div>' +
            '<div style="font-size:15px;font-weight:600;padding:0 12px">' + esc(current.primaryText || "Add a quote") + '</div>' +
            (current.secondaryText ? '<div style="font-size:11px;opacity:.75;margin-top:4px">— ' + esc(current.secondaryText) + '</div>' : "");
+  } else if (current.kind === "battery") {
+    html = '<div style="font-size:22px">🔋</div>' +
+           '<div style="font-size:40px;font-weight:800">82%</div>' +
+           '<div style="font-size:11px;opacity:.75">battery (live on your phone)</div>';
+  } else if (current.kind === "launcher") {
+    const apps = current.apps || [];
+    if (apps.length === 0) {
+      html = '<div style="font-size:13px;font-weight:600;padding:0 14px">Add apps below 👇</div>';
+    } else {
+      const perRow = previewSize === "small" ? 2 : 4;
+      let grid = '<div class="launch-grid" style="grid-template-columns:repeat(' + perRow + ',1fr)">';
+      for (const app of apps.slice(0, 12)) {
+        grid += '<div class="launch-cell"><div class="launch-icon">' + esc(app.emoji || "🌐") + '</div>' +
+                '<div class="launch-label">' + esc(app.label || "App") + '</div></div>';
+      }
+      grid += '</div>';
+      html = grid;
+    }
   } else {
     html = '<div style="font-size:18px;font-weight:700;padding:0 12px">' + esc(current.primaryText || "Your text here") + '</div>';
   }
   canvas.innerHTML = html;
 }
 
-function renderFreestyle(canvas, w, h) {
+function renderFreestyleCanvas(canvas, w, h) {
   canvas.innerHTML = "";
   const scale = Math.min(w, h) / 158;
   const now = new Date();
@@ -562,7 +922,6 @@ function renderFreestyle(canvas, w, h) {
     canvas.appendChild(div);
   }
 }
-
 function attachDrag(div, el) {
   div.addEventListener("pointerdown", function (event) {
     event.preventDefault();
@@ -585,11 +944,10 @@ function attachDrag(div, el) {
   });
 }
 
-// ---------- Freestyle palette & inspector ----------
+// ==================== Freestyle palette & inspector ====================
 function addElement(kind) {
   const el = {
-    id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random())),
-    kind: kind, text: kind === "emoji" ? "✨" : "Your text",
+    id: uid(), kind: kind, text: kind === "emoji" ? "✨" : "Your text",
     symbolName: "star.fill", x: 0.5, y: 0.5,
     size: kind === "clock" ? 34 : kind === "emoji" ? 30 : kind === "date" ? 14 : 18,
     colorHex: "#FFFFFF"
@@ -599,7 +957,6 @@ function addElement(kind) {
   renderFreestyleUI();
   renderPreview();
 }
-
 function renderFreestyleUI() {
   const tools = document.getElementById("freestyleTools");
   tools.style.display = current.kind === "freestyle" ? "block" : "none";
@@ -665,10 +1022,67 @@ function renderFreestyleUI() {
   inspector.appendChild(sizeRow);
 }
 
-// ---------- Controls ----------
+// ==================== Launcher editor ====================
+function renderLauncherUI() {
+  document.getElementById("fLauncher").style.display = current.kind === "launcher" ? "block" : "none";
+  if (current.kind !== "launcher") return;
+  const list = document.getElementById("appList");
+  list.innerHTML = "";
+  (current.apps || []).forEach(function (app, index) {
+    const tag = document.createElement("div");
+    tag.className = "app-tag";
+    tag.append(document.createTextNode((app.emoji || "🌐") + " " + (app.label || "App")));
+    const remove = document.createElement("button");
+    remove.textContent = "✕";
+    remove.onclick = function () {
+      current.apps.splice(index, 1);
+      renderLauncherUI();
+      renderPreview();
+    };
+    tag.appendChild(remove);
+    list.appendChild(tag);
+  });
+}
+function setupLauncherControls() {
+  const select = document.getElementById("appPreset");
+  const added = new Set();
+  for (const key of Object.keys(APP_PRESETS)) {
+    const preset = APP_PRESETS[key];
+    if (added.has(preset.label)) continue;
+    added.add(preset.label);
+    const option = document.createElement("option");
+    option.value = key;
+    option.textContent = preset.emoji + " " + preset.label;
+    select.appendChild(option);
+  }
+  document.getElementById("addPresetApp").onclick = function () {
+    const preset = APP_PRESETS[select.value];
+    if (!preset) return;
+    current.apps = current.apps || [];
+    current.apps.push(Object.assign({}, preset));
+    renderLauncherUI();
+    renderPreview();
+  };
+  document.getElementById("addCustomApp").onclick = function () {
+    const emoji = document.getElementById("customEmoji").value.trim() || "🌐";
+    const label = document.getElementById("customLabel").value.trim() || "App";
+    const url = document.getElementById("customUrl").value.trim();
+    if (!url) { toast("Enter a URL or app scheme"); return; }
+    current.apps = current.apps || [];
+    current.apps.push({ emoji: emoji, label: label, url: url });
+    document.getElementById("customEmoji").value = "";
+    document.getElementById("customLabel").value = "";
+    document.getElementById("customUrl").value = "";
+    renderLauncherUI();
+    renderPreview();
+  };
+}
+
+// ==================== Controls ====================
 function loadIntoEditor(design) {
   current = JSON.parse(JSON.stringify(design));
   if (!current.canvasElements) current.canvasElements = [];
+  if (!current.apps) current.apps = [];
   selectedElId = null;
   syncControls();
   renderAll();
@@ -693,13 +1107,11 @@ function renderControls() {
     button.onclick = function () {
       current.kind = kind;
       if (kind === "freestyle" && current.canvasElements.length === 0) {
-        addElement("clock");
-        const caption = current.canvasElements[0];
-        caption.y = 0.42;
-        addElement("text");
-        const label2 = current.canvasElements[1];
-        label2.text = "My Widget"; label2.size = 13; label2.y = 0.66;
+        current.canvasElements = composeFreestyle(true, false, "My Widget", [], current.textColorHex);
         selectedElId = null;
+      }
+      if (kind === "launcher" && (!current.apps || current.apps.length === 0)) {
+        current.apps = defaultApps();
       }
       renderAll();
     };
@@ -743,9 +1155,8 @@ function renderLibrary() {
     const item = document.createElement("div");
     item.className = "lib-item";
     const theme = THEMES[design.themeID] || THEMES.midnight;
-    const icons = { clock: "🕐", date: "📅", countdown: "⏳", quote: "💬", note: "📝", freestyle: "🎨" };
     item.innerHTML =
-      '<div class="lib-thumb" style="background:linear-gradient(135deg,' + theme[0] + "," + theme[1] + ')">' + (icons[design.kind] || "🧩") + '</div>' +
+      '<div class="lib-thumb" style="background:linear-gradient(135deg,' + theme[0] + "," + theme[1] + ')">' + (KIND_ICONS[design.kind] || "🧩") + '</div>' +
       '<div><div class="name">' + esc(design.name) + '</div><div class="kind">' + esc(design.kind) + '</div></div>' +
       '<div class="spacer"></div>';
     const editButton = document.createElement("button");
@@ -755,7 +1166,7 @@ function renderLibrary() {
     dupButton.textContent = "Duplicate";
     dupButton.onclick = function () {
       const copy = JSON.parse(JSON.stringify(design));
-      copy.id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
+      copy.id = uid();
       copy.name += " Copy";
       designs.push(copy);
       persist();
@@ -775,11 +1186,18 @@ function renderLibrary() {
 function renderAll() {
   renderControls();
   renderFreestyleUI();
+  renderLauncherUI();
   renderPreview();
   renderLibrary();
+  updateMagicHint();
+}
+function updateMagicHint() {
+  document.getElementById("magicHint").textContent = getApiKey()
+    ? "Claude AI is on — describe anything and it designs the whole widget. (API usage costs a few cents per request.)"
+    : "Built instantly in your browser — free, offline, no AI. It understands launchers, countdowns, quotes, clocks, battery, decorations, and “says …” phrases. For open-ended ideas, add a Claude API key below.";
 }
 
-// ---------- Wiring ----------
+// ==================== Wiring ====================
 document.getElementById("nameInput").oninput = function (e) { current.name = e.target.value; };
 document.getElementById("fontSelect").onchange = function (e) { current.fontStyle = e.target.value; renderPreview(); };
 document.getElementById("textColor").oninput = function (e) { current.textColorHex = e.target.value.toUpperCase(); renderPreview(); };
@@ -800,6 +1218,13 @@ document.getElementById("saveBtn").onclick = function () {
 };
 document.getElementById("newBtn").onclick = function () { loadIntoEditor(newDesign()); };
 
+const apiKeyInput = document.getElementById("apiKeyInput");
+apiKeyInput.value = getApiKey();
+apiKeyInput.oninput = function () {
+  localStorage.setItem("widgetking.apikey", apiKeyInput.value.trim());
+  updateMagicHint();
+};
+
 const magicChips = document.getElementById("magicChips");
 for (const example of EXAMPLES) {
   const button = document.createElement("button");
@@ -807,11 +1232,29 @@ for (const example of EXAMPLES) {
   button.onclick = function () { document.getElementById("magicInput").value = example; };
   magicChips.appendChild(button);
 }
-document.getElementById("magicBtn").onclick = function () {
+document.getElementById("magicBtn").onclick = async function () {
   const idea = document.getElementById("magicInput").value.trim();
   if (!idea) return;
-  loadIntoEditor(parseIdea(idea));
-  toast("Built! Tweak it below, then Save.");
+  const button = document.getElementById("magicBtn");
+  const key = getApiKey();
+  if (key) {
+    button.disabled = true;
+    button.textContent = "Asking Claude… 🤖";
+    try {
+      const design = await callClaude(idea, key);
+      loadIntoEditor(design);
+      toast("Designed by Claude ✨ Tweak it below, then Save.");
+    } catch (error) {
+      loadIntoEditor(parseIdea(idea));
+      toast("Claude failed (" + error.message + ") — built with the free parser instead.");
+    } finally {
+      button.disabled = false;
+      button.textContent = "Build it ✨";
+    }
+  } else {
+    loadIntoEditor(parseIdea(idea));
+    toast("Built! Tweak it below, then Save.");
+  }
 };
 
 function buildScript() {
@@ -863,7 +1306,7 @@ document.getElementById("importFile").onchange = function (event) {
       const parsed = JSON.parse(reader.result);
       const list = Array.isArray(parsed) ? parsed : [parsed];
       for (const design of list) {
-        design.id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
+        design.id = uid();
         designs.push(design);
       }
       persist();
@@ -882,6 +1325,7 @@ setInterval(function () {
   if (current.kind === "clock" || current.kind === "freestyle") renderPreview();
 }, 30000);
 
+setupLauncherControls();
 syncControls();
 renderAll();
 </script>
