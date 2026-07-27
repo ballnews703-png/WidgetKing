@@ -410,11 +410,18 @@ function drawFreestyle(design, family) {
   }
   return ctx.getImage();
 }
+function hashString(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) { h = ((h << 5) + h + s.charCodeAt(i)) >>> 0; }
+  return h.toString(36);
+}
 async function loadIcon(url) {
   try {
     const fm = FileManager.local();
     const dir = fm.cacheDirectory();
-    const name = "wk_" + url.replace(/[^a-zA-Z0-9]/g, "").slice(-40) + ".png";
+    // Hash the FULL url — icon URLs share identical endings across apps, so
+    // suffix-based names collide and serve the wrong app's icon.
+    const name = "wk2_" + hashString(url) + "_" + url.length + ".png";
     const path = fm.joinPath(dir, name);
     if (fm.fileExists(path)) return fm.readImage(path);
     const img = await new Request(url).loadImage();
