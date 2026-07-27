@@ -102,16 +102,21 @@ function drawFreestyle(design, family) {
   ctx.opaque = false;
   ctx.respectScreenScale = false;
 
-  // Vertical gradient approximated with strips (DrawContext has no gradient API).
+  // Gradient approximated with strips (DrawContext has no gradient API).
   const colors = themeColors(design);
   const c1 = hexToRgb(colors[0]);
   const c2 = hexToRgb(colors[1]);
   const steps = 60;
+  const horizontal = design.gradientDir === "horizontal";
   for (let i = 0; i < steps; i++) {
     const t = i / (steps - 1);
     const mix = [0, 1, 2].map(function (j) { return c1[j] + (c2[j] - c1[j]) * t; });
     ctx.setFillColor(new Color(rgbToHex(mix)));
-    ctx.fillRect(new Rect(0, Math.floor((H * i) / steps), W, Math.ceil(H / steps) + 1));
+    if (horizontal) {
+      ctx.fillRect(new Rect(Math.floor((W * i) / steps), 0, Math.ceil(W / steps) + 1, H));
+    } else {
+      ctx.fillRect(new Rect(0, Math.floor((H * i) / steps), W, Math.ceil(H / steps) + 1));
+    }
   }
 
   const scale = Math.min(W, H) / 158;
@@ -120,6 +125,25 @@ function drawFreestyle(design, family) {
     const px = el.x * W;
     const py = el.y * H;
     const fs = (el.size || 20) * scale;
+    const op = (typeof el.opacity === "number" && el.opacity >= 0 && el.opacity <= 1) ? el.opacity : 1;
+
+    if (el.kind === "shape") {
+      const shapeType = el.shape || "rect";
+      let wPx, hPx;
+      if (shapeType === "circle") { wPx = hPx = (el.w || 0.5) * Math.min(W, H); }
+      else { wPx = (el.w || 0.5) * W; hPx = (el.h || 0.25) * H; }
+      const rect = new Rect(px - wPx / 2, py - hPx / 2, wPx, hPx);
+      ctx.setFillColor(new Color(el.colorHex || "#FFFFFF", op));
+      const path = new Path();
+      if (shapeType === "circle") { path.addEllipse(rect); }
+      else {
+        const r = shapeType === "pill" ? Math.min(wPx, hPx) / 2 : 6 * scale;
+        path.addRoundedRect(rect, r, r);
+      }
+      ctx.addPath(path);
+      ctx.fillPath();
+      continue;
+    }
 
     let text;
     if (el.kind === "clock") {
@@ -130,6 +154,10 @@ function drawFreestyle(design, family) {
       const df = new DateFormatter();
       df.dateFormat = "EEE MMM d";
       text = df.string(new Date());
+    } else if (el.kind === "battery") {
+      text = Math.round(Device.batteryLevel() * 100) + "%";
+    } else if (el.kind === "countdown") {
+      text = String(Math.abs(daysUntil(el.dateISO)));
     } else if (el.kind === "symbol") {
       text = SYMBOL_EMOJI[el.symbolName] || "⭐";
     } else {
@@ -137,7 +165,7 @@ function drawFreestyle(design, family) {
     }
 
     ctx.setFont(fontFor(design.fontStyle, fs, true));
-    ctx.setTextColor(new Color(el.colorHex || "#FFFFFF"));
+    ctx.setTextColor(new Color(el.colorHex || "#FFFFFF", el.kind === "emoji" ? 1 : op));
     ctx.setTextAlignedCenter();
     ctx.drawTextInRect(text, new Rect(px - W / 2, py - fs * 0.72, W, fs * 1.7));
   }

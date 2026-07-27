@@ -27,7 +27,12 @@
     background: var(--card); border-radius: var(--radius);
     padding: 18px; margin-bottom: 18px;
   }
-  h2 { font-size: 16px; margin-bottom: 10px; }
+  h2 { font-size: 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .step {
+    background: var(--accent); color: #fff; font-size: 12px; font-weight: 700;
+    width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
   .hint { color: var(--muted); font-size: 13px; margin-bottom: 10px; line-height: 1.45; }
   textarea, input[type=text], input[type=password], input[type=date], select {
     width: 100%; background: var(--card2); color: var(--text);
@@ -39,22 +44,31 @@
     background: var(--card2); color: var(--text); border: 1px solid #34343f;
     border-radius: 10px; padding: 9px 14px; font-size: 13px;
     cursor: pointer; font-family: inherit;
+    transition: transform .12s ease, border-color .12s ease;
   }
   button:hover { border-color: var(--accent); }
+  button:active { transform: scale(.96); }
   button.primary { background: var(--accent); border-color: var(--accent); font-weight: 600; }
   button:disabled { opacity: .5; cursor: default; }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
   .chips button { font-size: 12px; border-radius: 999px; padding: 6px 12px; }
   .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
   .editor-grid { display: grid; grid-template-columns: auto 1fr; gap: 22px; }
-  @media (max-width: 760px) { .editor-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 760px) {
+    .editor-grid { grid-template-columns: 1fr; }
+    button { padding: 12px 16px; font-size: 14px; min-height: 44px; }
+    .chips button { padding: 9px 14px; }
+    .swatch { width: 40px; height: 40px; }
+  }
   .field { margin-bottom: 12px; }
   .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
   .kind-buttons button.active, .size-buttons button.active {
     background: var(--accent); border-color: var(--accent); font-weight: 600;
   }
   .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
-  .swatch { width: 34px; height: 34px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+  .swatch { width: 34px; height: 34px; border-radius: 50%; cursor: pointer;
+    border: 2px solid transparent; transition: transform .12s ease; }
+  .swatch:hover { transform: scale(1.12); }
   .swatch.active { border-color: #fff; }
   #canvasWrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
   #canvas {
@@ -63,9 +77,13 @@
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     text-align: center; user-select: none; -webkit-user-select: none;
   }
-  #canvas .cel { position: absolute; transform: translate(-50%, -50%); cursor: grab;
+  @keyframes pop { from { transform: scale(.96); } to { transform: scale(1); } }
+  #canvas.pop { animation: pop .25s ease; }
+  .cel { position: absolute; transform: translate(-50%, -50%); cursor: grab;
     white-space: nowrap; line-height: 1.1; touch-action: none; }
-  #canvas .cel.selected { outline: 1.5px dashed rgba(255,255,255,.9); outline-offset: 3px; border-radius: 6px; }
+  .cel.selected { outline: 1.5px dashed rgba(255,255,255,.9); outline-offset: 3px; border-radius: 6px; }
+  .cel-shape { pointer-events: auto; }
+  .snap-guide { position: absolute; background: rgba(255,255,255,.75); pointer-events: none; z-index: 5; }
   .launch-grid { display: grid; gap: 10px; padding: 10px; }
   .launch-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
   .launch-icon { border-radius: 12px; background: rgba(255,255,255,.18);
@@ -75,12 +93,18 @@
   #appSearchResults button { display: flex; align-items: center; gap: 6px; }
   #appSearchResults img { width: 22px; height: 22px; border-radius: 6px; }
   #inspector { background: var(--card2); border-radius: 12px; padding: 12px; margin-top: 10px; }
-  input[type=range] { flex: 1; }
+  #inspector .row { margin-bottom: 8px; }
+  input[type=range] { flex: 1; min-width: 60px; }
   input[type=color] { width: 44px; height: 32px; border: none; background: none; padding: 0; cursor: pointer; }
+  .tpl-row { display: flex; gap: 12px; overflow-x: auto; padding: 4px 2px 10px;
+    scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
+  .tpl-card { flex-shrink: 0; scroll-snap-align: start; cursor: pointer; text-align: center;
+    transition: transform .15s ease; }
+  .tpl-card:hover { transform: translateY(-3px); }
+  .tpl-name { font-size: 12px; font-weight: 600; margin-top: 6px; }
+  .tpl-cat { font-size: 10px; color: var(--muted); }
   .lib-item { display: flex; align-items: center; gap: 12px; padding: 10px;
     border-radius: 12px; background: var(--card2); margin-bottom: 8px; }
-  .lib-thumb { width: 46px; height: 46px; border-radius: 12px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center; font-size: 20px; }
   .lib-item .name { font-weight: 600; font-size: 14px; }
   .lib-item .kind { color: var(--muted); font-size: 12px; }
   .lib-item .spacer { flex: 1; }
@@ -88,12 +112,13 @@
   .app-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
   .app-tag { display: flex; align-items: center; gap: 6px; background: var(--card2);
     border: 1px solid #34343f; border-radius: 999px; padding: 4px 10px; font-size: 13px; }
-  .app-tag button { border: none; background: none; padding: 0 2px; font-size: 13px; color: var(--muted); }
+  .app-tag button { border: none; background: none; padding: 0 2px; font-size: 13px; color: var(--muted); min-height: 0; }
   details { margin-top: 10px; }
   summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   ol { padding-left: 20px; }
   ol li { margin-bottom: 6px; font-size: 14px; color: var(--muted); line-height: 1.5; }
   ol li b { color: var(--text); }
+  #editorSection { scroll-margin-top: 12px; }
   #toast {
     position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
     background: var(--accent); padding: 10px 18px; border-radius: 999px;
@@ -106,8 +131,13 @@
 
 <header><h1>👑 WidgetKing</h1><span>Designer</span></header>
 
+<section id="templatesSection">
+  <h2><span class="step">1</span> Start with a template…</h2>
+  <div class="tpl-row" id="templateRow"></div>
+</section>
+
 <section id="magicSection">
-  <h2>✨ Magic — type an idea</h2>
+  <h2>…or ✨ describe it</h2>
   <p class="hint" id="magicHint"></p>
   <textarea id="magicInput" placeholder="A launcher with Spotify, Instagram and YouTube"></textarea>
   <div class="chips" id="magicChips"></div>
@@ -145,16 +175,16 @@
   </details>
 </section>
 
-<section>
-  <h2>🎨 Editor</h2>
+<section id="editorSection">
+  <h2><span class="step">2</span> Make it yours</h2>
   <div class="editor-grid">
     <div id="canvasWrap">
       <div id="canvas"></div>
       <div class="row size-buttons" id="sizeButtons"></div>
-      <div id="freestyleTools" style="display:none; width: 100%; max-width: 360px;">
+      <div id="freestyleTools" style="display:none; width: 100%; max-width: 380px;">
         <div class="chips" id="palette"></div>
         <div id="inspector" style="display:none;"></div>
-        <p class="hint" id="freestyleHint">Tap a chip to add an element, then drag it anywhere on the widget. Click an element to edit it.</p>
+        <p class="hint" id="freestyleHint">Tap a chip to add an element, then drag it anywhere — it snaps to center lines. Click an element to edit, layer, and fine-tune it.</p>
       </div>
     </div>
     <div>
@@ -236,12 +266,16 @@
         <button class="primary" id="saveBtn">Save design</button>
         <button id="newBtn">New</button>
       </div>
+      <div class="row" id="remixRow" style="margin-top:10px;display:none">
+        <input type="text" id="remixInput" placeholder="✨ Remix with AI: make it warmer, add stars…" style="flex:1">
+        <button id="remixBtn">✨ Remix</button>
+      </div>
     </div>
   </div>
 </section>
 
 <section>
-  <h2>📚 My Widgets</h2>
+  <h2><span class="step">3</span> Save &amp; export</h2>
   <div id="library"></div>
   <div class="row" style="margin-top:12px">
     <button class="primary" id="copyScriptBtn">📋 Copy Scriptable Script</button>
@@ -253,7 +287,7 @@
 </section>
 
 <section>
-  <h2>📱 Put it on your iPhone (no Mac needed)</h2>
+  <h2><span class="step">4</span> Put it on your iPhone (no Mac needed)</h2>
   <ol>
     <li>Install the free <b>Scriptable</b> app from the App Store.</li>
     <li>Design widgets above, then tap <b>Copy Scriptable Script</b>.</li>
@@ -329,23 +363,48 @@ function drawFreestyle(design, family) {
   const colors = themeColors(design);
   const c1 = hexToRgb(colors[0]); const c2 = hexToRgb(colors[1]);
   const steps = 60;
+  const horizontal = design.gradientDir === "horizontal";
   for (let i = 0; i < steps; i++) {
     const t = i / (steps - 1);
     const mix = [0, 1, 2].map(function (j) { return c1[j] + (c2[j] - c1[j]) * t; });
     ctx.setFillColor(new Color(rgbToHex(mix)));
-    ctx.fillRect(new Rect(0, Math.floor((H * i) / steps), W, Math.ceil(H / steps) + 1));
+    if (horizontal) {
+      ctx.fillRect(new Rect(Math.floor((W * i) / steps), 0, Math.ceil(W / steps) + 1, H));
+    } else {
+      ctx.fillRect(new Rect(0, Math.floor((H * i) / steps), W, Math.ceil(H / steps) + 1));
+    }
   }
   const scale = Math.min(W, H) / 158;
   const els = design.canvasElements || [];
   for (const el of els) {
     const px = el.x * W; const py = el.y * H; const fs = (el.size || 20) * scale;
+    const op = (typeof el.opacity === "number" && el.opacity >= 0 && el.opacity <= 1) ? el.opacity : 1;
+    if (el.kind === "shape") {
+      const shapeType = el.shape || "rect";
+      let wPx, hPx;
+      if (shapeType === "circle") { wPx = hPx = (el.w || 0.5) * Math.min(W, H); }
+      else { wPx = (el.w || 0.5) * W; hPx = (el.h || 0.25) * H; }
+      const rect = new Rect(px - wPx / 2, py - hPx / 2, wPx, hPx);
+      ctx.setFillColor(new Color(el.colorHex || "#FFFFFF", op));
+      const path = new Path();
+      if (shapeType === "circle") { path.addEllipse(rect); }
+      else {
+        const r = shapeType === "pill" ? Math.min(wPx, hPx) / 2 : 6 * scale;
+        path.addRoundedRect(rect, r, r);
+      }
+      ctx.addPath(path);
+      ctx.fillPath();
+      continue;
+    }
     let text;
     if (el.kind === "clock") { const df = new DateFormatter(); df.useShortTimeStyle(); text = df.string(new Date()); }
     else if (el.kind === "date") { const df = new DateFormatter(); df.dateFormat = "EEE MMM d"; text = df.string(new Date()); }
+    else if (el.kind === "battery") { text = Math.round(Device.batteryLevel() * 100) + "%"; }
+    else if (el.kind === "countdown") { text = String(Math.abs(daysUntil(el.dateISO))); }
     else if (el.kind === "symbol") { text = SYMBOL_EMOJI[el.symbolName] || "⭐"; }
     else { text = el.text || "Text"; }
     ctx.setFont(fontFor(design.fontStyle, fs, true));
-    ctx.setTextColor(new Color(el.colorHex || "#FFFFFF"));
+    ctx.setTextColor(new Color(el.colorHex || "#FFFFFF", el.kind === "emoji" ? 1 : op));
     ctx.setTextAlignedCenter();
     ctx.drawTextInRect(text, new Rect(px - W / 2, py - fs * 0.72, W, fs * 1.7));
   }
@@ -534,8 +593,6 @@ const SYMBOL_EMOJI = {
   "music.note": "🎵", "pawprint.fill": "🐾", "crown.fill": "👑"
 };
 
-// App presets for launcher widgets. Keys are also used by the Magic parser
-// to spot app names inside ideas.
 const APP_PRESETS = {
   "phone":     { emoji: "📞", label: "Phone",     url: "tel://" },
   "messages":  { emoji: "💬", label: "Messages",  url: "sms://" },
@@ -563,7 +620,6 @@ const APP_PRESETS = {
   "chrome":    { emoji: "🌐", label: "Chrome",    url: "googlechrome://" }
 };
 
-// Words the Magic parser can turn into freestyle decorations.
 const DECOR_EMOJI = {
   moon: "🌙", star: "⭐", stars: "✨", sparkle: "✨", sparkles: "✨",
   heart: "❤️", hearts: "❤️", fire: "🔥", flame: "🔥", sun: "☀️",
@@ -601,26 +657,74 @@ function launcherStyleOf(design) {
     labels: style.labels !== false
   };
 }
-function gradientAngle(design) {
-  if (design.gradientDir === "vertical") return "180deg";
-  if (design.gradientDir === "horizontal") return "90deg";
-  return "135deg";
-}
 function themeOf(design) {
   if (design.themeID === "custom" && design.customColors && design.customColors.length === 2) {
     return design.customColors;
   }
   return THEMES[design.themeID] || THEMES.midnight;
 }
+function gradientAngle(design) {
+  if (design.gradientDir === "vertical") return "180deg";
+  if (design.gradientDir === "horizontal") return "90deg";
+  return "135deg";
+}
+
+// Single backward-compat layer: fills every missing field on a design (old
+// localStorage saves, imports, templates, AI output) so the rest of the code
+// can assume the full model.
+function normalizeDesign(design) {
+  if (!design || typeof design !== "object") design = {};
+  if (!design.id) design.id = uid();
+  if (!design.name) design.name = "My Widget";
+  if (!design.kind) design.kind = "clock";
+  if (!design.themeID) design.themeID = "midnight";
+  if (!design.fontStyle) design.fontStyle = "rounded";
+  if (!design.textColorHex) design.textColorHex = "#FFFFFF";
+  if (design.primaryText == null) design.primaryText = "";
+  if (design.secondaryText == null) design.secondaryText = "";
+  if (design.targetDate == null) design.targetDate = "";
+  if (!Array.isArray(design.canvasElements)) design.canvasElements = [];
+  if (!Array.isArray(design.apps)) design.apps = [];
+  if (design.customColors && !(Array.isArray(design.customColors) && design.customColors.length === 2)) {
+    design.customColors = null;
+  }
+  if (design.tapUrl == null) design.tapUrl = "";
+  if (!design.gradientDir) design.gradientDir = "diagonal";
+  design.launcherStyle = launcherStyleOf(design);
+  for (const el of design.canvasElements) {
+    if (!el.id) el.id = uid();
+    if (!el.kind) el.kind = "text";
+    if (el.text == null) el.text = "";
+    if (!el.symbolName) el.symbolName = "star.fill";
+    if (typeof el.x !== "number") el.x = 0.5;
+    if (typeof el.y !== "number") el.y = 0.5;
+    if (typeof el.size !== "number" || el.size <= 0) el.size = 18;
+    if (!el.colorHex) el.colorHex = "#FFFFFF";
+    if (typeof el.opacity !== "number" || el.opacity < 0.05 || el.opacity > 1) el.opacity = 1;
+    if (el.kind === "shape") {
+      if (!["rect", "pill", "circle"].includes(el.shape)) el.shape = "rect";
+      if (typeof el.w !== "number" || el.w <= 0) el.w = 0.5;
+      if (typeof el.h !== "number" || el.h <= 0) el.h = 0.25;
+    }
+    if (el.kind === "countdown" && !/^\d{4}-\d{2}-\d{2}$/.test(el.dateISO || "")) {
+      el.dateISO = isoInDays(30);
+    }
+  }
+  if (design.kind === "countdown" && !design.targetDate) design.targetDate = isoInDays(30);
+  return design;
+}
 
 let designs = loadDesigns();
 let current = newDesign();
 let previewSize = "small";
 let selectedElId = null;
+let snapGuides = { x: false, y: false };
 
 function loadDesigns() {
-  try { return JSON.parse(localStorage.getItem("widgetking.designs") || "[]"); }
-  catch (e) { return []; }
+  try {
+    const parsed = JSON.parse(localStorage.getItem("widgetking.designs") || "[]");
+    return (Array.isArray(parsed) ? parsed : []).map(normalizeDesign);
+  } catch (e) { return []; }
 }
 function persist() { localStorage.setItem("widgetking.designs", JSON.stringify(designs)); }
 function toast(message) {
@@ -632,7 +736,6 @@ function toast(message) {
 function getApiKey() { return (localStorage.getItem("widgetking.apikey") || "").trim(); }
 
 // ==================== AI budget tracking ====================
-// Per-million-token prices [input, output] in USD.
 const PRICES = { "claude-opus-5": [5, 25], "claude-haiku-4-5": [1, 5] };
 function getSpend() { return Number(localStorage.getItem("widgetking.spend") || 0) || 0; }
 function getBudget() {
@@ -655,12 +758,33 @@ function updateSpendUI() {
   if (readout) readout.textContent = "spent ≈ $" + getSpend().toFixed(3) + " of $" + getBudget().toFixed(2);
 }
 
+// ==================== Date helpers ====================
+function isoInDays(days) {
+  const d = new Date(Date.now() + days * 86400000);
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function isoFor(month, day) {
+  const now = new Date();
+  let year = now.getFullYear();
+  const candidate = new Date(year, month - 1, day);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (candidate < today) year += 1;
+  return year + "-" + String(month).padStart(2, "0") + "-" + String(day).padStart(2, "0");
+}
+function daysFromISO(iso) {
+  if (!iso) return 0;
+  const parts = iso.split("-").map(Number);
+  const target = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((target - today) / 86400000);
+}
+
 // ==================== Magic: local parser ====================
 function parseIdea(idea) {
   const lower = idea.toLowerCase();
   const design = newDesign();
 
-  // Theme from color/mood keywords.
   const themeWords = [
     ["sunset", ["sunset", "orange", "warm"]], ["ocean", ["ocean", "sea", "blue", "water"]],
     ["forest", ["forest", "green", "nature"]], ["midnight", ["dark", "black", "midnight", "night"]],
@@ -689,7 +813,6 @@ function parseIdea(idea) {
   const wantsClock = /clock|the time\b|show.*time/.test(lower);
   const wantsDate = /\bdate\b|calendar|today/.test(lower);
 
-  // Decide the widget kind, most specific first.
   if (foundApps.length >= 2 || (/launcher|shortcuts?|app icons|open apps|quick launch/.test(lower) && foundApps.length >= 1)) {
     design.kind = "launcher";
     design.apps = foundApps.length ? foundApps : defaultApps();
@@ -708,7 +831,6 @@ function parseIdea(idea) {
     design.secondaryText = author || "";
     design.name = "Quote";
   } else if ((wantsClock || wantsDate) && decorations.length > 0) {
-    // "clock with moon and stars" → a composed freestyle layout.
     design.kind = "freestyle";
     design.canvasElements = composeFreestyle(wantsClock, wantsDate, saysText || quoted, decorations, design.textColorHex);
     design.name = wantsClock ? "Clock" : "Date";
@@ -721,7 +843,6 @@ function parseIdea(idea) {
     design.primaryText = saysText || quoted;
     design.name = "Note";
   } else if (decorations.length > 0) {
-    // Pure decoration idea → freestyle with the emoji + any leftover words.
     design.kind = "freestyle";
     design.canvasElements = composeFreestyle(false, false, cleanedIdeaText(idea, 24), decorations, design.textColorHex);
     design.name = "Freestyle";
@@ -730,7 +851,7 @@ function parseIdea(idea) {
     design.primaryText = cleanedIdeaText(idea, 60);
     design.name = "Note";
   }
-  return design;
+  return normalizeDesign(design);
 }
 
 function extractSaysText(idea, lower) {
@@ -739,7 +860,6 @@ function extractSaysText(idea, lower) {
     const index = lower.indexOf(marker);
     if (index >= 0) {
       let text = idea.slice(index + marker.length);
-      // Stop at style descriptors so "says Drink water! with a sunset theme" keeps only the note.
       const stop = text.search(/\b(in|with|on|using)\s+(a\s+)?[a-z]+\s*(green|blue|red|pink|purple|gold|theme|colors?|font|background)/i);
       if (stop > 0) text = text.slice(0, stop);
       text = text.replace(/^[\s:,"'“”]+|[\s"'“”]+$/g, "");
@@ -786,39 +906,29 @@ function findDecorations(lower) {
 }
 function composeFreestyle(wantsClock, wantsDate, text, decorations, colorHex) {
   const elements = [];
-  const spots = [[0.18, 0.16], [0.84, 0.2], [0.16, 0.84], [0.85, 0.8]];
+  elements.push({ id: uid(), kind: "shape", shape: "pill", w: 0.84, h: 0.44,
+    x: 0.5, y: 0.5, size: 0, colorHex: "#FFFFFF", opacity: 0.16, text: "" });
+  const spots = [[0.16, 0.14], [0.85, 0.18], [0.14, 0.85], [0.86, 0.82]];
   decorations.slice(0, 4).forEach(function (emoji, index) {
     elements.push({ id: uid(), kind: "emoji", text: emoji, symbolName: "star.fill",
-      x: spots[index][0], y: spots[index][1], size: 22, colorHex: "#FFFFFF" });
+      x: spots[index][0], y: spots[index][1], size: 20, colorHex: "#FFFFFF", opacity: 1 });
   });
   if (wantsClock) {
     elements.push({ id: uid(), kind: "clock", text: "", symbolName: "star.fill",
-      x: 0.5, y: 0.44, size: 34, colorHex: colorHex });
+      x: 0.5, y: 0.45, size: 32, colorHex: colorHex, opacity: 1 });
   }
   if (wantsDate) {
     elements.push({ id: uid(), kind: "date", text: "", symbolName: "star.fill",
-      x: 0.5, y: wantsClock ? 0.66 : 0.48, size: 14, colorHex: colorHex });
+      x: 0.5, y: wantsClock ? 0.64 : 0.48, size: 13, colorHex: colorHex, opacity: 0.9 });
   }
   if (text && !wantsClock && !wantsDate) {
     elements.push({ id: uid(), kind: "text", text: text, symbolName: "star.fill",
-      x: 0.5, y: 0.5, size: 20, colorHex: colorHex });
+      x: 0.5, y: 0.5, size: 19, colorHex: colorHex, opacity: 1 });
   } else if (text) {
     elements.push({ id: uid(), kind: "text", text: text, symbolName: "star.fill",
-      x: 0.5, y: 0.82, size: 12, colorHex: colorHex });
+      x: 0.5, y: 0.8, size: 11, colorHex: colorHex, opacity: 0.9 });
   }
   return elements;
-}
-function isoInDays(days) {
-  const d = new Date(Date.now() + days * 86400000);
-  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-}
-function isoFor(month, day) {
-  const now = new Date();
-  let year = now.getFullYear();
-  const candidate = new Date(year, month - 1, day);
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (candidate < today) year += 1;
-  return year + "-" + String(month).padStart(2, "0") + "-" + String(day).padStart(2, "0");
 }
 function findDate(idea, lower) {
   let m = lower.match(/in (\d+) (day|week|month)s?/);
@@ -890,18 +1000,23 @@ const AI_SCHEMA = {
     },
     canvasElements: {
       type: "array",
-      description: "For freestyle widgets only, max 8; empty otherwise. Position is normalized 0-1 from top-left; size is point size on a 158pt canvas.",
+      description: "For freestyle widgets only, max 12; empty otherwise. Position is normalized 0-1 from top-left; size is point size on a 158pt canvas. Array order is z-order: put shape cards BEFORE the text that sits on them.",
       items: {
         type: "object",
         properties: {
-          kind: { type: "string", "enum": ["text", "clock", "date", "emoji"] },
-          text: { type: "string" },
+          kind: { type: "string", "enum": ["text", "clock", "date", "emoji", "shape", "battery", "countdown"] },
+          text: { type: "string", description: "Text or emoji content; empty for other kinds" },
           x: { type: "number" },
           y: { type: "number" },
-          size: { type: "number" },
-          colorHex: { type: "string" }
+          size: { type: "number", description: "Font size in points; 0 for shapes" },
+          colorHex: { type: "string" },
+          opacity: { type: "number", description: "0.05-1; use 0.15-0.35 for card shapes, 1 for text" },
+          shape: { type: "string", "enum": ["", "rect", "pill", "circle"], description: "Only for kind=shape; empty otherwise" },
+          w: { type: "number", description: "Shape width 0-1 of canvas; 0 when unused" },
+          h: { type: "number", description: "Shape height 0-1 of canvas; 0 when unused (ignored for circles)" },
+          dateISO: { type: "string", description: "yyyy-MM-dd for countdown elements; empty otherwise" }
         },
-        required: ["kind", "text", "x", "y", "size", "colorHex"],
+        required: ["kind", "text", "x", "y", "size", "colorHex", "opacity", "shape", "w", "h", "dateISO"],
         additionalProperties: false
       }
     }
@@ -910,20 +1025,38 @@ const AI_SCHEMA = {
   additionalProperties: false
 };
 
+const AI_EXAMPLE = {
+  name: "Cozy Night", kind: "freestyle", themeID: "midnight", fontStyle: "rounded",
+  textColorHex: "#FFFFFF", primaryText: "", secondaryText: "", targetDate: "",
+  backgroundColors: [], tapUrl: "", apps: [],
+  canvasElements: [
+    { kind: "shape", text: "", x: 0.5, y: 0.5, size: 0, colorHex: "#FFFFFF", opacity: 0.16, shape: "pill", w: 0.84, h: 0.46, dateISO: "" },
+    { kind: "clock", text: "", x: 0.5, y: 0.44, size: 34, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, dateISO: "" },
+    { kind: "text", text: "sweet dreams", x: 0.5, y: 0.62, size: 11, colorHex: "#D8CFFF", opacity: 0.9, shape: "", w: 0, h: 0, dateISO: "" },
+    { kind: "emoji", text: "🌙", x: 0.83, y: 0.15, size: 20, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, dateISO: "" },
+    { kind: "emoji", text: "✨", x: 0.15, y: 0.2, size: 13, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, dateISO: "" }
+  ]
+};
+
 function aiSystemPrompt() {
   const today = new Date().toISOString().slice(0, 10);
   return "You design iPhone Home Screen widgets for WidgetKing. The user describes a widget; return a spec.\n" +
     "Kinds: clock (time+date), date (big day), countdown (days until an event), quote, note (short text), " +
     "launcher (grid of tappable app icons with iOS URL schemes), battery (device battery level), " +
-    "freestyle (compose elements on a canvas — use it for creative/decorated requests, placing elements thoughtfully with normalized 0-1 coordinates).\n" +
-    "Themes: " + Object.keys(THEMES).join(", ") + ". 'paper' is light (use dark text like #333333); the rest are dark (use light text).\n" +
-    "Common app URL schemes: instagram://, spotify://, youtube://, tiktok://, twitter://, snapchat://, whatsapp://, fb://, reddit://, googlegmail://, googlechrome://, nflx://, music://, maps://, calshow://, mobilenotes://, shortcuts://, tel://, sms://, mailto:, photos-redirect://, camera://.\n" +
-    "If the requested colors don't match a preset theme, set backgroundColors to two #RRGGBB colors for a custom gradient. " +
+    "freestyle (compose elements on a canvas — prefer it for creative or decorated requests).\n" +
+    "Themes: " + Object.keys(THEMES).join(", ") + ". 'paper' is light (use dark text like #333333); the rest are dark (use light text). " +
+    "If the requested colors don't match a preset, set backgroundColors to two #RRGGBB colors for a custom gradient. " +
     "Set tapUrl when the user wants the widget to open an app on tap.\n" +
-    "Today is " + today + ". Resolve relative dates to yyyy-MM-dd. Keep names under 24 chars. Fill unused fields with empty strings or empty arrays.";
+    "Design principles for freestyle: one focal element (size 30-44); secondary text 11-16; decorations 13-24; " +
+    "keep every element inside x/y 0.08-0.92; use a translucent shape (white or black, opacity 0.15-0.35, pill or rect) " +
+    "as a card behind the main content; shapes come EARLIER in the array so they render underneath; " +
+    "center compositions on x=0.5; ensure text contrasts with the background.\n" +
+    "Example — idea: 'cozy night clock with a moon' -> " + JSON.stringify(AI_EXAMPLE) + "\n" +
+    "Common app URL schemes: instagram://, spotify://, youtube://, tiktok://, twitter://, snapchat://, whatsapp://, fb://, reddit://, googlegmail://, googlechrome://, nflx://, music://, maps://, calshow://, mobilenotes://, shortcuts://, tel://, sms://, mailto:, photos-redirect://, camera://.\n" +
+    "Today is " + today + ". Resolve relative dates to yyyy-MM-dd. Keep names under 24 chars. Fill unused fields with empty strings, 0, or empty arrays.";
 }
 
-async function callClaude(idea, key) {
+async function callClaude(messages, key) {
   if (getSpend() >= getBudget()) {
     throw new Error("AI budget reached ($" + getBudget().toFixed(2) + ") — raise the budget in the AI section to keep using Claude");
   }
@@ -941,7 +1074,7 @@ async function callClaude(idea, key) {
       max_tokens: 16000,
       system: aiSystemPrompt(),
       output_config: { format: { type: "json_schema", schema: AI_SCHEMA } },
-      messages: [{ role: "user", content: idea }]
+      messages: messages
     })
   });
   if (!response.ok) {
@@ -976,115 +1109,197 @@ function specToDesign(spec) {
   design.apps = (spec.apps || []).slice(0, 8).map(function (app) {
     return { emoji: app.emoji || "🌐", label: (app.label || "App").slice(0, 12), url: app.url || "" };
   });
-  design.canvasElements = (spec.canvasElements || []).slice(0, 8).map(function (el) {
+  design.canvasElements = (spec.canvasElements || []).slice(0, 12).map(function (el) {
+    const kind = ["text","clock","date","emoji","shape","battery","countdown"].includes(el.kind) ? el.kind : "text";
     return {
       id: uid(),
-      kind: ["text","clock","date","emoji"].includes(el.kind) ? el.kind : "text",
+      kind: kind,
       text: el.text || "", symbolName: "star.fill",
       x: Math.min(Math.max(Number(el.x) || 0.5, 0), 1),
       y: Math.min(Math.max(Number(el.y) || 0.5, 0), 1),
       size: Math.min(Math.max(Number(el.size) || 18, 6), 90),
-      colorHex: /^#[0-9a-fA-F]{6}$/.test(el.colorHex || "") ? el.colorHex.toUpperCase() : "#FFFFFF"
+      colorHex: /^#[0-9a-fA-F]{6}$/.test(el.colorHex || "") ? el.colorHex.toUpperCase() : "#FFFFFF",
+      opacity: Math.min(Math.max(Number(el.opacity) || 1, 0.05), 1),
+      shape: ["rect","pill","circle"].includes(el.shape) ? el.shape : "rect",
+      w: Math.min(Math.max(Number(el.w) || 0.5, 0.02), 1),
+      h: Math.min(Math.max(Number(el.h) || 0.25, 0.02), 1),
+      dateISO: /^\d{4}-\d{2}-\d{2}$/.test(el.dateISO || "") ? el.dateISO : ""
     };
   });
-  return design;
+  return normalizeDesign(design);
 }
 
-// ==================== Preview rendering ====================
+// Fill in real App Store icons for launcher apps the AI (or parser) produced.
+// Sequential with spacing to stay under iTunes' rate limit; non-fatal per app.
+async function fetchIconsForApps(design) {
+  const apps = design.apps || [];
+  let changed = false;
+  for (const app of apps) {
+    if (app.iconUrl) continue;
+    try {
+      const data = await jsonp("https://itunes.apple.com/search?media=software&entity=software&limit=1&term=" + encodeURIComponent(app.label));
+      const result = data.results && data.results[0];
+      if (result) {
+        app.iconUrl = result.artworkUrl512 || result.artworkUrl100 || "";
+        if ((app.url || "").indexOf("shortcuts://run-shortcut") === 0) {
+          const scheme = schemeForName(result.trackName || "");
+          if (scheme) app.url = scheme;
+        }
+        changed = true;
+      }
+    } catch (e) { /* offline or rate-limited — keep emoji */ }
+    await new Promise(function (r) { setTimeout(r, 300); });
+  }
+  if (changed && design === current) {
+    renderLauncherUI();
+    renderPreview();
+  }
+}
+
+// ==================== Preview rendering (reusable) ====================
 function esc(str) {
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
-function renderPreview() {
-  const canvas = document.getElementById("canvas");
-  const [w, h] = SIZES[previewSize];
-  canvas.style.width = w + "px";
-  canvas.style.height = h + "px";
-  const theme = themeOf(current);
-  canvas.style.background = "linear-gradient(" + gradientAngle(current) + ", " + theme[0] + ", " + theme[1] + ")";
-  canvas.style.color = current.textColorHex;
-  canvas.style.fontFamily = FONT_CSS[current.fontStyle] || FONT_CSS.rounded;
-
-  if (current.kind === "freestyle") { renderFreestyleCanvas(canvas, w, h); return; }
-
+function applyDesignBackground(node, design) {
+  const theme = themeOf(design);
+  node.style.background = "linear-gradient(" + gradientAngle(design) + ", " + theme[0] + ", " + theme[1] + ")";
+  node.style.color = design.textColorHex;
+  node.style.fontFamily = FONT_CSS[design.fontStyle] || FONT_CSS.rounded;
+}
+function designPreviewHTML(design, sizeKey) {
   const now = new Date();
-  let html = "";
-  if (current.kind === "clock") {
+  if (design.kind === "clock") {
     const time = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     const date = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
-    html = '<div style="font-size:38px;font-weight:700">' + time + '</div>' +
+    return '<div style="font-size:38px;font-weight:700">' + time + '</div>' +
            '<div style="font-size:12px;opacity:.85;margin-top:2px">' + date + '</div>';
-  } else if (current.kind === "date") {
+  }
+  if (design.kind === "date") {
     const weekday = now.toLocaleDateString([], { weekday: "long" }).toUpperCase();
     const month = now.toLocaleDateString([], { month: "long" });
-    html = '<div style="font-size:13px;font-weight:600;opacity:.85">' + weekday + '</div>' +
+    return '<div style="font-size:13px;font-weight:600;opacity:.85">' + weekday + '</div>' +
            '<div style="font-size:52px;font-weight:800;line-height:1">' + now.getDate() + '</div>' +
            '<div style="font-size:13px;opacity:.85">' + month + '</div>';
-  } else if (current.kind === "countdown") {
-    let days = 0;
-    if (current.targetDate) {
-      const parts = current.targetDate.split("-").map(Number);
-      const target = new Date(parts[0], parts[1] - 1, parts[2]);
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      days = Math.round((target - today) / 86400000);
-    }
-    html = '<div style="font-size:13px;font-weight:600;opacity:.85;padding:0 10px">' + esc(current.primaryText || current.name || "Countdown") + '</div>' +
+  }
+  if (design.kind === "countdown") {
+    const days = daysFromISO(design.targetDate);
+    return '<div style="font-size:13px;font-weight:600;opacity:.85;padding:0 10px">' + esc(design.primaryText || design.name || "Countdown") + '</div>' +
            '<div style="font-size:44px;font-weight:800;line-height:1.1">' + Math.abs(days) + '</div>' +
            '<div style="font-size:11px;opacity:.75">' + (days >= 0 ? "days to go" : "days ago") + '</div>';
-  } else if (current.kind === "quote") {
-    html = '<div style="font-size:16px;opacity:.6">“</div>' +
-           '<div style="font-size:15px;font-weight:600;padding:0 12px">' + esc(current.primaryText || "Add a quote") + '</div>' +
-           (current.secondaryText ? '<div style="font-size:11px;opacity:.75;margin-top:4px">— ' + esc(current.secondaryText) + '</div>' : "");
-  } else if (current.kind === "battery") {
-    html = '<div style="font-size:22px">🔋</div>' +
+  }
+  if (design.kind === "quote") {
+    return '<div style="font-size:16px;opacity:.6">“</div>' +
+           '<div style="font-size:15px;font-weight:600;padding:0 12px">' + esc(design.primaryText || "Add a quote") + '</div>' +
+           (design.secondaryText ? '<div style="font-size:11px;opacity:.75;margin-top:4px">— ' + esc(design.secondaryText) + '</div>' : "");
+  }
+  if (design.kind === "battery") {
+    return '<div style="font-size:22px">🔋</div>' +
            '<div style="font-size:40px;font-weight:800">82%</div>' +
            '<div style="font-size:11px;opacity:.75">battery (live on your phone)</div>';
-  } else if (current.kind === "launcher") {
-    const apps = current.apps || [];
-    if (apps.length === 0) {
-      html = '<div style="font-size:13px;font-weight:600;padding:0 14px">Add apps below 👇</div>';
-    } else {
-      const style = launcherStyleOf(current);
-      const radius = style.shape === "circle" ? "50%" : Math.round(style.iconSize * 0.24) + "px";
-      const iconCss = "width:" + style.iconSize + "px;height:" + style.iconSize + "px;border-radius:" + radius +
-        ";font-size:" + Math.round(style.iconSize * 0.6) + "px";
-      const perRow = previewSize === "small" ? 2 : 4;
-      let grid = '<div class="launch-grid" style="grid-template-columns:repeat(' + perRow + ',1fr)">';
-      for (const app of apps.slice(0, 12)) {
-        const inner = app.iconUrl
-          ? '<img src="' + esc(app.iconUrl) + '" alt="">'
-          : esc(app.emoji || "🌐");
-        grid += '<div class="launch-cell"><div class="launch-icon" style="' + iconCss + '">' + inner + '</div>' +
-                (style.labels ? '<div class="launch-label">' + esc(app.label || "App") + '</div>' : '') + '</div>';
-      }
-      grid += '</div>';
-      html = grid;
-    }
-  } else {
-    html = '<div style="font-size:18px;font-weight:700;padding:0 12px">' + esc(current.primaryText || "Your text here") + '</div>';
   }
-  canvas.innerHTML = html;
+  if (design.kind === "launcher") {
+    const apps = design.apps || [];
+    if (apps.length === 0) {
+      return '<div style="font-size:13px;font-weight:600;padding:0 14px">Add apps below 👇</div>';
+    }
+    const style = launcherStyleOf(design);
+    const radius = style.shape === "circle" ? "50%" : Math.round(style.iconSize * 0.24) + "px";
+    const iconCss = "width:" + style.iconSize + "px;height:" + style.iconSize + "px;border-radius:" + radius +
+      ";font-size:" + Math.round(style.iconSize * 0.6) + "px";
+    const perRow = sizeKey === "small" ? 2 : 4;
+    let grid = '<div class="launch-grid" style="grid-template-columns:repeat(' + perRow + ',1fr)">';
+    for (const app of apps.slice(0, 12)) {
+      const inner = app.iconUrl
+        ? '<img src="' + esc(app.iconUrl) + '" alt="">'
+        : esc(app.emoji || "🌐");
+      grid += '<div class="launch-cell"><div class="launch-icon" style="' + iconCss + '">' + inner + '</div>' +
+              (style.labels ? '<div class="launch-label">' + esc(app.label || "App") + '</div>' : '') + '</div>';
+    }
+    grid += '</div>';
+    return grid;
+  }
+  return '<div style="font-size:18px;font-weight:700;padding:0 12px">' + esc(design.primaryText || "Your text here") + '</div>';
 }
-
-function renderFreestyleCanvas(canvas, w, h) {
-  canvas.innerHTML = "";
+function renderFreestyleInto(node, design, w, h, interactive) {
+  node.innerHTML = "";
   const scale = Math.min(w, h) / 158;
   const now = new Date();
-  for (const el of current.canvasElements) {
+  for (const el of design.canvasElements) {
     const div = document.createElement("div");
-    div.className = "cel" + (el.id === selectedElId ? " selected" : "");
+    div.className = "cel" + (interactive && el.id === selectedElId ? " selected" : "");
     div.style.left = (el.x * 100) + "%";
     div.style.top = (el.y * 100) + "%";
-    div.style.fontSize = (el.size * scale) + "px";
-    div.style.fontWeight = "600";
-    div.style.color = el.colorHex;
-    if (el.kind === "clock") div.textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    else if (el.kind === "date") div.textContent = now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
-    else if (el.kind === "symbol") div.textContent = SYMBOL_EMOJI[el.symbolName] || "⭐";
-    else div.textContent = el.text || "Text";
-    attachDrag(div, el);
-    canvas.appendChild(div);
+    if (el.kind === "shape") {
+      const shapeType = el.shape || "rect";
+      let wPx, hPx;
+      if (shapeType === "circle") { wPx = hPx = (el.w || 0.5) * Math.min(w, h); }
+      else { wPx = (el.w || 0.5) * w; hPx = (el.h || 0.25) * h; }
+      div.style.width = wPx + "px";
+      div.style.height = hPx + "px";
+      div.style.background = el.colorHex;
+      div.style.borderRadius = shapeType === "circle" ? "50%"
+        : shapeType === "pill" ? (Math.min(wPx, hPx) / 2) + "px"
+        : (6 * scale) + "px";
+      div.style.opacity = el.opacity;
+      div.classList.add("cel-shape");
+    } else {
+      div.style.fontSize = (el.size * scale) + "px";
+      div.style.fontWeight = "600";
+      div.style.color = el.colorHex;
+      if (el.kind !== "emoji") div.style.opacity = el.opacity;
+      if (el.kind === "clock") div.textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      else if (el.kind === "date") div.textContent = now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+      else if (el.kind === "battery") div.textContent = "82%";
+      else if (el.kind === "countdown") div.textContent = String(Math.abs(daysFromISO(el.dateISO)));
+      else if (el.kind === "symbol") div.textContent = SYMBOL_EMOJI[el.symbolName] || "⭐";
+      else div.textContent = el.text || "Text";
+    }
+    if (interactive) attachDrag(div, el);
+    node.appendChild(div);
+  }
+  if (interactive && snapGuides.x) {
+    const guide = document.createElement("div");
+    guide.className = "snap-guide";
+    guide.style.cssText += "left:50%;top:0;width:1px;height:100%";
+    node.appendChild(guide);
+  }
+  if (interactive && snapGuides.y) {
+    const guide = document.createElement("div");
+    guide.className = "snap-guide";
+    guide.style.cssText += "top:50%;left:0;height:1px;width:100%";
+    node.appendChild(guide);
   }
 }
+function renderPreview() {
+  const canvas = document.getElementById("canvas");
+  const dims = SIZES[previewSize];
+  canvas.style.width = dims[0] + "px";
+  canvas.style.height = dims[1] + "px";
+  applyDesignBackground(canvas, current);
+  if (current.kind === "freestyle") {
+    renderFreestyleInto(canvas, current, dims[0], dims[1], true);
+  } else {
+    canvas.innerHTML = designPreviewHTML(current, previewSize);
+  }
+}
+function makeThumb(design, scale) {
+  const outer = document.createElement("div");
+  outer.style.cssText = "width:" + Math.round(158 * scale) + "px;height:" + Math.round(158 * scale) +
+    "px;overflow:hidden;border-radius:" + Math.round(28 * scale) + "px;flex-shrink:0;margin:0 auto";
+  const inner = document.createElement("div");
+  inner.style.cssText = "width:158px;height:158px;transform:scale(" + scale + ");transform-origin:top left;" +
+    "display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;" +
+    "position:relative;overflow:hidden";
+  applyDesignBackground(inner, design);
+  if (design.kind === "freestyle") {
+    renderFreestyleInto(inner, design, 158, 158, false);
+  } else {
+    inner.innerHTML = designPreviewHTML(design, "small");
+  }
+  outer.appendChild(inner);
+  return outer;
+}
+
 function attachDrag(div, el) {
   div.addEventListener("pointerdown", function (event) {
     event.preventDefault();
@@ -1094,11 +1309,19 @@ function attachDrag(div, el) {
     const canvas = document.getElementById("canvas");
     const rect = canvas.getBoundingClientRect();
     function move(ev) {
-      el.x = Math.min(Math.max((ev.clientX - rect.left) / rect.width, 0), 1);
-      el.y = Math.min(Math.max((ev.clientY - rect.top) / rect.height, 0), 1);
+      let nx = (ev.clientX - rect.left) / rect.width;
+      let ny = (ev.clientY - rect.top) / rect.height;
+      snapGuides.x = Math.abs(nx - 0.5) < 0.03;
+      snapGuides.y = Math.abs(ny - 0.5) < 0.03;
+      if (snapGuides.x) nx = 0.5;
+      if (snapGuides.y) ny = 0.5;
+      el.x = Math.min(Math.max(nx, 0), 1);
+      el.y = Math.min(Math.max(ny, 0), 1);
       renderPreview();
     }
     function up() {
+      snapGuides = { x: false, y: false };
+      renderPreview();
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
     }
@@ -1112,9 +1335,12 @@ function addElement(kind) {
   const el = {
     id: uid(), kind: kind, text: kind === "emoji" ? "✨" : "Your text",
     symbolName: "star.fill", x: 0.5, y: 0.5,
-    size: kind === "clock" ? 34 : kind === "emoji" ? 30 : kind === "date" ? 14 : 18,
-    colorHex: "#FFFFFF"
+    size: kind === "clock" ? 34 : kind === "emoji" ? 30 : kind === "date" ? 14
+      : kind === "battery" ? 30 : kind === "countdown" ? 34 : kind === "shape" ? 0 : 18,
+    colorHex: "#FFFFFF", opacity: kind === "shape" ? 0.25 : 1
   };
+  if (kind === "shape") { el.shape = "rect"; el.w = 0.5; el.h = 0.25; }
+  if (kind === "countdown") { el.dateISO = isoInDays(30); }
   current.canvasElements.push(el);
   selectedElId = el.id;
   renderFreestyleUI();
@@ -1127,7 +1353,8 @@ function renderFreestyleUI() {
 
   const palette = document.getElementById("palette");
   palette.innerHTML = "";
-  for (const [kind, label] of [["text", "Text"], ["clock", "🕐 Clock"], ["date", "📅 Date"], ["emoji", "✨ Emoji"]]) {
+  for (const [kind, label] of [["text", "Text"], ["clock", "🕐 Clock"], ["date", "📅 Date"],
+       ["emoji", "✨ Emoji"], ["shape", "▢ Shape"], ["battery", "🔋 Battery"], ["countdown", "⏳ Countdown"]]) {
     const button = document.createElement("button");
     button.textContent = "+ " + label;
     button.onclick = function () { addElement(kind); };
@@ -1136,11 +1363,26 @@ function renderFreestyleUI() {
 
   const inspector = document.getElementById("inspector");
   const hint = document.getElementById("freestyleHint");
-  const el = current.canvasElements.find(function (e) { return e.id === selectedElId; });
+  const index = current.canvasElements.findIndex(function (e) { return e.id === selectedElId; });
+  const el = index >= 0 ? current.canvasElements[index] : null;
   if (!el) { inspector.style.display = "none"; hint.style.display = "block"; return; }
   inspector.style.display = "block";
   hint.style.display = "none";
   inspector.innerHTML = "";
+
+  function sliderRow(label, min, max, value, onInput) {
+    const row = document.createElement("div");
+    row.className = "row";
+    const span = document.createElement("span");
+    span.textContent = label;
+    span.style.cssText = "font-size:12px;color:var(--muted);width:52px";
+    const slider = document.createElement("input");
+    slider.type = "range"; slider.min = min; slider.max = max; slider.value = value;
+    slider.oninput = function () { onInput(Number(slider.value)); renderPreview(); };
+    row.append(span, slider);
+    inspector.appendChild(row);
+    return row;
+  }
 
   if (el.kind === "text" || el.kind === "emoji") {
     const input = document.createElement("input");
@@ -1161,31 +1403,155 @@ function renderFreestyleUI() {
     }
   }
 
-  const sizeRow = document.createElement("div");
-  sizeRow.className = "row";
-  sizeRow.style.marginTop = "8px";
-  const sizeLabel = document.createElement("span");
-  sizeLabel.textContent = "Size";
-  sizeLabel.style.cssText = "font-size:12px;color:var(--muted)";
-  const slider = document.createElement("input");
-  slider.type = "range"; slider.min = 8; slider.max = 80; slider.value = el.size;
-  slider.oninput = function () { el.size = Number(slider.value); renderPreview(); };
-  const colorInput = document.createElement("input");
-  colorInput.type = "color"; colorInput.value = el.colorHex.toLowerCase();
-  colorInput.oninput = function () { el.colorHex = colorInput.value.toUpperCase(); renderPreview(); };
-  const deleteButton = document.createElement("button");
-  deleteButton.textContent = "🗑";
-  deleteButton.onclick = function () {
-    current.canvasElements = current.canvasElements.filter(function (e) { return e.id !== el.id; });
-    selectedElId = null;
-    renderFreestyleUI();
-    renderPreview();
-  };
-  sizeRow.append(sizeLabel, slider, colorInput, deleteButton);
-  inspector.appendChild(sizeRow);
+  if (el.kind === "countdown") {
+    const dateInput = document.createElement("input");
+    dateInput.type = "date";
+    dateInput.value = el.dateISO || "";
+    dateInput.onchange = function () { el.dateISO = dateInput.value; renderPreview(); };
+    inspector.appendChild(dateInput);
+  }
+
+  if (el.kind === "shape") {
+    const shapeRow = document.createElement("div");
+    shapeRow.className = "row";
+    shapeRow.style.marginTop = "8px";
+    const shapeSelect = document.createElement("select");
+    for (const [value, label] of [["rect", "▢ Rectangle"], ["pill", "▭ Pill"], ["circle", "◯ Circle"]]) {
+      const option = document.createElement("option");
+      option.value = value; option.textContent = label;
+      shapeSelect.appendChild(option);
+    }
+    shapeSelect.value = el.shape || "rect";
+    shapeSelect.onchange = function () { el.shape = shapeSelect.value; renderFreestyleUI(); renderPreview(); };
+    shapeRow.appendChild(shapeSelect);
+    inspector.appendChild(shapeRow);
+    sliderRow("Width", 2, 100, Math.round((el.w || 0.5) * 100), function (v) { el.w = v / 100; });
+    if (el.shape !== "circle") {
+      sliderRow("Height", 2, 100, Math.round((el.h || 0.25) * 100), function (v) { el.h = v / 100; });
+    }
+  } else {
+    sliderRow("Size", 8, 80, el.size, function (v) { el.size = v; });
+  }
+
+  if (el.kind !== "emoji") {
+    sliderRow("Opacity", 5, 100, Math.round((el.opacity || 1) * 100), function (v) { el.opacity = v / 100; });
+    const colorRow = document.createElement("div");
+    colorRow.className = "row";
+    const colorLabel = document.createElement("span");
+    colorLabel.textContent = "Color";
+    colorLabel.style.cssText = "font-size:12px;color:var(--muted);width:52px";
+    const colorInput = document.createElement("input");
+    colorInput.type = "color";
+    colorInput.value = /^#[0-9a-fA-F]{6}$/.test(el.colorHex) ? el.colorHex.toLowerCase() : "#ffffff";
+    colorInput.oninput = function () { el.colorHex = colorInput.value.toUpperCase(); renderPreview(); };
+    colorRow.append(colorLabel, colorInput);
+    inspector.appendChild(colorRow);
+  }
+
+  // Layer / arrange / nudge controls.
+  const arrangeRow = document.createElement("div");
+  arrangeRow.className = "row";
+  arrangeRow.style.marginTop = "8px";
+  function smallButton(label, title, disabled, onClick) {
+    const button = document.createElement("button");
+    button.textContent = label;
+    button.title = title;
+    button.disabled = disabled;
+    button.onclick = onClick;
+    return button;
+  }
+  arrangeRow.append(
+    smallButton("⧉", "Duplicate", false, function () {
+      const copy = JSON.parse(JSON.stringify(el));
+      copy.id = uid();
+      copy.x = Math.min(copy.x + 0.05, 1);
+      copy.y = Math.min(copy.y + 0.05, 1);
+      current.canvasElements.push(copy);
+      selectedElId = copy.id;
+      renderFreestyleUI(); renderPreview();
+    }),
+    smallButton("⬆︎", "Bring forward", index === current.canvasElements.length - 1, function () {
+      const t = current.canvasElements[index + 1];
+      current.canvasElements[index + 1] = current.canvasElements[index];
+      current.canvasElements[index] = t;
+      renderFreestyleUI(); renderPreview();
+    }),
+    smallButton("⬇︎", "Send back", index === 0, function () {
+      const t = current.canvasElements[index - 1];
+      current.canvasElements[index - 1] = current.canvasElements[index];
+      current.canvasElements[index] = t;
+      renderFreestyleUI(); renderPreview();
+    }),
+    smallButton("◀", "Nudge left", false, function () { el.x = Math.max(el.x - 0.01, 0); renderPreview(); }),
+    smallButton("▲", "Nudge up", false, function () { el.y = Math.max(el.y - 0.01, 0); renderPreview(); }),
+    smallButton("▼", "Nudge down", false, function () { el.y = Math.min(el.y + 0.01, 1); renderPreview(); }),
+    smallButton("▶", "Nudge right", false, function () { el.x = Math.min(el.x + 0.01, 1); renderPreview(); }),
+    smallButton("🗑", "Delete", false, function () {
+      current.canvasElements.splice(index, 1);
+      selectedElId = null;
+      renderFreestyleUI(); renderPreview();
+    })
+  );
+  inspector.appendChild(arrangeRow);
 }
 
 // ==================== Launcher editor ====================
+let editingIconUrl = "";
+
+function jsonp(url) {
+  return new Promise(function (resolve, reject) {
+    const cb = "wk_cb_" + Math.floor(Math.random() * 1e9);
+    const script = document.createElement("script");
+    window[cb] = function (data) { resolve(data); delete window[cb]; script.remove(); };
+    script.onerror = function () { reject(new Error("search failed")); delete window[cb]; script.remove(); };
+    script.src = url + "&callback=" + cb;
+    document.body.appendChild(script);
+  });
+}
+function schemeForName(name) {
+  const lower = name.toLowerCase();
+  for (const key of Object.keys(APP_PRESETS)) {
+    if (lower.includes(key)) return APP_PRESETS[key].url;
+  }
+  return null;
+}
+async function searchAppStore() {
+  const term = document.getElementById("appSearch").value.trim();
+  if (!term) return;
+  const resultsDiv = document.getElementById("appSearchResults");
+  resultsDiv.innerHTML = '<span class="hint">Searching…</span>';
+  try {
+    const data = await jsonp("https://itunes.apple.com/search?media=software&entity=software&limit=6&term=" + encodeURIComponent(term));
+    resultsDiv.innerHTML = "";
+    if (!data.results || data.results.length === 0) {
+      resultsDiv.innerHTML = '<span class="hint">No apps found.</span>';
+      return;
+    }
+    for (const result of data.results) {
+      const button = document.createElement("button");
+      const img = document.createElement("img");
+      img.src = result.artworkUrl100 || result.artworkUrl60 || "";
+      const label = (result.trackName || "App").split(/[–—:|-]/)[0].trim().slice(0, 14);
+      button.appendChild(img);
+      button.appendChild(document.createTextNode(label));
+      button.onclick = function () {
+        const scheme = schemeForName(result.trackName || "");
+        const url = scheme || ("shortcuts://run-shortcut?name=" + encodeURIComponent("Open " + label));
+        current.apps = current.apps || [];
+        current.apps.push({
+          emoji: "📱", label: label, url: url,
+          iconUrl: result.artworkUrl512 || result.artworkUrl100 || ""
+        });
+        renderLauncherUI();
+        renderPreview();
+        toast(scheme ? ("Added " + label) : ("Added " + label + " via Shortcut — see the ⚡ note"));
+      };
+      resultsDiv.appendChild(button);
+    }
+  } catch (error) {
+    resultsDiv.innerHTML = '<span class="hint">Search failed — check your connection.</span>';
+  }
+}
 function renderLauncherUI() {
   document.getElementById("fLauncher").style.display = current.kind === "launcher" ? "block" : "none";
   if (current.kind !== "launcher") return;
@@ -1263,63 +1629,6 @@ function renderLauncherUI() {
     list.appendChild(tag);
   });
 }
-let editingIconUrl = "";
-
-function jsonp(url) {
-  return new Promise(function (resolve, reject) {
-    const cb = "wk_cb_" + Math.floor(Math.random() * 1e9);
-    const script = document.createElement("script");
-    window[cb] = function (data) { resolve(data); delete window[cb]; script.remove(); };
-    script.onerror = function () { reject(new Error("search failed")); delete window[cb]; script.remove(); };
-    script.src = url + "&callback=" + cb;
-    document.body.appendChild(script);
-  });
-}
-function schemeForName(name) {
-  const lower = name.toLowerCase();
-  for (const key of Object.keys(APP_PRESETS)) {
-    if (lower.includes(key)) return APP_PRESETS[key].url;
-  }
-  return null;
-}
-async function searchAppStore() {
-  const term = document.getElementById("appSearch").value.trim();
-  if (!term) return;
-  const resultsDiv = document.getElementById("appSearchResults");
-  resultsDiv.innerHTML = '<span class="hint">Searching…</span>';
-  try {
-    const data = await jsonp("https://itunes.apple.com/search?media=software&entity=software&limit=6&term=" + encodeURIComponent(term));
-    resultsDiv.innerHTML = "";
-    if (!data.results || data.results.length === 0) {
-      resultsDiv.innerHTML = '<span class="hint">No apps found.</span>';
-      return;
-    }
-    for (const result of data.results) {
-      const button = document.createElement("button");
-      const img = document.createElement("img");
-      img.src = result.artworkUrl100 || result.artworkUrl60 || "";
-      const label = (result.trackName || "App").split(/[–—:|-]/)[0].trim().slice(0, 14);
-      button.appendChild(img);
-      button.appendChild(document.createTextNode(label));
-      button.onclick = function () {
-        const scheme = schemeForName(result.trackName || "");
-        const url = scheme || ("shortcuts://run-shortcut?name=" + encodeURIComponent("Open " + label));
-        current.apps = current.apps || [];
-        current.apps.push({
-          emoji: "📱", label: label, url: url,
-          iconUrl: result.artworkUrl512 || result.artworkUrl100 || ""
-        });
-        renderLauncherUI();
-        renderPreview();
-        toast(scheme ? ("Added " + label) : ("Added " + label + " via Shortcut — see the ⚡ note"));
-      };
-      resultsDiv.appendChild(button);
-    }
-  } catch (error) {
-    resultsDiv.innerHTML = '<span class="hint">Search failed — check your connection.</span>';
-  }
-}
-
 function setupLauncherControls() {
   document.getElementById("appSearchBtn").onclick = searchAppStore;
   document.getElementById("appSearch").addEventListener("keydown", function (event) {
@@ -1376,13 +1685,96 @@ function setupLauncherControls() {
   };
 }
 
+// ==================== Templates ====================
+function buildTemplates() {
+  return [
+    { category: "Clocks", design: { name: "Midnight Moon", kind: "freestyle", themeID: "midnight", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "shape", shape: "pill", w: 0.84, h: 0.44, x: 0.5, y: 0.5, size: 0, colorHex: "#FFFFFF", opacity: 0.15 },
+      { kind: "clock", x: 0.5, y: 0.45, size: 32, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "text", text: "good night", x: 0.5, y: 0.62, size: 11, colorHex: "#C9C4E4", opacity: 0.9 },
+      { kind: "emoji", text: "🌙", x: 0.83, y: 0.15, size: 20, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "emoji", text: "✨", x: 0.16, y: 0.19, size: 13, colorHex: "#FFFFFF", opacity: 1 }
+    ] } },
+    { category: "Clocks", design: { name: "Paper Minimal", kind: "clock", themeID: "paper", fontStyle: "classic", textColorHex: "#333333" } },
+    { category: "Clocks", design: { name: "Neon Time", kind: "freestyle", themeID: "custom", customColors: ["#0F0C29", "#F72585"], gradientDir: "vertical", fontStyle: "mono", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "clock", x: 0.5, y: 0.44, size: 34, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "text", text: "N E O N", x: 0.5, y: 0.63, size: 10, colorHex: "#FF8FAB", opacity: 1 },
+      { kind: "emoji", text: "⚡", x: 0.85, y: 0.14, size: 17, colorHex: "#FFFFFF", opacity: 1 }
+    ] } },
+    { category: "Dates", design: { name: "Big Day", kind: "date", themeID: "mist", fontStyle: "rounded", textColorHex: "#FFFFFF" } },
+    { category: "Dates", design: { name: "Today Card", kind: "freestyle", themeID: "forest", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "shape", shape: "rect", w: 0.78, h: 0.52, x: 0.5, y: 0.5, size: 0, colorHex: "#0A2E24", opacity: 0.35 },
+      { kind: "date", x: 0.5, y: 0.43, size: 15, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "text", text: "make it count", x: 0.5, y: 0.59, size: 10, colorHex: "#CFE8D8", opacity: 0.9 },
+      { kind: "emoji", text: "🍃", x: 0.85, y: 0.16, size: 16, colorHex: "#FFFFFF", opacity: 1 }
+    ] } },
+    { category: "Countdowns", design: { name: "Getaway", kind: "countdown", themeID: "ocean", fontStyle: "rounded", textColorHex: "#FFFFFF", primaryText: "Vacation ✈️", targetDate: isoInDays(45) } },
+    { category: "Countdowns", design: { name: "New Year Sparkle", kind: "freestyle", themeID: "berry", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "shape", shape: "circle", w: 0.56, x: 0.5, y: 0.47, size: 0, colorHex: "#FFFFFF", opacity: 0.14 },
+      { kind: "countdown", dateISO: isoFor(1, 1), x: 0.5, y: 0.44, size: 38, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "text", text: "days to New Year", x: 0.5, y: 0.65, size: 10, colorHex: "#E6D9FF", opacity: 0.9 },
+      { kind: "emoji", text: "✨", x: 0.18, y: 0.16, size: 15, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "emoji", text: "⭐", x: 0.84, y: 0.2, size: 13, colorHex: "#FFFFFF", opacity: 1 }
+    ] } },
+    { category: "Quotes", design: { name: "Daily Stoic", kind: "quote", themeID: "paper", fontStyle: "serif", textColorHex: "#333333", primaryText: "You have power over your mind — not outside events.", secondaryText: "Marcus Aurelius" } },
+    { category: "Quotes", design: { name: "Keep Going", kind: "quote", themeID: "lava", fontStyle: "rounded", textColorHex: "#FFFFFF", primaryText: "Keep going.", secondaryText: "you" } },
+    { category: "Launchers", design: { name: "Social Hub", kind: "launcher", themeID: "midnight", fontStyle: "rounded", textColorHex: "#FFFFFF", apps: [
+      Object.assign({}, APP_PRESETS.instagram), Object.assign({}, APP_PRESETS.tiktok),
+      Object.assign({}, APP_PRESETS.twitter), Object.assign({}, APP_PRESETS.snapchat)
+    ] } },
+    { category: "Launchers", design: { name: "Essentials", kind: "launcher", themeID: "mist", fontStyle: "rounded", textColorHex: "#FFFFFF", apps: [
+      Object.assign({}, APP_PRESETS.phone), Object.assign({}, APP_PRESETS.messages),
+      Object.assign({}, APP_PRESETS.camera), Object.assign({}, APP_PRESETS.maps)
+    ] } },
+    { category: "Utility", design: { name: "Battery Ring", kind: "freestyle", themeID: "mint", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "shape", shape: "circle", w: 0.62, x: 0.5, y: 0.47, size: 0, colorHex: "#FFFFFF", opacity: 0.18 },
+      { kind: "battery", x: 0.5, y: 0.44, size: 30, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "text", text: "battery", x: 0.5, y: 0.61, size: 10, colorHex: "#E2FFF6", opacity: 0.85 }
+    ] } },
+    { category: "Notes", design: { name: "Drink Water", kind: "note", themeID: "mint", fontStyle: "rounded", textColorHex: "#FFFFFF", primaryText: "Drink water 💧" } },
+    { category: "Vibes", design: { name: "Golden Hour", kind: "freestyle", themeID: "sunset", gradientDir: "horizontal", fontStyle: "serif", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "shape", shape: "pill", w: 0.72, h: 0.24, x: 0.5, y: 0.55, size: 0, colorHex: "#3B1B00", opacity: 0.25 },
+      { kind: "emoji", text: "☀️", x: 0.5, y: 0.27, size: 24, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "text", text: "golden hour", x: 0.5, y: 0.55, size: 15, colorHex: "#FFF3DB", opacity: 1 }
+    ] } }
+  ];
+}
+function renderTemplates() {
+  const row = document.getElementById("templateRow");
+  row.innerHTML = "";
+  for (const template of buildTemplates()) {
+    const card = document.createElement("div");
+    card.className = "tpl-card";
+    const design = normalizeDesign(JSON.parse(JSON.stringify(template.design)));
+    card.appendChild(makeThumb(design, 0.55));
+    const name = document.createElement("div");
+    name.className = "tpl-name";
+    name.textContent = template.design.name;
+    const cat = document.createElement("div");
+    cat.className = "tpl-cat";
+    cat.textContent = template.category;
+    card.append(name, cat);
+    card.onclick = function () {
+      const copy = normalizeDesign(JSON.parse(JSON.stringify(template.design)));
+      copy.id = uid();
+      loadIntoEditor(copy);
+      document.getElementById("editorSection").scrollIntoView({ behavior: "smooth" });
+      popCanvas();
+      toast("Template loaded — make it yours ✨");
+    };
+    row.appendChild(card);
+  }
+}
+function popCanvas() {
+  const canvas = document.getElementById("canvas");
+  canvas.classList.remove("pop");
+  void canvas.offsetWidth;
+  canvas.classList.add("pop");
+}
+
 // ==================== Controls ====================
 function loadIntoEditor(design) {
-  current = JSON.parse(JSON.stringify(design));
-  if (!current.canvasElements) current.canvasElements = [];
-  if (!current.apps) current.apps = [];
-  if (!current.gradientDir) current.gradientDir = "diagonal";
-  current.launcherStyle = launcherStyleOf(current);
+  current = normalizeDesign(JSON.parse(JSON.stringify(design)));
   selectedElId = null;
   syncControls();
   renderAll();
@@ -1415,6 +1807,7 @@ function renderControls() {
       if (kind === "launcher" && (!current.apps || current.apps.length === 0)) {
         current.apps = defaultApps();
       }
+      normalizeDesign(current);
       renderAll();
     };
     kindButtons.appendChild(button);
@@ -1451,9 +1844,11 @@ function renderControls() {
     document.getElementById("bg2").value = current.customColors[1].toLowerCase();
   }
   document.getElementById("fTap").style.display = current.kind === "launcher" ? "none" : "block";
+  document.getElementById("remixRow").style.display = getApiKey() ? "flex" : "none";
 
   const gradDirRow = document.getElementById("gradDirRow");
   gradDirRow.innerHTML = "";
+  gradDirRow.className = "row kind-buttons";
   for (const [dir, label] of [["diagonal", "↘ Diagonal"], ["vertical", "↓ Vertical"], ["horizontal", "→ Horizontal"]]) {
     const button = document.createElement("button");
     button.textContent = label;
@@ -1461,7 +1856,6 @@ function renderControls() {
     button.onclick = function () { current.gradientDir = dir; renderAll(); };
     gradDirRow.appendChild(button);
   }
-  gradDirRow.className = "row kind-buttons";
 
   const sizeButtons = document.getElementById("sizeButtons");
   sizeButtons.innerHTML = "";
@@ -1477,26 +1871,31 @@ function renderLibrary() {
   const library = document.getElementById("library");
   library.innerHTML = "";
   if (designs.length === 0) {
-    library.innerHTML = '<p class="hint">No saved designs yet. Build one above and hit Save.</p>';
+    library.innerHTML = '<p class="hint">No saved designs yet. Pick a template or build one above and hit Save.</p>';
     return;
   }
   for (const design of designs) {
     const item = document.createElement("div");
     item.className = "lib-item";
-    const theme = themeOf(design);
-    item.innerHTML =
-      '<div class="lib-thumb" style="background:linear-gradient(135deg,' + theme[0] + "," + theme[1] + ')">' + (KIND_ICONS[design.kind] || "🧩") + '</div>' +
-      '<div><div class="name">' + esc(design.name) + '</div><div class="kind">' + esc(design.kind) + '</div></div>' +
-      '<div class="spacer"></div>';
+    item.appendChild(makeThumb(design, 0.3));
+    const meta = document.createElement("div");
+    meta.innerHTML = '<div class="name">' + esc(design.name) + '</div><div class="kind">' +
+      (KIND_ICONS[design.kind] || "🧩") + ' ' + esc(design.kind) + '</div>';
+    const spacer = document.createElement("div");
+    spacer.className = "spacer";
     const editButton = document.createElement("button");
     editButton.textContent = "Edit";
-    editButton.onclick = function () { loadIntoEditor(design); window.scrollTo({ top: 0, behavior: "smooth" }); };
+    editButton.onclick = function () {
+      loadIntoEditor(design);
+      document.getElementById("editorSection").scrollIntoView({ behavior: "smooth" });
+      popCanvas();
+    };
     const dupButton = document.createElement("button");
     dupButton.textContent = "Duplicate";
     dupButton.onclick = function () {
-      const copy = JSON.parse(JSON.stringify(design));
+      const copy = normalizeDesign(JSON.parse(JSON.stringify(design)));
       copy.id = uid();
-      copy.name += " Copy";
+      copy.name = dedupedName(copy.name + " Copy", null);
       designs.push(copy);
       persist();
       renderLibrary();
@@ -1508,16 +1907,28 @@ function renderLibrary() {
       persist();
       renderLibrary();
     };
-    item.append(editButton, dupButton, deleteButton);
+    item.append(meta, spacer, editButton, dupButton, deleteButton);
     library.appendChild(item);
   }
+}
+// Widgets pick designs by name (Scriptable widget parameter), so names must
+// be unique or the wrong design silently shows.
+function dedupedName(name, excludeId) {
+  let candidate = name;
+  let counter = 2;
+  while (designs.some(function (d) {
+    return d.id !== excludeId && (d.name || "").toLowerCase() === candidate.toLowerCase();
+  })) {
+    candidate = name + " " + counter;
+    counter += 1;
+  }
+  return candidate;
 }
 function renderAll() {
   renderControls();
   renderFreestyleUI();
   renderLauncherUI();
   renderPreview();
-  renderLibrary();
   updateMagicHint();
 }
 function updateMagicHint() {
@@ -1537,7 +1948,9 @@ document.getElementById("quoteAuthor").oninput = function (e) { current.secondar
 document.getElementById("noteText").oninput = function (e) { current.primaryText = e.target.value; renderPreview(); };
 
 document.getElementById("saveBtn").onclick = function () {
-  current.name = document.getElementById("nameInput").value || "My Widget";
+  const rawName = document.getElementById("nameInput").value || "My Widget";
+  current.name = dedupedName(rawName, current.id);
+  document.getElementById("nameInput").value = current.name;
   const index = designs.findIndex(function (d) { return d.id === current.id; });
   const copy = JSON.parse(JSON.stringify(current));
   if (index >= 0) designs[index] = copy; else designs.push(copy);
@@ -1552,13 +1965,13 @@ apiKeyInput.value = getApiKey();
 apiKeyInput.oninput = function () {
   localStorage.setItem("widgetking.apikey", apiKeyInput.value.trim());
   updateMagicHint();
+  document.getElementById("remixRow").style.display = getApiKey() ? "flex" : "none";
 };
 const aiModelSelect = document.getElementById("aiModel");
 aiModelSelect.value = localStorage.getItem("widgetking.aimodel") || "claude-opus-5";
 aiModelSelect.onchange = function () {
   localStorage.setItem("widgetking.aimodel", aiModelSelect.value);
 };
-
 const budgetInput = document.getElementById("budgetInput");
 budgetInput.value = getBudget().toFixed(2);
 budgetInput.onchange = function () {
@@ -1574,13 +1987,11 @@ document.getElementById("resetSpend").onclick = function () {
   updateSpendUI();
   toast("Spend counter reset");
 };
-updateSpendUI();
 
 function setCustomColor(index, value) {
   if (!current.customColors) current.customColors = ["#232526", "#8F52FA"];
   current.customColors[index] = value.toUpperCase();
   renderPreview();
-  renderLibrary();
 }
 document.getElementById("bg1").oninput = function (e) { setCustomColor(0, e.target.value); };
 document.getElementById("bg2").oninput = function (e) { setCustomColor(1, e.target.value); };
@@ -1616,23 +2027,68 @@ document.getElementById("magicBtn").onclick = async function () {
   if (!idea) return;
   const button = document.getElementById("magicBtn");
   const key = getApiKey();
+  let design = null;
   if (key) {
     button.disabled = true;
     button.textContent = "Asking Claude… 🤖";
     try {
-      const design = await callClaude(idea, key);
-      loadIntoEditor(design);
+      design = await callClaude([{ role: "user", content: idea }], key);
       toast("Designed by Claude ✨ Tweak it below, then Save.");
     } catch (error) {
-      loadIntoEditor(parseIdea(idea));
+      design = parseIdea(idea);
       toast("Claude failed (" + error.message + ") — built with the free parser instead.");
     } finally {
       button.disabled = false;
       button.textContent = "Build it ✨";
     }
   } else {
-    loadIntoEditor(parseIdea(idea));
+    design = parseIdea(idea);
     toast("Built! Tweak it below, then Save.");
+  }
+  loadIntoEditor(design);
+  document.getElementById("editorSection").scrollIntoView({ behavior: "smooth" });
+  popCanvas();
+  if (current.kind === "launcher" && current.apps.some(function (a) { return !a.iconUrl; })) {
+    toast("Fetching real app icons…");
+    fetchIconsForApps(current);
+  }
+};
+
+document.getElementById("remixBtn").onclick = async function () {
+  const instruction = document.getElementById("remixInput").value.trim();
+  const key = getApiKey();
+  if (!instruction || !key) return;
+  const button = document.getElementById("remixBtn");
+  button.disabled = true;
+  button.textContent = "Remixing…";
+  try {
+    const stripped = JSON.parse(JSON.stringify(current));
+    delete stripped.id;
+    (stripped.canvasElements || []).forEach(function (el) { delete el.id; });
+    (stripped.apps || []).forEach(function (app) { delete app.iconUrl; });
+    const message = "Current design JSON:\n" + JSON.stringify(stripped) +
+      "\n\nEdit instruction: " + instruction +
+      "\nReturn the full updated design spec, changing only what the instruction asks for.";
+    const design = await callClaude([{ role: "user", content: message }], key);
+    design.id = current.id;
+    for (const app of design.apps) {
+      const old = (current.apps || []).find(function (a) {
+        return (a.label || "").toLowerCase() === (app.label || "").toLowerCase();
+      });
+      if (old && old.iconUrl) app.iconUrl = old.iconUrl;
+    }
+    loadIntoEditor(design);
+    popCanvas();
+    document.getElementById("remixInput").value = "";
+    toast("Remixed ✨ Save to keep it.");
+    if (current.kind === "launcher" && current.apps.some(function (a) { return !a.iconUrl; })) {
+      fetchIconsForApps(current);
+    }
+  } catch (error) {
+    toast("Remix failed: " + error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = "✨ Remix";
   }
 };
 
@@ -1684,8 +2140,10 @@ document.getElementById("importFile").onchange = function (event) {
     try {
       const parsed = JSON.parse(reader.result);
       const list = Array.isArray(parsed) ? parsed : [parsed];
-      for (const design of list) {
+      for (const raw of list) {
+        const design = normalizeDesign(raw);
         design.id = uid();
+        design.name = dedupedName(design.name, null);
         designs.push(design);
       }
       persist();
@@ -1705,8 +2163,11 @@ setInterval(function () {
 }, 30000);
 
 setupLauncherControls();
+renderTemplates();
+renderLibrary();
 syncControls();
 renderAll();
+updateSpendUI();
 </script>
 </body>
 </html>
