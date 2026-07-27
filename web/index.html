@@ -183,6 +183,13 @@
       browser.
     </p>
     <input type="password" id="apiKeyInput" placeholder="sk-ant-…" autocomplete="off">
+    <p class="hint" style="margin-top:6px">
+      👨‍👩‍👧 <b>Sharing with family:</b> send them the key privately (iMessage) and
+      have them paste it in this box on <i>their</i> device — it stays in their
+      browser only. Never post the key anywhere public. All devices draw from
+      the same prepaid credits, so keeping a small balance (like $5, auto-reload
+      off) stays a hard cap for everyone combined.
+    </p>
     <div class="row" style="margin-top:8px">
       <span style="font-size:12px;color:var(--muted)">Model</span>
       <select id="aiModel" style="flex:1">
@@ -367,6 +374,7 @@
     <button id="downloadScriptBtn">⬇️ Download Script</button>
     <button id="backupBtn">💾 Back up all designs</button>
     <button id="importJsonBtn">📂 Restore / Import</button>
+    <button id="syncAllBtn">📲 Send all to my other device</button>
     <button id="exportJsonBtn" style="display:none">Export JSON</button>
     <input type="file" id="importFile" accept=".json,application/json" style="display:none">
   </div>
@@ -3898,13 +3906,7 @@ async function pipeBytes(bytes, stream) {
 async function designToLink(design) {
   const copy = normalizeDesign(JSON.parse(JSON.stringify(design)));
   delete copy.id;
-  let hadPhotos = false;
-  for (const el of copy.canvasElements || []) {
-    if (el.kind === "photo" && (el.dataUrl || (el.photos || []).length)) {
-      hadPhotos = true;
-      el.dataUrl = ""; el.photos = [];
-    }
-  }
+  const hadPhotos = stripPhotoData(copy);
   const raw = new TextEncoder().encode(JSON.stringify(copy));
   let mode = "p", bytes = raw;
   if (window.CompressionStream) {
@@ -3928,7 +3930,84 @@ async function shareDesign(design) {
     }
   } catch (e) { /* user cancelled the share sheet */ }
 }
+function stripPhotoData(design) {
+  let hadPhotos = false;
+  for (const el of design.canvasElements || []) {
+    if (el.kind === "photo" && (el.dataUrl || (el.photos || []).length)) {
+      hadPhotos = true;
+      el.dataUrl = ""; el.photos = [];
+    }
+  }
+  return hadPhotos;
+}
+// Device-to-device sync: all designs in one link. Re-sending updates by id
+// instead of duplicating, so it works like a manual sync in either direction.
+async function allDesignsLink() {
+  const copies = JSON.parse(JSON.stringify(designs));
+  let hadPhotos = false;
+  for (const copy of copies) { if (stripPhotoData(copy)) hadPhotos = true; }
+  const raw = new TextEncoder().encode(JSON.stringify({ app: "WidgetKing", sync: 1, designs: copies }));
+  let mode = "p", bytes = raw;
+  if (window.CompressionStream) {
+    try { bytes = await pipeBytes(raw, new CompressionStream("gzip")); mode = "g"; } catch (e) { bytes = raw; }
+  }
+  const base = location.origin.startsWith("http") ? location.origin + location.pathname
+    : "https://ballnews703-png.github.io/WidgetKing/";
+  return { url: base + "#s=" + mode + b64urlEncode(bytes), hadPhotos: hadPhotos, count: copies.length };
+}
+document.getElementById("syncAllBtn").onclick = async function () {
+  if (designs.length === 0) { toast("No designs to send yet"); return; }
+  try {
+    const link = await allDesignsLink();
+    if (link.hadPhotos) toast("Note: photos don't fit in a link — use 💾 Backup via iCloud Files for those");
+    if (navigator.share) {
+      await navigator.share({ title: "WidgetKing — all my designs", url: link.url });
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(link.url);
+      toast("Link with all " + link.count + " designs copied — open it on the other device 📲");
+    } else {
+      prompt("Open this link on your other device:", link.url);
+    }
+  } catch (e) { /* user cancelled the share sheet */ }
+};
+// Merging an incoming design by id must not wipe local photo data (links
+// strip photos) — graft the local element's photos back in where ids match.
+function preservePhotos(incoming, local) {
+  if (!local) return;
+  const byId = {};
+  for (const el of local.canvasElements || []) byId[el.id] = el;
+  for (const el of incoming.canvasElements || []) {
+    if (el.kind === "photo" && !el.dataUrl && byId[el.id] && byId[el.id].dataUrl) {
+      el.dataUrl = byId[el.id].dataUrl;
+      el.photos = (byId[el.id].photos || []).slice();
+      el.aspect = byId[el.id].aspect;
+    }
+  }
+}
 async function receiveSharedDesign() {
+  const bundle = location.hash.match(/^#s=([gp])(.+)$/);
+  if (bundle) {
+    try {
+      let bytes = b64urlDecode(bundle[2]);
+      if (bundle[1] === "g") bytes = await pipeBytes(bytes, new DecompressionStream("gzip"));
+      const parsed = JSON.parse(new TextDecoder().decode(bytes));
+      if (!parsed || !Array.isArray(parsed.designs)) throw new Error("bad bundle");
+      let added = 0, updated = 0;
+      for (const raw of parsed.designs) {
+        const design = normalizeDesign(raw);
+        const index = designs.findIndex(function (d) { return d.id === design.id; });
+        if (index >= 0) { preservePhotos(design, designs[index]); designs[index] = design; updated++; }
+        else { designs.push(design); added++; }
+      }
+      persist();
+      renderLibrary();
+      history.replaceState(null, "", location.pathname + location.search);
+      toast("📲 Synced " + parsed.designs.length + " designs — " + added + " new, " + updated + " updated ✓");
+    } catch (e) {
+      toast("That sync link couldn't be read");
+    }
+    return;
+  }
   const match = location.hash.match(/^#d=([gp])(.+)$/);
   if (!match) return;
   try {
