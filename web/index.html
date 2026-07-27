@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WidgetKing Designer</title>
+<style>
+  :root {
+    --bg: #101014;
+    --card: #1a1a21;
+    --card2: #23232c;
+    --text: #f2f2f5;
+    --muted: #9a9aa5;
+    --accent: #8f52fa;
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+    padding: 20px; max-width: 1080px; margin: 0 auto;
+  }
+  header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 20px; }
+  header h1 { font-size: 26px; }
+  header span { color: var(--muted); font-size: 14px; }
+  section {
+    background: var(--card); border-radius: var(--radius);
+    padding: 18px; margin-bottom: 18px;
+  }
+  h2 { font-size: 16px; margin-bottom: 10px; }
+  .hint { color: var(--muted); font-size: 13px; margin-bottom: 10px; line-height: 1.45; }
+  textarea, input[type=text], input[type=date], select {
+    width: 100%; background: var(--card2); color: var(--text);
+    border: 1px solid #34343f; border-radius: 10px;
+    padding: 10px 12px; font-size: 14px; font-family: inherit;
+  }
+  textarea { resize: vertical; min-height: 48px; }
+  button {
+    background: var(--card2); color: var(--text); border: 1px solid #34343f;
+    border-radius: 10px; padding: 9px 14px; font-size: 13px;
+    cursor: pointer; font-family: inherit;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  .chips button { font-size: 12px; border-radius: 999px; padding: 6px 12px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .editor-grid { display: grid; grid-template-columns: auto 1fr; gap: 22px; }
+  @media (max-width: 760px) { .editor-grid { grid-template-columns: 1fr; } }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .kind-buttons button.active, .size-buttons button.active {
+    background: var(--accent); border-color: var(--accent); font-weight: 600;
+  }
+  .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+  .swatch {
+    width: 34px; height: 34px; border-radius: 50%; cursor: pointer;
+    border: 2px solid transparent;
+  }
+  .swatch.active { border-color: #fff; }
+  #canvasWrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  #canvas {
+    border-radius: 28px; overflow: hidden; position: relative;
+    box-shadow: 0 10px 30px rgba(0,0,0,.45);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; user-select: none; -webkit-user-select: none;
+  }
+  #canvas .cel { position: absolute; transform: translate(-50%, -50%); cursor: grab;
+    white-space: nowrap; line-height: 1.1; touch-action: none; }
+  #canvas .cel.selected { outline: 1.5px dashed rgba(255,255,255,.9); outline-offset: 3px; border-radius: 6px; }
+  #inspector { background: var(--card2); border-radius: 12px; padding: 12px; margin-top: 10px; }
+  #inspector .row { margin-bottom: 8px; }
+  input[type=range] { flex: 1; }
+  input[type=color] { width: 44px; height: 32px; border: none; background: none; padding: 0; cursor: pointer; }
+  .lib-item {
+    display: flex; align-items: center; gap: 12px; padding: 10px;
+    border-radius: 12px; background: var(--card2); margin-bottom: 8px;
+  }
+  .lib-thumb { width: 46px; height: 46px; border-radius: 12px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 20px; }
+  .lib-item .name { font-weight: 600; font-size: 14px; }
+  .lib-item .kind { color: var(--muted); font-size: 12px; }
+  .lib-item .spacer { flex: 1; }
+  .lib-item button { font-size: 12px; padding: 6px 10px; }
+  ol { padding-left: 20px; }
+  ol li { margin-bottom: 6px; font-size: 14px; color: var(--muted); line-height: 1.5; }
+  ol li b { color: var(--text); }
+  #toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--accent); padding: 10px 18px; border-radius: 999px;
+    font-size: 14px; font-weight: 600; opacity: 0; transition: opacity .25s; pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<header><h1>👑 WidgetKing</h1><span>Designer — no Mac, no AI, no cost</span></header>
+
+<section id="magicSection">
+  <h2>✨ Magic — type an idea</h2>
+  <p class="hint">Describe the widget you want and it's built instantly, entirely in your browser. No AI, no network.</p>
+  <textarea id="magicInput" placeholder="Countdown to my birthday on October 12, sunset colors"></textarea>
+  <div class="chips" id="magicChips"></div>
+  <button class="primary" id="magicBtn">Build it ✨</button>
+</section>
+
+<section>
+  <h2>🎨 Editor</h2>
+  <div class="editor-grid">
+    <div id="canvasWrap">
+      <div id="canvas"></div>
+      <div class="row size-buttons" id="sizeButtons"></div>
+      <div id="freestyleTools" style="display:none; width: 100%; max-width: 360px;">
+        <div class="chips" id="palette"></div>
+        <div id="inspector" style="display:none;"></div>
+        <p class="hint" id="freestyleHint">Tap a chip to add an element, then drag it anywhere on the widget. Click an element to edit it.</p>
+      </div>
+    </div>
+    <div>
+      <div class="field"><label>Name</label><input type="text" id="nameInput"></div>
+      <div class="field"><label>Type</label><div class="row kind-buttons" id="kindButtons"></div></div>
+      <div class="field" id="fCountdown" style="display:none">
+        <label>Countdown</label>
+        <input type="text" id="countTitle" placeholder="Event title" style="margin-bottom:8px">
+        <input type="date" id="countDate">
+      </div>
+      <div class="field" id="fQuote" style="display:none">
+        <label>Quote</label>
+        <input type="text" id="quoteText" placeholder="Quote" style="margin-bottom:8px">
+        <input type="text" id="quoteAuthor" placeholder="Author (optional)">
+      </div>
+      <div class="field" id="fNote" style="display:none">
+        <label>Note</label>
+        <input type="text" id="noteText" placeholder="Your text">
+      </div>
+      <div class="field"><label>Theme</label><div class="swatches" id="themeSwatches"></div></div>
+      <div class="field"><label>Font</label><select id="fontSelect">
+        <option value="classic">Classic</option><option value="rounded" selected>Rounded</option>
+        <option value="serif">Serif</option><option value="mono">Mono</option>
+      </select></div>
+      <div class="field"><label>Text color</label><input type="color" id="textColor" value="#ffffff"></div>
+      <div class="row">
+        <button class="primary" id="saveBtn">Save design</button>
+        <button id="newBtn">New</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>📚 My Widgets</h2>
+  <div id="library"></div>
+  <div class="row" style="margin-top:12px">
+    <button class="primary" id="copyScriptBtn">📋 Copy Scriptable Script</button>
+    <button id="downloadScriptBtn">⬇️ Download Script</button>
+    <button id="exportJsonBtn">Export JSON</button>
+    <button id="importJsonBtn">Import JSON</button>
+    <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+  </div>
+</section>
+
+<section>
+  <h2>📱 Put it on your iPhone (no Mac needed)</h2>
+  <ol>
+    <li>Install the free <b>Scriptable</b> app from the App Store.</li>
+    <li>Design your widgets above, then tap <b>Copy Scriptable Script</b> (or Download it and send it to your phone via Notes, email, or messages).</li>
+    <li>In Scriptable, tap <b>+</b>, paste the script, and name it <b>WidgetKing</b>.</li>
+    <li>Long-press your Home Screen → <b>Edit → Add Widget</b> → search <b>Scriptable</b> → add a widget.</li>
+    <li>Long-press the new widget → <b>Edit Widget</b> → set Script to <b>WidgetKing</b>, and set <b>Parameter</b> to a design's name to choose which one it shows. Add more widgets with different parameters — designs are fully interchangeable.</li>
+    <li>Changed your designs? Copy the script again and paste over the old one in Scriptable.</li>
+  </ol>
+  <p class="hint">Note: iOS refreshes Scriptable widgets on its own schedule (every few minutes), so clock widgets are close but not to-the-second. Everything runs on your devices — nothing is uploaded anywhere.</p>
+</section>
+
+<div id="toast"></div>
+
+<script type="text/plain" id="scriptableTemplate">
+// WidgetKing — Scriptable renderer (generated by the WidgetKing web designer)
+// Widget "Parameter" = design name chooses which design a widget shows.
+
+const DESIGNS = "__DESIGNS__";
+
+const THEMES = {
+  midnight: ["#232526", "#414345"], royal: ["#5B2C98", "#8E44AD"],
+  sunset: ["#FF512F", "#F09819"], ocean: ["#1A2980", "#26D0CE"],
+  forest: ["#134E5E", "#71B280"], candy: ["#FC5C7D", "#6A82FB"],
+  lava: ["#870000", "#190A05"], gold: ["#B8860B", "#FFD700"],
+  berry: ["#8E2DE2", "#4A00E0"], mist: ["#606C88", "#3F4C6B"],
+  mint: ["#02AABD", "#00CDAC"], paper: ["#F5F5F0", "#E4E0D8"]
+};
+const SYMBOL_EMOJI = {
+  "star.fill": "⭐", "heart.fill": "❤️", "bolt.fill": "⚡",
+  "moon.stars.fill": "🌙", "sun.max.fill": "☀️", "cloud.fill": "☁️",
+  "leaf.fill": "🍃", "flame.fill": "🔥", "sparkles": "✨",
+  "music.note": "🎵", "pawprint.fill": "🐾", "crown.fill": "👑"
+};
+
+function fontFor(style, size, bold) {
+  if (style === "serif") return new Font(bold ? "Georgia-Bold" : "Georgia", size);
+  if (style === "mono") return bold ? Font.boldMonospacedSystemFont(size) : Font.regularMonospacedSystemFont(size);
+  if (style === "classic") return bold ? Font.boldSystemFont(size) : Font.systemFont(size);
+  return bold ? Font.boldRoundedSystemFont(size) : Font.regularRoundedSystemFont(size);
+}
+function themeColors(d) { return THEMES[d.themeID] || THEMES.midnight; }
+function daysUntil(iso) {
+  if (!iso) return 0;
+  const p = iso.split("-").map(Number);
+  const target = new Date(p[0], (p[1] || 1) - 1, p[2] || 1);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((target - today) / 86400000);
+}
+function centeredText(w, str, font, color) {
+  const t = w.addText(str);
+  t.font = font; t.textColor = color; t.centerAlignText(); t.minimumScaleFactor = 0.5;
+  return t;
+}
+function hexToRgb(hex) {
+  const c = hex.replace("#", "");
+  return [parseInt(c.substring(0,2),16), parseInt(c.substring(2,4),16), parseInt(c.substring(4,6),16)];
+}
+function rgbToHex(rgb) {
+  return "#" + rgb.map(function (v) {
+    return Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0");
+  }).join("");
+}
+function drawFreestyle(design, family) {
+  const sizes = { small: [474, 474], medium: [1014, 474], large: [1014, 1062] };
+  const dims = sizes[family] || sizes.small;
+  const W = dims[0], H = dims[1];
+  const ctx = new DrawContext();
+  ctx.size = new Size(W, H); ctx.opaque = false; ctx.respectScreenScale = false;
+  const colors = themeColors(design);
+  const c1 = hexToRgb(colors[0]); const c2 = hexToRgb(colors[1]);
+  const steps = 60;
+  for (let i = 0; i < steps; i++) {
+    const t = i / (steps - 1);
+    const mix = [0, 1, 2].map(function (j) { return c1[j] + (c2[j] - c1[j]) * t; });
+    ctx.setFillColor(new Color(rgbToHex(mix)));
+    ctx.fillRect(new Rect(0, Math.floor((H * i) / steps), W, Math.ceil(H / steps) + 1));
+  }
+  const scale = Math.min(W, H) / 158;
+  const els = design.canvasElements || [];
+  for (const el of els) {
+    const px = el.x * W; const py = el.y * H; const fs = (el.size || 20) * scale;
+    let text;
+    if (el.kind === "clock") { const df = new DateFormatter(); df.useShortTimeStyle(); text = df.string(new Date()); }
+    else if (el.kind === "date") { const df = new DateFormatter(); df.dateFormat = "EEE MMM d"; text = df.string(new Date()); }
+    else if (el.kind === "symbol") { text = SYMBOL_EMOJI[el.symbolName] || "⭐"; }
+    else { text = el.text || "Text"; }
+    ctx.setFont(fontFor(design.fontStyle, fs, true));
+    ctx.setTextColor(new Color(el.colorHex || "#FFFFFF"));
+    ctx.setTextAlignedCenter();
+    ctx.drawTextInRect(text, new Rect(px - W / 2, py - fs * 0.72, W, fs * 1.7));
+  }
+  return ctx.getImage();
+}
+function buildWidget(design) {
+  const family = config.widgetFamily || "small";
+  const w = new ListWidget();
+  w.setPadding(12, 12, 12, 12);
+  const colors = themeColors(design);
+  const g = new LinearGradient();
+  g.colors = [new Color(colors[0]), new Color(colors[1])];
+  g.locations = [0, 1];
+  w.backgroundGradient = g;
+  const tc = new Color(design.textColorHex || "#FFFFFF");
+  const style = design.fontStyle || "rounded";
+  if (design.kind === "freestyle") {
+    w.setPadding(0, 0, 0, 0);
+    w.backgroundImage = drawFreestyle(design, family);
+    w.refreshAfterDate = new Date(Date.now() + 5 * 60 * 1000);
+    return w;
+  }
+  w.addSpacer();
+  switch (design.kind) {
+    case "clock": {
+      const t = w.addDate(new Date());
+      t.applyTimeStyle(); t.font = fontFor(style, 40, true); t.textColor = tc;
+      t.centerAlignText(); t.minimumScaleFactor = 0.4;
+      const d = w.addDate(new Date());
+      d.applyDateStyle(); d.font = fontFor(style, 12, false); d.textColor = tc;
+      d.textOpacity = 0.85; d.centerAlignText();
+      break;
+    }
+    case "date": {
+      const now = new Date();
+      const wd = new DateFormatter(); wd.dateFormat = "EEEE";
+      const mo = new DateFormatter(); mo.dateFormat = "MMMM";
+      centeredText(w, wd.string(now).toUpperCase(), fontFor(style, 13, true), tc).textOpacity = 0.85;
+      centeredText(w, String(now.getDate()), fontFor(style, 50, true), tc);
+      centeredText(w, mo.string(now), fontFor(style, 13, false), tc).textOpacity = 0.85;
+      break;
+    }
+    case "countdown": {
+      const days = daysUntil(design.targetDate);
+      centeredText(w, design.primaryText || design.name || "Countdown", fontFor(style, 13, true), tc).textOpacity = 0.85;
+      centeredText(w, String(Math.abs(days)), fontFor(style, 44, true), tc);
+      centeredText(w, days >= 0 ? "days to go" : "days ago", fontFor(style, 11, false), tc).textOpacity = 0.75;
+      break;
+    }
+    case "quote": {
+      centeredText(w, "“", fontFor(style, 18, true), tc).textOpacity = 0.6;
+      centeredText(w, design.primaryText || "Add a quote", fontFor(style, 15, true), tc);
+      if (design.secondaryText) {
+        centeredText(w, "— " + design.secondaryText, fontFor(style, 11, false), tc).textOpacity = 0.75;
+      }
+      break;
+    }
+    default: {
+      centeredText(w, design.primaryText || design.name || "WidgetKing", fontFor(style, 18, true), tc);
+    }
+  }
+  w.addSpacer();
+  w.refreshAfterDate = new Date(Date.now() + 5 * 60 * 1000);
+  return w;
+}
+const parameter = (args.widgetParameter || "").trim().toLowerCase();
+let design = DESIGNS.find(function (d) { return (d.name || "").toLowerCase() === parameter; });
+if (!design) design = DESIGNS[0];
+if (!design) {
+  const w = new ListWidget();
+  w.addText("No designs yet — build one in the WidgetKing designer.");
+  if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentSmall(); }
+} else {
+  const w = buildWidget(design);
+  if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentSmall(); }
+}
+Script.complete();
+</script>
+
+<script>
+"use strict";
+
+const THEMES = {
+  midnight: ["#232526", "#414345"], royal: ["#5B2C98", "#8E44AD"],
+  sunset: ["#FF512F", "#F09819"], ocean: ["#1A2980", "#26D0CE"],
+  forest: ["#134E5E", "#71B280"], candy: ["#FC5C7D", "#6A82FB"],
+  lava: ["#870000", "#190A05"], gold: ["#B8860B", "#FFD700"],
+  berry: ["#8E2DE2", "#4A00E0"], mist: ["#606C88", "#3F4C6B"],
+  mint: ["#02AABD", "#00CDAC"], paper: ["#F5F5F0", "#E4E0D8"]
+};
+const KINDS = [
+  ["clock", "🕐 Clock"], ["date", "📅 Date"], ["countdown", "⏳ Countdown"],
+  ["quote", "💬 Quote"], ["note", "📝 Note"], ["freestyle", "🎨 Freestyle"]
+];
+const SIZES = { small: [158, 158], medium: [338, 158], large: [338, 354] };
+const FONT_CSS = {
+  classic: "-apple-system, 'Segoe UI', sans-serif",
+  rounded: "ui-rounded, 'SF Pro Rounded', 'Nunito', -apple-system, sans-serif",
+  serif: "Georgia, 'Times New Roman', serif",
+  mono: "ui-monospace, Menlo, Consolas, monospace"
+};
+const EMOJI_PICKS = ["⭐","❤️","⚡","🌙","☀️","☁️","🍃","🔥","✨","🎵","🐾","👑"];
+const SYMBOL_EMOJI = {
+  "star.fill": "⭐", "heart.fill": "❤️", "bolt.fill": "⚡",
+  "moon.stars.fill": "🌙", "sun.max.fill": "☀️", "cloud.fill": "☁️",
+  "leaf.fill": "🍃", "flame.fill": "🔥", "sparkles": "✨",
+  "music.note": "🎵", "pawprint.fill": "🐾", "crown.fill": "👑"
+};
+const EXAMPLES = [
+  "Countdown to my birthday on October 12",
+  'A sunset quote widget: "Dream big" — Mom',
+  "Minimal dark clock with a serif font",
+  "Note that says Drink water! in mint green"
+];
+
+function newDesign() {
+  return {
+    id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random())),
+    name: "My Widget", kind: "clock", themeID: "midnight", fontStyle: "rounded",
+    textColorHex: "#FFFFFF", primaryText: "", secondaryText: "",
+    targetDate: "", canvasElements: []
+  };
+}
+
+let designs = loadDesigns();
+let current = newDesign();
+let previewSize = "small";
+let selectedElId = null;
+
+function loadDesigns() {
+  try { return JSON.parse(localStorage.getItem("widgetking.designs") || "[]"); }
+  catch (e) { return []; }
+}
+function persist() {
+  localStorage.setItem("widgetking.designs", JSON.stringify(designs));
+}
+function toast(message) {
+  const el = document.getElementById("toast");
+  el.textContent = message;
+  el.style.opacity = 1;
+  setTimeout(function () { el.style.opacity = 0; }, 2200);
+}
+
+// ---------- Magic parser (pure JS, no AI) ----------
+function parseIdea(idea) {
+  const lower = idea.toLowerCase();
+  const design = newDesign();
+
+  const themeWords = [
+    ["sunset", ["sunset", "orange", "warm"]], ["ocean", ["ocean", "sea", "blue", "water"]],
+    ["forest", ["forest", "green", "nature"]], ["midnight", ["dark", "black", "midnight", "night"]],
+    ["royal", ["purple", "royal"]], ["candy", ["pink", "candy", "cute"]],
+    ["lava", ["red", "lava", "fire"]], ["gold", ["gold", "yellow"]],
+    ["berry", ["berry", "violet"]], ["mist", ["gray", "grey", "mist", "slate"]],
+    ["mint", ["mint", "teal", "aqua"]], ["paper", ["white", "light", "paper", "cream", "minimal"]]
+  ];
+  for (const [id, words] of themeWords) {
+    if (words.some(function (word) { return lower.includes(word); })) { design.themeID = id; break; }
+  }
+  if (design.themeID === "paper") design.textColorHex = "#333333";
+
+  if (/serif|elegant|fancy/.test(lower)) design.fontStyle = "serif";
+  else if (/mono|code|terminal/.test(lower)) design.fontStyle = "mono";
+  else if (/classic/.test(lower)) design.fontStyle = "classic";
+
+  const quoteMatch = idea.match(/"([^"]+)"/) || idea.match(/“([^”]+)”/) || idea.match(/'([^']+)'/);
+  const quoted = quoteMatch ? quoteMatch[1].trim() : null;
+  const authorMatch = idea.match(/(?:—|–|\s-\s|\bby\s)\s*([A-Za-z][A-Za-z .'-]{1,38})\s*$/);
+  const author = authorMatch ? authorMatch[1].trim() : null;
+  const date = findDate(idea, lower);
+
+  if (/countdown|days until|until/.test(lower) || (date && !/clock/.test(lower))) design.kind = "countdown";
+  else if (/quote/.test(lower) || (quoted && author)) design.kind = "quote";
+  else if (/clock|time/.test(lower)) design.kind = "clock";
+  else if (/\bdate\b|calendar|today/.test(lower)) design.kind = "date";
+  else design.kind = "note";
+
+  if (design.kind === "countdown") {
+    design.targetDate = date || isoInDays(30);
+    design.primaryText = eventTitle(idea);
+    design.name = design.primaryText || "Countdown";
+  } else if (design.kind === "quote") {
+    design.primaryText = quoted || idea.slice(0, 80);
+    design.secondaryText = author || "";
+    design.name = "Quote";
+  } else if (design.kind === "note") {
+    design.primaryText = quoted || idea.slice(0, 60);
+    design.name = "Note";
+  } else {
+    design.name = design.kind === "clock" ? "Clock" : "Date";
+  }
+  return design;
+}
+
+function isoInDays(days) {
+  const d = new Date(Date.now() + days * 86400000);
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function isoFor(month, day) {
+  const now = new Date();
+  let year = now.getFullYear();
+  const candidate = new Date(year, month - 1, day);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (candidate < today) year += 1;
+  return year + "-" + String(month).padStart(2, "0") + "-" + String(day).padStart(2, "0");
+}
+function findDate(idea, lower) {
+  let m = lower.match(/in (\d+) (day|week|month)s?/);
+  if (m) {
+    const n = parseInt(m[1], 10);
+    return isoInDays(m[2] === "day" ? n : m[2] === "week" ? n * 7 : n * 30);
+  }
+  if (lower.includes("tomorrow")) return isoInDays(1);
+  if (lower.includes("christmas")) return isoFor(12, 25);
+  if (lower.includes("new year")) return isoFor(1, 1);
+  const months = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+  m = lower.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})\b/);
+  if (m) return isoFor(months.indexOf(m[1]) + 1, parseInt(m[2], 10));
+  m = lower.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
+  if (m) {
+    if (m[3]) {
+      let year = parseInt(m[3], 10); if (year < 100) year += 2000;
+      return year + "-" + m[1].padStart(2, "0") + "-" + m[2].padStart(2, "0");
+    }
+    return isoFor(parseInt(m[1], 10), parseInt(m[2], 10));
+  }
+  return null;
+}
+function eventTitle(idea) {
+  let text = idea;
+  for (const phrase of ["countdown to", "countdown for", "days until", "until", "countdown"]) {
+    const index = text.toLowerCase().indexOf(phrase);
+    if (index >= 0) { text = text.slice(index + phrase.length); break; }
+  }
+  for (const marker of [" on ", " in ", " by ", " at ", ","]) {
+    const index = text.toLowerCase().indexOf(marker);
+    if (index >= 0) text = text.slice(0, index);
+  }
+  text = text.replace(/^[\s,.!?]+|[\s,.!?]+$/g, "");
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
+}
+
+// ---------- Preview rendering ----------
+function esc(str) {
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function renderPreview() {
+  const canvas = document.getElementById("canvas");
+  const [w, h] = SIZES[previewSize];
+  canvas.style.width = w + "px";
+  canvas.style.height = h + "px";
+  const theme = THEMES[current.themeID] || THEMES.midnight;
+  canvas.style.background = "linear-gradient(135deg, " + theme[0] + ", " + theme[1] + ")";
+  canvas.style.color = current.textColorHex;
+  canvas.style.fontFamily = FONT_CSS[current.fontStyle] || FONT_CSS.rounded;
+
+  if (current.kind === "freestyle") { renderFreestyle(canvas, w, h); return; }
+
+  const now = new Date();
+  let html = "";
+  if (current.kind === "clock") {
+    const time = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    const date = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+    html = '<div style="font-size:38px;font-weight:700">' + time + '</div>' +
+           '<div style="font-size:12px;opacity:.85;margin-top:2px">' + date + '</div>';
+  } else if (current.kind === "date") {
+    const weekday = now.toLocaleDateString([], { weekday: "long" }).toUpperCase();
+    const month = now.toLocaleDateString([], { month: "long" });
+    html = '<div style="font-size:13px;font-weight:600;opacity:.85">' + weekday + '</div>' +
+           '<div style="font-size:52px;font-weight:800;line-height:1">' + now.getDate() + '</div>' +
+           '<div style="font-size:13px;opacity:.85">' + month + '</div>';
+  } else if (current.kind === "countdown") {
+    let days = 0;
+    if (current.targetDate) {
+      const parts = current.targetDate.split("-").map(Number);
+      const target = new Date(parts[0], parts[1] - 1, parts[2]);
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      days = Math.round((target - today) / 86400000);
+    }
+    html = '<div style="font-size:13px;font-weight:600;opacity:.85;padding:0 10px">' + esc(current.primaryText || current.name || "Countdown") + '</div>' +
+           '<div style="font-size:44px;font-weight:800;line-height:1.1">' + Math.abs(days) + '</div>' +
+           '<div style="font-size:11px;opacity:.75">' + (days >= 0 ? "days to go" : "days ago") + '</div>';
+  } else if (current.kind === "quote") {
+    html = '<div style="font-size:16px;opacity:.6">“</div>' +
+           '<div style="font-size:15px;font-weight:600;padding:0 12px">' + esc(current.primaryText || "Add a quote") + '</div>' +
+           (current.secondaryText ? '<div style="font-size:11px;opacity:.75;margin-top:4px">— ' + esc(current.secondaryText) + '</div>' : "");
+  } else {
+    html = '<div style="font-size:18px;font-weight:700;padding:0 12px">' + esc(current.primaryText || "Your text here") + '</div>';
+  }
+  canvas.innerHTML = html;
+}
+
+function renderFreestyle(canvas, w, h) {
+  canvas.innerHTML = "";
+  const scale = Math.min(w, h) / 158;
+  const now = new Date();
+  for (const el of current.canvasElements) {
+    const div = document.createElement("div");
+    div.className = "cel" + (el.id === selectedElId ? " selected" : "");
+    div.style.left = (el.x * 100) + "%";
+    div.style.top = (el.y * 100) + "%";
+    div.style.fontSize = (el.size * scale) + "px";
+    div.style.fontWeight = "600";
+    div.style.color = el.colorHex;
+    if (el.kind === "clock") div.textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    else if (el.kind === "date") div.textContent = now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+    else if (el.kind === "symbol") div.textContent = SYMBOL_EMOJI[el.symbolName] || "⭐";
+    else div.textContent = el.text || "Text";
+    attachDrag(div, el);
+    canvas.appendChild(div);
+  }
+}
+
+function attachDrag(div, el) {
+  div.addEventListener("pointerdown", function (event) {
+    event.preventDefault();
+    selectedElId = el.id;
+    renderFreestyleUI();
+    renderPreview();
+    const canvas = document.getElementById("canvas");
+    const rect = canvas.getBoundingClientRect();
+    function move(ev) {
+      el.x = Math.min(Math.max((ev.clientX - rect.left) / rect.width, 0), 1);
+      el.y = Math.min(Math.max((ev.clientY - rect.top) / rect.height, 0), 1);
+      renderPreview();
+    }
+    function up() {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    }
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  });
+}
+
+// ---------- Freestyle palette & inspector ----------
+function addElement(kind) {
+  const el = {
+    id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random())),
+    kind: kind, text: kind === "emoji" ? "✨" : "Your text",
+    symbolName: "star.fill", x: 0.5, y: 0.5,
+    size: kind === "clock" ? 34 : kind === "emoji" ? 30 : kind === "date" ? 14 : 18,
+    colorHex: "#FFFFFF"
+  };
+  current.canvasElements.push(el);
+  selectedElId = el.id;
+  renderFreestyleUI();
+  renderPreview();
+}
+
+function renderFreestyleUI() {
+  const tools = document.getElementById("freestyleTools");
+  tools.style.display = current.kind === "freestyle" ? "block" : "none";
+  if (current.kind !== "freestyle") return;
+
+  const palette = document.getElementById("palette");
+  palette.innerHTML = "";
+  for (const [kind, label] of [["text", "Text"], ["clock", "🕐 Clock"], ["date", "📅 Date"], ["emoji", "✨ Emoji"]]) {
+    const button = document.createElement("button");
+    button.textContent = "+ " + label;
+    button.onclick = function () { addElement(kind); };
+    palette.appendChild(button);
+  }
+
+  const inspector = document.getElementById("inspector");
+  const hint = document.getElementById("freestyleHint");
+  const el = current.canvasElements.find(function (e) { return e.id === selectedElId; });
+  if (!el) { inspector.style.display = "none"; hint.style.display = "block"; return; }
+  inspector.style.display = "block";
+  hint.style.display = "none";
+  inspector.innerHTML = "";
+
+  if (el.kind === "text" || el.kind === "emoji") {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = el.text;
+    input.oninput = function () { el.text = input.value; renderPreview(); };
+    inspector.appendChild(input);
+    if (el.kind === "emoji") {
+      const row = document.createElement("div");
+      row.className = "chips";
+      for (const emoji of EMOJI_PICKS) {
+        const button = document.createElement("button");
+        button.textContent = emoji;
+        button.onclick = function () { el.text = emoji; input.value = emoji; renderPreview(); };
+        row.appendChild(button);
+      }
+      inspector.appendChild(row);
+    }
+  }
+
+  const sizeRow = document.createElement("div");
+  sizeRow.className = "row";
+  sizeRow.style.marginTop = "8px";
+  const sizeLabel = document.createElement("span");
+  sizeLabel.textContent = "Size";
+  sizeLabel.style.cssText = "font-size:12px;color:var(--muted)";
+  const slider = document.createElement("input");
+  slider.type = "range"; slider.min = 8; slider.max = 80; slider.value = el.size;
+  slider.oninput = function () { el.size = Number(slider.value); renderPreview(); };
+  const colorInput = document.createElement("input");
+  colorInput.type = "color"; colorInput.value = el.colorHex.toLowerCase();
+  colorInput.oninput = function () { el.colorHex = colorInput.value.toUpperCase(); renderPreview(); };
+  const deleteButton = document.createElement("button");
+  deleteButton.textContent = "🗑";
+  deleteButton.onclick = function () {
+    current.canvasElements = current.canvasElements.filter(function (e) { return e.id !== el.id; });
+    selectedElId = null;
+    renderFreestyleUI();
+    renderPreview();
+  };
+  sizeRow.append(sizeLabel, slider, colorInput, deleteButton);
+  inspector.appendChild(sizeRow);
+}
+
+// ---------- Controls ----------
+function loadIntoEditor(design) {
+  current = JSON.parse(JSON.stringify(design));
+  if (!current.canvasElements) current.canvasElements = [];
+  selectedElId = null;
+  syncControls();
+  renderAll();
+}
+function syncControls() {
+  document.getElementById("nameInput").value = current.name;
+  document.getElementById("fontSelect").value = current.fontStyle;
+  document.getElementById("textColor").value = /^#[0-9a-fA-F]{6}$/.test(current.textColorHex) ? current.textColorHex.toLowerCase() : "#ffffff";
+  document.getElementById("countTitle").value = current.kind === "countdown" ? current.primaryText : "";
+  document.getElementById("countDate").value = current.targetDate || "";
+  document.getElementById("quoteText").value = current.kind === "quote" ? current.primaryText : "";
+  document.getElementById("quoteAuthor").value = current.secondaryText || "";
+  document.getElementById("noteText").value = current.kind === "note" ? current.primaryText : "";
+}
+function renderControls() {
+  const kindButtons = document.getElementById("kindButtons");
+  kindButtons.innerHTML = "";
+  for (const [kind, label] of KINDS) {
+    const button = document.createElement("button");
+    button.textContent = label;
+    if (current.kind === kind) button.className = "active";
+    button.onclick = function () {
+      current.kind = kind;
+      if (kind === "freestyle" && current.canvasElements.length === 0) {
+        addElement("clock");
+        const caption = current.canvasElements[0];
+        caption.y = 0.42;
+        addElement("text");
+        const label2 = current.canvasElements[1];
+        label2.text = "My Widget"; label2.size = 13; label2.y = 0.66;
+        selectedElId = null;
+      }
+      renderAll();
+    };
+    kindButtons.appendChild(button);
+  }
+
+  document.getElementById("fCountdown").style.display = current.kind === "countdown" ? "block" : "none";
+  document.getElementById("fQuote").style.display = current.kind === "quote" ? "block" : "none";
+  document.getElementById("fNote").style.display = current.kind === "note" ? "block" : "none";
+
+  const swatches = document.getElementById("themeSwatches");
+  swatches.innerHTML = "";
+  for (const id of Object.keys(THEMES)) {
+    const [c1, c2] = THEMES[id];
+    const swatch = document.createElement("div");
+    swatch.className = "swatch" + (current.themeID === id ? " active" : "");
+    swatch.title = id;
+    swatch.style.background = "linear-gradient(135deg, " + c1 + ", " + c2 + ")";
+    swatch.onclick = function () { current.themeID = id; renderAll(); };
+    swatches.appendChild(swatch);
+  }
+
+  const sizeButtons = document.getElementById("sizeButtons");
+  sizeButtons.innerHTML = "";
+  for (const size of ["small", "medium", "large"]) {
+    const button = document.createElement("button");
+    button.textContent = size[0].toUpperCase() + size.slice(1);
+    if (previewSize === size) button.className = "active";
+    button.onclick = function () { previewSize = size; renderAll(); };
+    sizeButtons.appendChild(button);
+  }
+}
+function renderLibrary() {
+  const library = document.getElementById("library");
+  library.innerHTML = "";
+  if (designs.length === 0) {
+    library.innerHTML = '<p class="hint">No saved designs yet. Build one above and hit Save.</p>';
+    return;
+  }
+  for (const design of designs) {
+    const item = document.createElement("div");
+    item.className = "lib-item";
+    const theme = THEMES[design.themeID] || THEMES.midnight;
+    const icons = { clock: "🕐", date: "📅", countdown: "⏳", quote: "💬", note: "📝", freestyle: "🎨" };
+    item.innerHTML =
+      '<div class="lib-thumb" style="background:linear-gradient(135deg,' + theme[0] + "," + theme[1] + ')">' + (icons[design.kind] || "🧩") + '</div>' +
+      '<div><div class="name">' + esc(design.name) + '</div><div class="kind">' + esc(design.kind) + '</div></div>' +
+      '<div class="spacer"></div>';
+    const editButton = document.createElement("button");
+    editButton.textContent = "Edit";
+    editButton.onclick = function () { loadIntoEditor(design); window.scrollTo({ top: 0, behavior: "smooth" }); };
+    const dupButton = document.createElement("button");
+    dupButton.textContent = "Duplicate";
+    dupButton.onclick = function () {
+      const copy = JSON.parse(JSON.stringify(design));
+      copy.id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
+      copy.name += " Copy";
+      designs.push(copy);
+      persist();
+      renderLibrary();
+    };
+    const deleteButton = document.createElement("button");
+    deleteButton.textContent = "Delete";
+    deleteButton.onclick = function () {
+      designs = designs.filter(function (d) { return d.id !== design.id; });
+      persist();
+      renderLibrary();
+    };
+    item.append(editButton, dupButton, deleteButton);
+    library.appendChild(item);
+  }
+}
+function renderAll() {
+  renderControls();
+  renderFreestyleUI();
+  renderPreview();
+  renderLibrary();
+}
+
+// ---------- Wiring ----------
+document.getElementById("nameInput").oninput = function (e) { current.name = e.target.value; };
+document.getElementById("fontSelect").onchange = function (e) { current.fontStyle = e.target.value; renderPreview(); };
+document.getElementById("textColor").oninput = function (e) { current.textColorHex = e.target.value.toUpperCase(); renderPreview(); };
+document.getElementById("countTitle").oninput = function (e) { current.primaryText = e.target.value; renderPreview(); };
+document.getElementById("countDate").onchange = function (e) { current.targetDate = e.target.value; renderPreview(); };
+document.getElementById("quoteText").oninput = function (e) { current.primaryText = e.target.value; renderPreview(); };
+document.getElementById("quoteAuthor").oninput = function (e) { current.secondaryText = e.target.value; renderPreview(); };
+document.getElementById("noteText").oninput = function (e) { current.primaryText = e.target.value; renderPreview(); };
+
+document.getElementById("saveBtn").onclick = function () {
+  current.name = document.getElementById("nameInput").value || "My Widget";
+  const index = designs.findIndex(function (d) { return d.id === current.id; });
+  const copy = JSON.parse(JSON.stringify(current));
+  if (index >= 0) designs[index] = copy; else designs.push(copy);
+  persist();
+  renderLibrary();
+  toast("Saved “" + current.name + "”");
+};
+document.getElementById("newBtn").onclick = function () { loadIntoEditor(newDesign()); };
+
+const magicChips = document.getElementById("magicChips");
+for (const example of EXAMPLES) {
+  const button = document.createElement("button");
+  button.textContent = example;
+  button.onclick = function () { document.getElementById("magicInput").value = example; };
+  magicChips.appendChild(button);
+}
+document.getElementById("magicBtn").onclick = function () {
+  const idea = document.getElementById("magicInput").value.trim();
+  if (!idea) return;
+  loadIntoEditor(parseIdea(idea));
+  toast("Built! Tweak it below, then Save.");
+};
+
+function buildScript() {
+  const template = document.getElementById("scriptableTemplate").textContent;
+  const list = designs.length ? designs : [Object.assign(newDesign(), { name: "Clock" })];
+  return template.replace('"__DESIGNS__"', JSON.stringify(list, null, 2)).trim() + "\n";
+}
+document.getElementById("copyScriptBtn").onclick = function () {
+  const script = buildScript();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(script).then(
+      function () { toast("Script copied — paste it into Scriptable"); },
+      function () { fallbackCopy(script); }
+    );
+  } else { fallbackCopy(script); }
+};
+function fallbackCopy(text) {
+  const area = document.createElement("textarea");
+  area.value = text;
+  document.body.appendChild(area);
+  area.select();
+  document.execCommand("copy");
+  area.remove();
+  toast("Script copied — paste it into Scriptable");
+}
+document.getElementById("downloadScriptBtn").onclick = function () {
+  download("WidgetKing.js", buildScript(), "text/javascript");
+};
+document.getElementById("exportJsonBtn").onclick = function () {
+  download("widgetking-designs.json", JSON.stringify(designs, null, 2), "application/json");
+};
+function download(name, content, type) {
+  const blob = new Blob([content], { type: type });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+document.getElementById("importJsonBtn").onclick = function () {
+  document.getElementById("importFile").click();
+};
+document.getElementById("importFile").onchange = function (event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function () {
+    try {
+      const parsed = JSON.parse(reader.result);
+      const list = Array.isArray(parsed) ? parsed : [parsed];
+      for (const design of list) {
+        design.id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
+        designs.push(design);
+      }
+      persist();
+      renderLibrary();
+      toast("Imported " + list.length + " design" + (list.length === 1 ? "" : "s"));
+    } catch (e) {
+      toast("Couldn't read that file");
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = "";
+};
+
+// Keep clock previews ticking.
+setInterval(function () {
+  if (current.kind === "clock" || current.kind === "freestyle") renderPreview();
+}, 30000);
+
+syncControls();
+renderAll();
+</script>
+</body>
+</html>

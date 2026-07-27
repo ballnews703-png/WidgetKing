@@ -1,6 +1,40 @@
 # WidgetKing 👑
 
 Design your own iPhone Home Screen widgets in seconds — no code, no fuss.
+
+There are **two ways to use WidgetKing**:
+
+| | Requirements | Cost |
+| --- | --- | --- |
+| **🌐 Web designer + Scriptable** (recommended if you don't have a Mac) | Any browser + the free [Scriptable](https://apps.apple.com/app/scriptable/id1405459188) app | **$0** |
+| **📱 Native SwiftUI app** | A Mac with Xcode 15+ | $0 to build; free Apple ID installs expire after 7 days ($99/yr developer account removes that) |
+
+## 🌐 No Mac? Use the web designer (100% free, no AI needed)
+
+Everything runs locally — no server, no accounts, no API keys, nothing uploaded.
+
+1. Open `web/index.html` in any browser (double-click it — it works offline).
+   You can do this on a Windows PC, a borrowed laptop, or host it anywhere.
+2. Design widgets: use the **Magic box** (type an idea in plain English — a
+   built-in parser handles it, no AI required), the regular editor, or the
+   **Freestyle drag-and-drop canvas**. Designs save in your browser.
+3. Tap **Copy Scriptable Script** (or Download it and send it to your phone
+   however you like — Notes, email, messages).
+4. On your iPhone: install the free **Scriptable** app, create a new script,
+   paste, and name it `WidgetKing`.
+5. Add a **Scriptable widget** to your Home Screen, long-press it → Edit
+   Widget → choose the `WidgetKing` script, and set **Parameter** to a
+   design's name. Add more widgets with different parameters — designs are
+   fully interchangeable.
+
+That gets you real Home Screen widgets with no Mac, no developer account, and
+no ongoing costs. (One honest limitation: iOS refreshes Scriptable widgets on
+its own schedule — every few minutes — so clock widgets aren't to-the-second
+the way the native app's are.) A reference copy of the renderer lives at
+`scriptable/WidgetKing.js`.
+
+## 📱 The native app
+
 Built with SwiftUI + WidgetKit for iOS 17 and later (great on iPhone 17 Pro).
 
 ## What it does
