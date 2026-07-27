@@ -250,8 +250,8 @@
         <input type="date" id="countDate">
       </div>
       <div class="field" id="fQuote" style="display:none">
-        <label>Quote</label>
-        <input type="text" id="quoteText" placeholder="Quote" style="margin-bottom:8px">
+        <label>Quote — put several on separate lines and the widget shows a different one each day 🔄</label>
+        <textarea id="quoteText" placeholder="Dream big&#10;One day at a time&#10;Make it count" rows="3" style="margin-bottom:8px"></textarea>
         <input type="text" id="quoteAuthor" placeholder="Author (optional)">
       </div>
       <div class="field" id="fNote" style="display:none">
@@ -365,8 +365,9 @@
   <div class="row" style="margin-top:12px">
     <button class="primary" id="copyScriptBtn">📋 Copy Scriptable Script</button>
     <button id="downloadScriptBtn">⬇️ Download Script</button>
-    <button id="exportJsonBtn">Export JSON</button>
-    <button id="importJsonBtn">Import JSON</button>
+    <button id="backupBtn">💾 Back up all designs</button>
+    <button id="importJsonBtn">📂 Restore / Import</button>
+    <button id="exportJsonBtn" style="display:none">Export JSON</button>
     <input type="file" id="importFile" accept=".json,application/json" style="display:none">
   </div>
 </section>
@@ -436,6 +437,113 @@ function fontFor(style, size, bold) {
 function themeColors(d) {
   if (d.themeID === "custom" && d.customColors && d.customColors.length === 2) return d.customColors;
   return THEMES[d.themeID] || THEMES.midnight;
+}
+function dayOfYear(d) {
+  const start = new Date(d.getFullYear(), 0, 0);
+  return Math.floor((d - start) / 86400000);
+}
+// Quote widgets rotate daily when the quote field holds one entry per line.
+function activeQuote(design) {
+  const lines = String(design.primaryText || "").split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+  if (lines.length <= 1) return design.primaryText || "";
+  return lines[dayOfYear(new Date()) % lines.length];
+}
+function weatherEmoji(code) {
+  if (code === 0) return "☀️";
+  if (code <= 2) return "🌤";
+  if (code === 3) return "☁️";
+  if (code === 45 || code === 48) return "🌫";
+  if (code >= 51 && code <= 67) return "🌧";
+  if (code >= 71 && code <= 77) return "❄️";
+  if (code >= 80 && code <= 82) return "🌧";
+  if (code >= 85 && code <= 86) return "❄️";
+  if (code >= 95) return "⛈";
+  return "🌡";
+}
+// Free weather from Open-Meteo (no API key). Location and result are cached
+// so widget refreshes stay fast and work offline with the last reading.
+async function fetchWeather() {
+  const fm = FileManager.local();
+  const cachePath = fm.joinPath(fm.documentsDirectory(), "widgetking-weather.json");
+  try {
+    if (fm.fileExists(cachePath)) {
+      const cached = JSON.parse(fm.readString(cachePath));
+      if (cached && (Date.now() - cached.at) < 30 * 60 * 1000) return cached;
+    }
+  } catch (e) {}
+  try {
+    const prefs = loadPrefs();
+    let lat = prefs.lat, lon = prefs.lon;
+    if (typeof lat !== "number" || typeof lon !== "number") {
+      Location.setAccuracyToKilometer();
+      const loc = await Location.current();
+      lat = loc.latitude; lon = loc.longitude;
+      prefs.lat = lat; prefs.lon = lon;
+      savePrefs(prefs);
+    }
+    const url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon +
+      "&current=temperature_2m,weather_code&temperature_unit=fahrenheit";
+    const data = await new Request(url).loadJSON();
+    const out = { at: Date.now(), tempF: Math.round(data.current.temperature_2m), code: data.current.weather_code };
+    fm.writeString(cachePath, JSON.stringify(out));
+    return out;
+  } catch (e) {
+    try { if (fm.fileExists(cachePath)) return JSON.parse(fm.readString(cachePath)); } catch (e2) {}
+    return null;
+  }
+}
+function weatherText(el, wx) {
+  if (!wx) return "--°";
+  let temp = wx.tempF;
+  if (el.unit === "c") temp = Math.round((wx.tempF - 32) * 5 / 9);
+  return weatherEmoji(wx.code) + " " + temp + "°";
+}
+// Next calendar event (asks for calendar permission on first run).
+async function fetchNextEvent() {
+  try {
+    const now = new Date();
+    let events = (await CalendarEvent.today([])).filter(function (e) { return !e.isAllDay && e.endDate > now; });
+    if (events.length === 0) {
+      events = (await CalendarEvent.tomorrow([])).filter(function (e) { return !e.isAllDay; });
+    }
+    if (events.length === 0) return { none: true };
+    events.sort(function (a, b) { return a.startDate - b.startDate; });
+    const df = new DateFormatter();
+    df.useShortTimeStyle();
+    return { title: String(events[0].title || "Event"), time: df.string(events[0].startDate) };
+  } catch (e) { return null; }
+}
+function calendarText(ev) {
+  if (!ev) return "Calendar off";
+  if (ev.none) return "No events ✓";
+  let title = ev.title;
+  if (title.length > 18) title = title.slice(0, 17) + "…";
+  return title + " · " + ev.time;
+}
+// Fetch only the live data this design actually uses.
+async function liveDataFor(design) {
+  const els = design.canvasElements || [];
+  const live = {};
+  if (els.some(function (e) { return e.kind === "weather"; })) live.weather = await fetchWeather();
+  if (els.some(function (e) { return e.kind === "calendar"; })) live.event = await fetchNextEvent();
+  return live;
+}
+function progressPct(el) {
+  const src = el.source || "day";
+  const now = new Date();
+  if (src === "battery") { try { return Device.batteryLevel(); } catch (e) { return 0.5; } }
+  if (src === "year") {
+    const start = new Date(now.getFullYear(), 0, 1);
+    const end = new Date(now.getFullYear() + 1, 0, 1);
+    return (now - start) / (end - start);
+  }
+  if (src === "countdown") {
+    const done = Math.max(0, -daysUntil(el.startISO || el.dateISO));
+    const left = Math.max(0, daysUntil(el.dateISO));
+    const span = done + left;
+    return span > 0 ? done / span : 1;
+  }
+  return (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) / 86400;
 }
 function daysUntil(iso) {
   if (!iso) return 0;
@@ -668,7 +776,7 @@ function backgroundImageFor(design, family, position) {
   return img;
 }
 
-function drawFreestyle(design, family, bgImg) {
+function drawFreestyle(design, family, bgImg, live) {
   // Draw at the device's true widget size (in pixels) so nothing stretches.
   const pts = widgetPointSizes(family);
   let s = 3;
@@ -719,14 +827,42 @@ function drawFreestyle(design, family, bgImg) {
     if (el.kind === "photo") {
       // Photos arrive pre-baked from the designer: crop shape and opacity are
       // already burned into the PNG's pixels/alpha, so we just draw it.
-      if (el.b64) {
+      // Multiple photos rotate daily or on every widget refresh.
+      const list = (Array.isArray(el.b64s) && el.b64s.length) ? el.b64s : (el.b64 ? [el.b64] : []);
+      if (list.length) {
+        let idx = 0;
+        if (list.length > 1) {
+          idx = el.rotate === "refresh"
+            ? Math.floor(Math.random() * list.length)
+            : dayOfYear(new Date()) % list.length;
+        }
         try {
-          const img = Image.fromData(Data.fromBase64String(el.b64));
+          const img = Image.fromData(Data.fromBase64String(list[idx]));
           let wPx, hPx;
           if (el.shape === "circle") { wPx = hPx = (el.w || 0.55) * Math.min(W, H); }
           else { wPx = (el.w || 0.55) * W; hPx = wPx * (el.aspect || 1); }
           ctx.drawImageInRect(img, new Rect(px - wPx / 2, py - hPx / 2, wPx, hPx));
         } catch (e) {}
+      }
+      continue;
+    }
+    if (el.kind === "progress") {
+      const pct = Math.min(Math.max(progressPct(el), 0), 1);
+      const wPx = (el.w || 0.7) * W;
+      const hPx = Math.max(3 * scale, (el.size || 8) * scale);
+      const x0 = px - wPx / 2, y0 = py - hPx / 2;
+      const r = hPx / 2;
+      ctx.setFillColor(new Color(el.colorHex || "#FFFFFF", op * 0.25));
+      const track = new Path();
+      track.addRoundedRect(new Rect(x0, y0, wPx, hPx), r, r);
+      ctx.addPath(track);
+      ctx.fillPath();
+      if (pct > 0.02) {
+        ctx.setFillColor(new Color(el.colorHex || "#FFFFFF", op));
+        const fill = new Path();
+        fill.addRoundedRect(new Rect(x0, y0, Math.max(hPx, wPx * pct), hPx), r, r);
+        ctx.addPath(fill);
+        ctx.fillPath();
       }
       continue;
     }
@@ -738,6 +874,8 @@ function drawFreestyle(design, family, bgImg) {
     else if (el.kind === "countdown") { text = String(Math.abs(daysUntil(el.dateISO))); }
     else if (el.kind === "symbol") { text = SYMBOL_EMOJI[el.symbolName] || "⭐"; }
     else if (el.kind === "icon") { text = el.text || "★"; }
+    else if (el.kind === "weather") { text = weatherText(el, live ? live.weather : null); }
+    else if (el.kind === "calendar") { text = calendarText(live ? live.event : null); }
     else { text = el.text || "Text"; }
     const isBold = el.kind !== "text" || el.bold !== false;
     ctx.setFont(fontFor(el.font || design.fontStyle, fs, isBold));
@@ -937,7 +1075,8 @@ async function buildWidget(design, position) {
   if (design.tapUrl) w.url = design.tapUrl;
   if (design.kind === "freestyle") {
     w.setPadding(0, 0, 0, 0);
-    w.backgroundImage = drawFreestyle(design, family, bgImg);
+    const live = await liveDataFor(design);
+    w.backgroundImage = drawFreestyle(design, family, bgImg, live);
     await addFreestyleApps(w, design, family);
     w.refreshAfterDate = new Date(Date.now() + 5 * 60 * 1000);
     return w;
@@ -975,7 +1114,7 @@ async function buildWidget(design, position) {
     }
     case "quote": {
       centeredText(w, "“", fontFor(style, 18, true), tc).textOpacity = 0.6;
-      centeredText(w, design.primaryText || "Add a quote", fontFor(style, 15, true), tc);
+      centeredText(w, activeQuote(design) || "Add a quote", fontFor(style, 15, true), tc);
       if (design.secondaryText) {
         centeredText(w, "— " + design.secondaryText, fontFor(style, 11, false), tc).textOpacity = 0.75;
       }
@@ -1284,6 +1423,20 @@ function normalizeDesign(design) {
       if (!["rect", "rounded", "circle"].includes(el.shape)) el.shape = "rounded";
       if (typeof el.w !== "number" || el.w <= 0) el.w = 0.55;
       if (typeof el.aspect !== "number" || el.aspect <= 0) el.aspect = 1;
+      if (!Array.isArray(el.photos)) el.photos = [];
+      el.photos = el.photos.filter(function (p) { return typeof p === "string" && p; }).slice(0, 5);
+      if (el.photos.length === 0 && el.dataUrl) el.photos = [el.dataUrl];
+      if (el.photos.length > 0) el.dataUrl = el.photos[0];
+      if (!["day", "refresh"].includes(el.rotate)) el.rotate = "day";
+    }
+    if (el.kind === "weather" && el.unit !== "c") el.unit = "f";
+    if (el.kind === "progress") {
+      if (!["battery", "day", "year", "countdown"].includes(el.source)) el.source = "day";
+      if (typeof el.w !== "number" || el.w <= 0 || el.w > 1) el.w = 0.7;
+      if (el.source === "countdown") {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(el.dateISO || "")) el.dateISO = isoInDays(30);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(el.startISO || "")) el.startISO = isoInDays(0);
+      }
     }
     if (el.kind === "icon" && !el.text) el.text = "★";
     if (el.kind === "app") {
@@ -1608,7 +1761,7 @@ const AI_SCHEMA = {
       items: {
         type: "object",
         properties: {
-          kind: { type: "string", "enum": ["text", "clock", "date", "emoji", "icon", "shape", "battery", "countdown", "app"] },
+          kind: { type: "string", "enum": ["text", "clock", "date", "emoji", "icon", "shape", "battery", "countdown", "app", "weather", "calendar", "progress"] },
           text: { type: "string", description: "Text or emoji content; for kind=icon a single glyph like ★ ♥ ● ▲ ☾ ⚡ ✈ ⚙ →; empty for other kinds" },
           label: { type: "string", description: "App name for kind=app; empty otherwise" },
           url: { type: "string", description: "URL scheme to open for kind=app (e.g. spotify://); empty otherwise" },
@@ -1622,10 +1775,11 @@ const AI_SCHEMA = {
           w: { type: "number", description: "Shape width 0-1 of canvas (0 when unused). For kind=text: 0 = auto single line, >0 = wrapping text box of that width — use ~0.8 for quotes/long text" },
           h: { type: "number", description: "Shape height 0-1 of canvas; 0 when unused (ignored for circles)" },
           align: { type: "string", "enum": ["", "left", "center", "right"], description: "Text-box alignment when kind=text and w>0; empty otherwise" },
+          source: { type: "string", "enum": ["", "day", "year", "battery", "countdown"], description: "For kind=progress only: what the bar measures; empty otherwise" },
           bold: { type: "boolean", description: "For kind=text: false for lighter body text; true otherwise" },
           dateISO: { type: "string", description: "yyyy-MM-dd for countdown elements; empty otherwise" }
         },
-        required: ["kind", "text", "label", "url", "font", "x", "y", "size", "colorHex", "opacity", "shape", "w", "h", "align", "bold", "dateISO"],
+        required: ["kind", "text", "label", "url", "font", "x", "y", "size", "colorHex", "opacity", "shape", "w", "h", "align", "bold", "source", "dateISO"],
         additionalProperties: false
       }
     }
@@ -1640,11 +1794,11 @@ const AI_EXAMPLE = {
   background: "gradient", glassTint: "dark", bgOpacity: 1,
   backgroundColors: [], tapUrl: "", apps: [],
   canvasElements: [
-    { kind: "shape", text: "", label: "", url: "", font: "", x: 0.5, y: 0.5, size: 0, colorHex: "#FFFFFF", opacity: 0.16, shape: "pill", w: 0.84, h: 0.46, align: "", bold: true, dateISO: "" },
-    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.5, y: 0.44, size: 34, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, dateISO: "" },
-    { kind: "text", text: "sweet dreams", label: "", url: "", font: "script", x: 0.5, y: 0.62, size: 11, colorHex: "#D8CFFF", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, dateISO: "" },
-    { kind: "icon", text: "☾", label: "", url: "", font: "", x: 0.83, y: 0.15, size: 20, colorHex: "#F5E9C9", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, dateISO: "" },
-    { kind: "emoji", text: "✨", label: "", url: "", font: "", x: 0.15, y: 0.2, size: 13, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, dateISO: "" }
+    { kind: "shape", text: "", label: "", url: "", font: "", x: 0.5, y: 0.5, size: 0, colorHex: "#FFFFFF", opacity: 0.16, shape: "pill", w: 0.84, h: 0.46, align: "", bold: true, source: "", dateISO: "" },
+    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.5, y: 0.44, size: 34, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, source: "", dateISO: "" },
+    { kind: "text", text: "sweet dreams", label: "", url: "", font: "script", x: 0.5, y: 0.62, size: 11, colorHex: "#D8CFFF", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, source: "", dateISO: "" },
+    { kind: "icon", text: "☾", label: "", url: "", font: "", x: 0.83, y: 0.15, size: 20, colorHex: "#F5E9C9", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, source: "", dateISO: "" },
+    { kind: "emoji", text: "✨", label: "", url: "", font: "", x: 0.15, y: 0.2, size: 13, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, source: "", dateISO: "" }
   ]
 };
 
@@ -1657,7 +1811,9 @@ function aiSystemPrompt() {
     "Fonts (fontStyle, or per-element font override): " + Object.keys(FONT_CSS).join(", ") +
     " — didot/baskerville for elegance, script/noteworthy for handwritten, marker/chalkboard for playful, futura/avenir for modern, typewriter for retro.\n" +
     "Freestyle elements: kind=icon is a clean monochrome glyph (set text to one glyph: ★ ☆ ♥ ♡ ● ◆ ▲ ✦ ❀ ☀ ☾ ☁ ⚡ ♪ ☕ ✈ ⌂ ✉ ⚙ ✓ → ∞) tinted via colorHex — prefer it over emoji for minimal/elegant looks. " +
-    "kind=app is a tappable app icon: set label and url (the real icon is fetched automatically); space them like a launcher grid.\n" +
+    "kind=app is a tappable app icon: set label and url (the real icon is fetched automatically); space them like a launcher grid. " +
+    "kind=weather shows live temperature with a condition emoji (size ~26). kind=calendar shows the user's next calendar event (size ~12). " +
+    "kind=progress is a rounded progress bar: set source (day/year/battery/countdown), w = bar width 0-1, size = bar thickness in points (6-12 typical) — great minimal look.\n" +
     "Themes: " + Object.keys(THEMES).join(", ") + ". 'paper' is light (use dark text like #333333); the rest are dark (use light text). " +
     "If the requested colors don't match a preset, set backgroundColors to two #RRGGBB colors for a custom gradient. " +
     "Backgrounds: background=glass gives a frosted blurred wallpaper look (choose glassTint dark or light); background=clear makes the widget fully transparent against the wallpaper — use these when the user says transparent, see-through, frosted, glass, or wants it to blend with their wallpaper; otherwise background=gradient. bgOpacity below 1 (e.g. 0.5) makes a gradient blend see-through over the wallpaper like tinted glass. " +
@@ -1730,7 +1886,7 @@ function specToDesign(spec) {
     return { emoji: app.emoji || "🌐", label: (app.label || "App").slice(0, 12), url: app.url || "" };
   });
   design.canvasElements = (spec.canvasElements || []).slice(0, 12).map(function (el) {
-    const kind = ["text","clock","date","emoji","icon","shape","battery","countdown","app"].includes(el.kind) ? el.kind : "text";
+    const kind = ["text","clock","date","emoji","icon","shape","battery","countdown","app","weather","calendar","progress"].includes(el.kind) ? el.kind : "text";
     const rawW = Number(el.w) || 0;
     const out = {
       id: uid(),
@@ -1763,6 +1919,13 @@ function specToDesign(spec) {
       out.shape = "rounded"; out.showLabel = false;
     }
     if (kind === "icon" && !out.text) out.text = "★";
+    if (kind === "weather") out.unit = "f";
+    if (kind === "progress") {
+      out.source = ["day","year","battery","countdown"].includes(el.source) ? el.source : "day";
+      out.w = Math.min(Math.max(rawW || 0.7, 0.1), 1);
+      out.size = Math.min(Math.max(Number(el.size) || 8, 3), 30);
+      if (out.source === "countdown") { out.startISO = isoInDays(0); if (!out.dateISO) out.dateISO = isoInDays(30); }
+    }
     if (el.font && FONT_CSS[el.font]) out.font = el.font;
     return out;
   });
@@ -1863,7 +2026,7 @@ function designPreviewHTML(design, sizeKey) {
   }
   if (design.kind === "quote") {
     return '<div style="font-size:16px;opacity:.6">“</div>' +
-           '<div style="font-size:15px;font-weight:600;padding:0 12px">' + esc(design.primaryText || "Add a quote") + '</div>' +
+           '<div style="font-size:15px;font-weight:600;padding:0 12px">' + esc(activeQuote(design) || "Add a quote") + '</div>' +
            (design.secondaryText ? '<div style="font-size:11px;opacity:.75;margin-top:4px">— ' + esc(design.secondaryText) + '</div>' : "");
   }
   if (design.kind === "battery") {
@@ -1940,6 +2103,21 @@ function renderFreestyleInto(node, design, w, h, interactive) {
         div.style.background = "rgba(255,255,255,.15)";
         div.textContent = "🖼";
       }
+    } else if (el.kind === "progress") {
+      const pct = Math.min(Math.max(progressPctPreview(el), 0), 1);
+      const wPx = (el.w || 0.7) * w;
+      const hPx = Math.max(3, (el.size || 8) * scale);
+      div.style.width = wPx + "px";
+      div.style.height = hPx + "px";
+      div.style.borderRadius = (hPx / 2) + "px";
+      div.style.background = hexToRgba(/^#[0-9a-fA-F]{6}$/.test(el.colorHex || "") ? el.colorHex : "#FFFFFF", 0.25 * (el.opacity || 1));
+      const fill = document.createElement("div");
+      fill.style.cssText = "position:absolute;left:0;top:0;height:100%;border-radius:" + (hPx / 2) + "px;" +
+        "width:" + Math.max(hPx / wPx * 100, pct * 100) + "%;background:" +
+        hexToRgba(/^#[0-9a-fA-F]{6}$/.test(el.colorHex || "") ? el.colorHex : "#FFFFFF", el.opacity || 1) +
+        ";pointer-events:none";
+      div.appendChild(fill);
+      div.classList.add("cel-shape");
     } else if (el.kind === "app") {
       const pt = (el.size || 40) * scale;
       const iconBox = document.createElement("div");
@@ -1984,6 +2162,8 @@ function renderFreestyleInto(node, design, w, h, interactive) {
       else if (el.kind === "countdown") div.textContent = String(Math.abs(daysFromISO(el.dateISO)));
       else if (el.kind === "symbol") div.textContent = SYMBOL_EMOJI[el.symbolName] || "⭐";
       else if (el.kind === "icon") div.textContent = el.text || "★";
+      else if (el.kind === "weather") div.textContent = "☀️ " + (el.unit === "c" ? "22°" : "72°");
+      else if (el.kind === "calendar") div.textContent = "Team call · 2:30 PM";
       else div.textContent = el.text || "Text";
     }
     if (interactive) attachDrag(div, el);
@@ -2143,8 +2323,36 @@ function attachDrag(div, el) {
 
 // ==================== Freestyle palette & inspector ====================
 const ELEMENT_PALETTE = [["text", "Text"], ["photo", "🖼 Photo"], ["app", "📲 App icon"],
-  ["clock", "🕐 Clock"], ["date", "📅 Date"], ["icon", "◆ Icon"], ["emoji", "✨ Emoji"],
+  ["clock", "🕐 Clock"], ["date", "📅 Date"], ["weather", "☀️ Weather"], ["calendar", "📆 Calendar"],
+  ["progress", "▬ Progress"], ["icon", "◆ Icon"], ["emoji", "✨ Emoji"],
   ["shape", "▢ Shape"], ["battery", "🔋 Battery"], ["countdown", "⏳ Countdown"]];
+
+function dayOfYear(d) {
+  const start = new Date(d.getFullYear(), 0, 0);
+  return Math.floor((d - start) / 86400000);
+}
+function activeQuote(design) {
+  const lines = String(design.primaryText || "").split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+  if (lines.length <= 1) return design.primaryText || "";
+  return lines[dayOfYear(new Date()) % lines.length];
+}
+function progressPctPreview(el) {
+  const src = el.source || "day";
+  const now = new Date();
+  if (src === "battery") return 0.82; // stand-in; live on the phone
+  if (src === "year") {
+    const start = new Date(now.getFullYear(), 0, 1);
+    const end = new Date(now.getFullYear() + 1, 0, 1);
+    return (now - start) / (end - start);
+  }
+  if (src === "countdown") {
+    const done = Math.max(0, -daysFromISO(el.startISO || el.dateISO));
+    const left = Math.max(0, daysFromISO(el.dateISO));
+    const span = done + left;
+    return span > 0 ? done / span : 1;
+  }
+  return (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) / 86400;
+}
 
 let pendingPhoto = null; // {mode:"new"} or {mode:"replace", el}
 
@@ -2160,12 +2368,15 @@ function addElement(kind) {
     symbolName: "star.fill", x: 0.5, y: 0.5,
     size: kind === "clock" ? 34 : kind === "emoji" ? 30 : kind === "date" ? 14
       : kind === "battery" ? 30 : kind === "countdown" ? 34 : kind === "shape" ? 0
-      : kind === "icon" ? 26 : kind === "app" ? 40 : 18,
+      : kind === "icon" ? 26 : kind === "app" ? 40 : kind === "weather" ? 26
+      : kind === "calendar" ? 12 : kind === "progress" ? 8 : 18,
     colorHex: "#FFFFFF", opacity: kind === "shape" ? 0.25 : 1
   };
   if (kind === "shape") { el.shape = "rect"; el.w = 0.5; el.h = 0.25; }
   if (kind === "text") { el.w = 0; el.align = "center"; el.bold = true; }
   if (kind === "countdown") { el.dateISO = isoInDays(30); }
+  if (kind === "weather") { el.unit = "f"; }
+  if (kind === "progress") { el.source = "day"; el.w = 0.7; }
   if (kind === "app") {
     el.label = "App"; el.url = ""; el.iconUrl = ""; el.emoji = "📲";
     el.shape = "rounded"; el.showLabel = false;
@@ -2195,9 +2406,16 @@ document.getElementById("photoInput").onchange = function (event) {
       c.width = cw; c.height = ch;
       c.getContext("2d").drawImage(img, 0, 0, cw, ch);
       const dataUrl = c.toDataURL("image/jpeg", 0.82);
-      if (job.mode === "replace" && job.el) {
+      if (job.mode === "add" && job.el) {
+        if (!Array.isArray(job.el.photos) || job.el.photos.length === 0) {
+          job.el.photos = job.el.dataUrl ? [job.el.dataUrl] : [];
+        }
+        if (job.el.photos.length < 5) job.el.photos.push(dataUrl);
+        if (!job.el.dataUrl) { job.el.dataUrl = dataUrl; job.el.aspect = ch / cw; }
+      } else if (job.mode === "replace" && job.el) {
         job.el.dataUrl = dataUrl;
         job.el.aspect = ch / cw;
+        job.el.photos = [dataUrl];
       } else {
         const el = {
           id: uid(), kind: "photo", dataUrl: dataUrl, aspect: ch / cw,
@@ -2220,6 +2438,9 @@ function labelForElement(el) {
   if (el.kind === "photo") return "🖼 Photo";
   if (el.kind === "app") return "📲 " + (el.label || "App");
   if (el.kind === "icon") return "◆ " + (el.text || "★");
+  if (el.kind === "weather") return "☀️ Weather";
+  if (el.kind === "calendar") return "📆 Calendar";
+  if (el.kind === "progress") return "▬ " + (el.source || "day");
   if (el.kind === "clock") return "🕐 Clock";
   if (el.kind === "date") return "📅 Date";
   if (el.kind === "emoji") return el.text || "✨";
@@ -2409,7 +2630,66 @@ function buildInspectorContent(inspector) {
     inspector.appendChild(dateInput);
   }
 
-  if (["text", "clock", "date", "countdown", "battery", "icon"].includes(el.kind)) {
+  if (el.kind === "weather") {
+    const unitRow = document.createElement("div");
+    unitRow.className = "row";
+    const unitLabel = document.createElement("span");
+    unitLabel.textContent = "Unit";
+    unitLabel.style.cssText = "font-size:12px;color:var(--muted);width:52px";
+    const unitSel = document.createElement("select");
+    for (const [value, label] of [["f", "°F"], ["c", "°C"]]) {
+      const option = document.createElement("option");
+      option.value = value; option.textContent = label;
+      unitSel.appendChild(option);
+    }
+    unitSel.value = el.unit === "c" ? "c" : "f";
+    unitSel.onchange = function () { el.unit = unitSel.value; refreshCanvases(); };
+    unitRow.append(unitLabel, unitSel);
+    inspector.appendChild(unitRow);
+    const wxHint = document.createElement("p");
+    wxHint.className = "hint";
+    wxHint.textContent = "Live temperature on your phone (free, no key). First run asks for location; updates every ~30 min.";
+    inspector.appendChild(wxHint);
+  }
+
+  if (el.kind === "calendar") {
+    const calHint = document.createElement("p");
+    calHint.className = "hint";
+    calHint.textContent = "Shows your next calendar event (today, then tomorrow). Scriptable asks for calendar access on first run.";
+    inspector.appendChild(calHint);
+  }
+
+  if (el.kind === "progress") {
+    const srcRow = document.createElement("div");
+    srcRow.className = "row";
+    const srcSel = document.createElement("select");
+    for (const [value, label] of [["day", "🕐 Day progress"], ["year", "📅 Year progress"],
+         ["battery", "🔋 Battery level"], ["countdown", "⏳ Countdown progress"]]) {
+      const option = document.createElement("option");
+      option.value = value; option.textContent = label;
+      srcSel.appendChild(option);
+    }
+    srcSel.value = el.source || "day";
+    srcSel.onchange = function () {
+      el.source = srcSel.value;
+      if (el.source === "countdown") {
+        if (!el.dateISO) el.dateISO = isoInDays(30);
+        if (!el.startISO) el.startISO = isoInDays(0);
+      }
+      refreshEditors();
+    };
+    srcRow.appendChild(srcSel);
+    inspector.appendChild(srcRow);
+    if (el.source === "countdown") {
+      const dateInput = document.createElement("input");
+      dateInput.type = "date";
+      dateInput.value = el.dateISO || "";
+      dateInput.onchange = function () { el.dateISO = dateInput.value; refreshCanvases(); };
+      inspector.appendChild(dateInput);
+    }
+  }
+
+  if (["text", "clock", "date", "countdown", "battery", "icon", "weather", "calendar"].includes(el.kind)) {
     const fontRow = document.createElement("div");
     fontRow.className = "row";
     const fontLabel = document.createElement("span");
@@ -2475,8 +2755,48 @@ function buildInspectorContent(inspector) {
     shapeRow.append(shapeSelect, replaceBtn);
     inspector.appendChild(shapeRow);
     sliderRow("Width", 5, 100, Math.round((el.w || 0.55) * 100), function (v) { el.w = v / 100; });
+    const rotRow = document.createElement("div");
+    rotRow.className = "row";
+    rotRow.style.marginTop = "8px";
+    const addBtn = document.createElement("button");
+    const count = (el.photos || []).length || (el.dataUrl ? 1 : 0);
+    addBtn.textContent = "➕ Add photo (" + count + "/5)";
+    addBtn.disabled = count >= 5;
+    addBtn.onclick = function () {
+      pendingPhoto = { mode: "add", el: el };
+      document.getElementById("photoInput").click();
+    };
+    rotRow.appendChild(addBtn);
+    if (count > 1) {
+      const rotSel = document.createElement("select");
+      for (const [value, label] of [["day", "🔄 New photo daily"], ["refresh", "🎲 Shuffle every refresh"]]) {
+        const option = document.createElement("option");
+        option.value = value; option.textContent = label;
+        rotSel.appendChild(option);
+      }
+      rotSel.value = el.rotate === "refresh" ? "refresh" : "day";
+      rotSel.onchange = function () { el.rotate = rotSel.value; };
+      const oneBtn = document.createElement("button");
+      oneBtn.textContent = "1️⃣ Keep first only";
+      oneBtn.onclick = function () {
+        el.photos = el.photos.slice(0, 1);
+        el.dataUrl = el.photos[0];
+        refreshEditors();
+      };
+      rotRow.append(rotSel, oneBtn);
+      const rotHint = document.createElement("p");
+      rotHint.className = "hint";
+      rotHint.textContent = "The widget rotates between these photos on your phone; the preview shows the first one.";
+      inspector.appendChild(rotRow);
+      inspector.appendChild(rotHint);
+    } else {
+      inspector.appendChild(rotRow);
+    }
   } else if (el.kind === "app") {
     sliderRow("Size", 16, 96, el.size, function (v) { el.size = v; });
+  } else if (el.kind === "progress") {
+    sliderRow("Width", 10, 100, Math.round((el.w || 0.7) * 100), function (v) { el.w = v / 100; });
+    sliderRow("Thick", 3, 30, el.size || 8, function (v) { el.size = v; });
   } else {
     sliderRow("Size", 8, 80, el.size, function (v) { el.size = v; });
   }
@@ -2638,7 +2958,7 @@ function convertToFreestyle(design) {
     add({ kind: "countdown", dateISO: design.targetDate || isoInDays(30), y: 0.48, size: 44 });
     add({ text: "days to go", y: 0.68, size: 11, opacity: 0.75 });
   } else if (design.kind === "quote") {
-    add({ text: design.primaryText || "Add a quote", y: 0.42, size: 15, w: 0.84, align: "center", bold: true });
+    add({ text: activeQuote(design) || "Add a quote", y: 0.42, size: 15, w: 0.84, align: "center", bold: true });
     if (design.secondaryText) add({ text: "— " + design.secondaryText, y: 0.72, size: 11, opacity: 0.75 });
   } else if (design.kind === "battery") {
     add({ kind: "battery", y: 0.5, size: 38 });
@@ -3142,6 +3462,10 @@ function renderLibrary() {
       persist();
       renderLibrary();
     };
+    const shareButton = document.createElement("button");
+    shareButton.textContent = "🔗";
+    shareButton.title = "Share this design as a link";
+    shareButton.onclick = function () { shareDesign(design); };
     const deleteButton = document.createElement("button");
     deleteButton.textContent = "Delete";
     deleteButton.onclick = function () {
@@ -3149,7 +3473,7 @@ function renderLibrary() {
       persist();
       renderLibrary();
     };
-    item.append(meta, spacer, editButton, dupButton, deleteButton);
+    item.append(meta, spacer, editButton, dupButton, shareButton, deleteButton);
     library.appendChild(item);
   }
 }
@@ -3347,7 +3671,8 @@ document.getElementById("remixBtn").onclick = async function () {
 
 // Bakes a photo element's crop shape + opacity into a PNG so the Scriptable
 // renderer (which has no clipping or image alpha) can draw it directly.
-function bakePhoto(el) {
+function bakePhoto(dataUrl, shape, opacity) {
+  const el = { dataUrl: dataUrl, shape: shape, opacity: opacity };
   return new Promise(function (resolve) {
     if (!el.dataUrl) { resolve(""); return; }
     if (el.shape === "rect" && (el.opacity == null || el.opacity >= 0.999)) {
@@ -3392,8 +3717,14 @@ async function buildScript() {
   for (const design of list) {
     for (const el of design.canvasElements || []) {
       if (el.kind === "photo") {
-        el.b64 = await bakePhoto(el);
+        const sources = (Array.isArray(el.photos) && el.photos.length) ? el.photos
+          : (el.dataUrl ? [el.dataUrl] : []);
+        const baked = [];
+        for (const src of sources) baked.push(await bakePhoto(src, el.shape, el.opacity));
+        el.b64s = baked.filter(Boolean);
+        el.b64 = el.b64s[0] || "";
         delete el.dataUrl;
+        delete el.photos;
       }
     }
   }
@@ -3426,6 +3757,12 @@ document.getElementById("downloadScriptBtn").onclick = async function () {
 document.getElementById("exportJsonBtn").onclick = function () {
   download("widgetking-designs.json", JSON.stringify(designs, null, 2), "application/json");
 };
+document.getElementById("backupBtn").onclick = function () {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const backup = { app: "WidgetKing", version: 1, exportedAt: new Date().toISOString(), designs: designs };
+  download("widgetking-backup-" + stamp + ".json", JSON.stringify(backup, null, 2), "application/json");
+  toast("Backup saved — keep it in Files/iCloud. Restore any time with 📂");
+};
 function download(name, content, type) {
   const blob = new Blob([content], { type: type });
   const a = document.createElement("a");
@@ -3444,6 +3781,21 @@ document.getElementById("importFile").onchange = function (event) {
   reader.onload = function () {
     try {
       const parsed = JSON.parse(reader.result);
+      if (parsed && parsed.app === "WidgetKing" && Array.isArray(parsed.designs)) {
+        // Backup file: restore in place — same ids update the existing copy
+        // instead of duplicating, so restoring twice is safe.
+        let updated = 0, added = 0;
+        for (const raw of parsed.designs) {
+          const design = normalizeDesign(raw);
+          const index = designs.findIndex(function (d) { return d.id === design.id; });
+          if (index >= 0) { designs[index] = design; updated++; }
+          else { designs.push(design); added++; }
+        }
+        persist();
+        renderLibrary();
+        toast("Backup restored — " + added + " added, " + updated + " updated ✓");
+        return;
+      }
       const list = Array.isArray(parsed) ? parsed : [parsed];
       for (const raw of list) {
         const design = normalizeDesign(raw);
@@ -3461,6 +3813,81 @@ document.getElementById("importFile").onchange = function (event) {
   reader.readAsText(file);
   event.target.value = "";
 };
+
+// ==================== Share links ====================
+// A design travels as base64 JSON in the URL hash — no server involved.
+// Photos are stripped (they'd blow past URL length limits).
+function b64urlEncode(bytes) {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function b64urlDecode(str) {
+  const b64 = str.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((str.length + 3) % 4);
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+async function pipeBytes(bytes, stream) {
+  const out = new Response(new Blob([bytes]).stream().pipeThrough(stream));
+  return new Uint8Array(await out.arrayBuffer());
+}
+async function designToLink(design) {
+  const copy = normalizeDesign(JSON.parse(JSON.stringify(design)));
+  delete copy.id;
+  let hadPhotos = false;
+  for (const el of copy.canvasElements || []) {
+    if (el.kind === "photo" && (el.dataUrl || (el.photos || []).length)) {
+      hadPhotos = true;
+      el.dataUrl = ""; el.photos = [];
+    }
+  }
+  const raw = new TextEncoder().encode(JSON.stringify(copy));
+  let mode = "p", bytes = raw;
+  if (window.CompressionStream) {
+    try { bytes = await pipeBytes(raw, new CompressionStream("gzip")); mode = "g"; } catch (e) { bytes = raw; }
+  }
+  const base = location.origin.startsWith("http") ? location.origin + location.pathname
+    : "https://ballnews703-png.github.io/WidgetKing/";
+  return { url: base + "#d=" + mode + b64urlEncode(bytes), hadPhotos: hadPhotos };
+}
+async function shareDesign(design) {
+  try {
+    const link = await designToLink(design);
+    if (link.hadPhotos) toast("Heads-up: photos are left out of share links (too big for a URL)");
+    if (navigator.share) {
+      await navigator.share({ title: "WidgetKing — " + design.name, url: link.url });
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(link.url);
+      toast("Link copied — send it to a friend 🔗");
+    } else {
+      prompt("Copy this link:", link.url);
+    }
+  } catch (e) { /* user cancelled the share sheet */ }
+}
+async function receiveSharedDesign() {
+  const match = location.hash.match(/^#d=([gp])(.+)$/);
+  if (!match) return;
+  try {
+    let bytes = b64urlDecode(match[2]);
+    if (match[1] === "g") bytes = await pipeBytes(bytes, new DecompressionStream("gzip"));
+    const design = normalizeDesign(JSON.parse(new TextDecoder().decode(bytes)));
+    design.id = uid();
+    design.name = dedupedName(design.name, null);
+    designs.push(design);
+    persist();
+    renderLibrary();
+    loadIntoEditor(design);
+    history.replaceState(null, "", location.pathname + location.search);
+    toast("🎁 Shared design “" + design.name + "” added to My Widgets!");
+    document.getElementById("editorSection").scrollIntoView({ behavior: "smooth" });
+  } catch (e) {
+    toast("That share link couldn't be read");
+  }
+}
 
 // Keep clock previews ticking.
 setInterval(function () {
@@ -3485,6 +3912,7 @@ renderLibrary();
 syncControls();
 renderAll();
 updateSpendUI();
+receiveSharedDesign();
 </script>
 </body>
 </html>
