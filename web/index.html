@@ -184,11 +184,13 @@
     </p>
     <input type="password" id="apiKeyInput" placeholder="sk-ant-…" autocomplete="off">
     <p class="hint" style="margin-top:6px">
-      👨‍👩‍👧 <b>Sharing with family:</b> send them the key privately (iMessage) and
-      have them paste it in this box on <i>their</i> device — it stays in their
-      browser only. Never post the key anywhere public. All devices draw from
-      the same prepaid credits, so keeping a small balance (like $5, auto-reload
-      off) stays a hard cap for everyone combined.
+      👨‍👩‍👧 <b>Sharing with family:</b> easiest way — tap
+      <b>📲 Send all to my other device</b> below and choose to include your AI
+      key: their device gets your designs <i>and</i> AI, zero setup. The key
+      stays out of the public site (it only rides inside that private link) and
+      lives in their browser only. All devices draw from the same prepaid
+      credits, so a small balance ($5, auto-reload off) stays a hard cap for
+      everyone combined.
     </p>
     <div class="row" style="margin-top:8px">
       <span style="font-size:12px;color:var(--muted)">Model</span>
@@ -3942,11 +3944,21 @@ function stripPhotoData(design) {
 }
 // Device-to-device sync: all designs in one link. Re-sending updates by id
 // instead of duplicating, so it works like a manual sync in either direction.
-async function allDesignsLink() {
+async function allDesignsLink(includeAI) {
   const copies = JSON.parse(JSON.stringify(designs));
   let hadPhotos = false;
   for (const copy of copies) { if (stripPhotoData(copy)) hadPhotos = true; }
-  const raw = new TextEncoder().encode(JSON.stringify({ app: "WidgetKing", sync: 1, designs: copies }));
+  const payload = { app: "WidgetKing", sync: 1, designs: copies };
+  if (includeAI && getApiKey()) {
+    // The key rides only inside this private link (like texting it) — it is
+    // never part of the public site.
+    payload.ai = {
+      key: getApiKey(),
+      model: localStorage.getItem("widgetking.aimodel") || "claude-opus-5",
+      budget: getBudget()
+    };
+  }
+  const raw = new TextEncoder().encode(JSON.stringify(payload));
   let mode = "p", bytes = raw;
   if (window.CompressionStream) {
     try { bytes = await pipeBytes(raw, new CompressionStream("gzip")); mode = "g"; } catch (e) { bytes = raw; }
@@ -3958,7 +3970,11 @@ async function allDesignsLink() {
 document.getElementById("syncAllBtn").onclick = async function () {
   if (designs.length === 0) { toast("No designs to send yet"); return; }
   try {
-    const link = await allDesignsLink();
+    let includeAI = false;
+    if (getApiKey()) {
+      includeAI = confirm("Include your Claude AI key in this link, so the other device gets AI with zero setup?\n\nOnly send the link to family/people you trust — anyone with the link can use your (capped) credits.");
+    }
+    const link = await allDesignsLink(includeAI);
     if (link.hadPhotos) toast("Note: photos don't fit in a link — use 💾 Backup via iCloud Files for those");
     if (navigator.share) {
       await navigator.share({ title: "WidgetKing — all my designs", url: link.url });
@@ -4001,8 +4017,19 @@ async function receiveSharedDesign() {
       }
       persist();
       renderLibrary();
+      let aiNote = "";
+      if (parsed.ai && typeof parsed.ai.key === "string" && parsed.ai.key.trim()) {
+        localStorage.setItem("widgetking.apikey", parsed.ai.key.trim());
+        if (PRICES[parsed.ai.model]) localStorage.setItem("widgetking.aimodel", parsed.ai.model);
+        const budget = Number(parsed.ai.budget);
+        if (isFinite(budget) && budget > 0) localStorage.setItem("widgetking.budget", String(budget));
+        document.getElementById("apiKeyInput").value = parsed.ai.key.trim();
+        updateSpendUI();
+        updateMagicHint();
+        aiNote = " + AI is ready ✨";
+      }
       history.replaceState(null, "", location.pathname + location.search);
-      toast("📲 Synced " + parsed.designs.length + " designs — " + added + " new, " + updated + " updated ✓");
+      toast("📲 Synced " + parsed.designs.length + " designs — " + added + " new, " + updated + " updated ✓" + aiNote);
     } catch (e) {
       toast("That sync link couldn't be read");
     }
