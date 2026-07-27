@@ -902,7 +902,7 @@ async function addFreestyleApps(w, design, family) {
   if (apps.length === 0) return;
   const dims = widgetPointSizes(family);
   const W = dims[0], H = dims[1];
-  if (family === "small" && !w.url && apps[0].url) w.url = apps[0].url;
+  if (!w.url && apps[0].url) w.url = apps[0].url;
   // Group into rows: elements whose vertical centers overlap share a row.
   const sorted = apps.slice().sort(function (a, b) { return a.y - b.y; });
   const rows = [];
@@ -993,7 +993,9 @@ async function buildLauncher(w, design, family, tc, style) {
   const columns = Math.min(Math.max(Math.round(Number(ls.columns) || 0), 0), 6);
   const perRow = columns > 0 ? columns : (family === "small" ? 2 : 4);
   const labelPt = Math.min(13, Math.max(9, Math.round(iconPt * 0.22)));
-  if (family === "small" && apps[0].url && !w.url) w.url = apps[0].url;
+  // Whole-widget fallback URL: a tap on empty space (or anywhere on a Small
+  // widget) opens the first app instead of bouncing into Scriptable.
+  if (apps[0].url && !w.url) w.url = apps[0].url;
   // Deterministic layout: every margin and gap is a computed fixed number of
   // points — the same math the designer preview uses — because flexible
   // spacers distribute differently across iOS versions (preview mismatch).
@@ -1327,6 +1329,43 @@ const APP_PRESETS = {
   "chrome":    { emoji: "🌐", label: "Chrome",    url: "googlechrome://" }
 };
 
+// Known iOS URL schemes beyond the presets. A direct scheme opens the app
+// instantly on tap; anything not listed falls back to a Shortcuts bounce.
+const EXTRA_SCHEMES = {
+  "messenger": "fb-messenger://", "discord": "discord://", "telegram": "tg://",
+  "signal": "sgnl://", "threads": "barcelona://", "pinterest": "pinterest://",
+  "linkedin": "linkedin://", "twitch": "twitch://", "tumblr": "tumblr://",
+  "bereal": "bereal://", "groupme": "groupme://", "wechat": "weixin://",
+  "line": "line://", "kakaotalk": "kakaotalk://", "viber": "viber://",
+  "youtube music": "youtubemusic://", "pandora": "pandora://",
+  "soundcloud": "soundcloud://", "audible": "audible://", "podcasts": "podcasts://",
+  "shazam": "shazam://", "sonos": "sonos://",
+  "hulu": "hulu://", "disney": "disneyplus://", "hbo": "hbomax://", "max": "hbomax://",
+  "peacock": "peacocktv://", "prime video": "aiv://", "vlc": "vlc://",
+  "amazon": "com.amazon.mobile.shopping://", "walmart": "walmart://",
+  "target": "target://", "ebay": "ebay://", "etsy": "etsy://", "shop": "shopapp://",
+  "instacart": "instacart://", "doordash": "doordash://", "uber eats": "ubereats://",
+  "ubereats": "ubereats://", "grubhub": "grubhub://", "starbucks": "starbucks://",
+  "uber": "uber://", "lyft": "lyft://", "waze": "waze://",
+  "google maps": "comgooglemaps://", "google drive": "googledrive://", "google": "google://",
+  "venmo": "venmo://", "cash app": "squarecash://", "cashapp": "squarecash://",
+  "paypal": "paypal://", "robinhood": "robinhood://", "coinbase": "coinbase://",
+  "chase": "chase://",
+  "outlook": "ms-outlook://", "teams": "msteams://", "slack": "slack://",
+  "zoom": "zoomus://", "notion": "notion://", "todoist": "todoist://",
+  "trello": "trello://", "github": "github://", "dropbox": "dropbox://",
+  "1password": "onepassword://", "chatgpt": "chatgpt://", "claude": "claude://",
+  "duolingo": "duolingo://", "kindle": "kindle://", "goodreads": "goodreads://",
+  "strava": "strava://", "fitbit": "fitbit://", "myfitnesspal": "mfp://",
+  "alltrails": "alltrails://", "life360": "life360://",
+  "airbnb": "airbnb://", "booking": "booking://",
+  "espn": "sportscenter://", "steam": "steammobile://",
+  "facetime": "facetime://", "files": "shareddocuments://", "find my": "findmy://",
+  "wallet": "shoebox://", "weather": "weather://", "stocks": "stocks://",
+  "books": "ibooks://", "app store": "itms-apps://", "news": "applenews://",
+  "reminders": "x-apple-reminderkit://", "health": "x-apple-health://"
+};
+
 const DECOR_EMOJI = {
   moon: "🌙", star: "⭐", stars: "✨", sparkle: "✨", sparkles: "✨",
   heart: "❤️", hearts: "❤️", fire: "🔥", flame: "🔥", sun: "☀️",
@@ -1447,6 +1486,10 @@ function normalizeDesign(design) {
       if (typeof el.size !== "number" || el.size < 16) el.size = 40;
       if (!["rounded", "circle"].includes(el.shape)) el.shape = "rounded";
       if (typeof el.showLabel !== "boolean") el.showLabel = false;
+      if (el.url.indexOf("shortcuts://run-shortcut") === 0) {
+        const scheme = schemeForName(el.label);
+        if (scheme) el.url = scheme;
+      }
     }
     if (el.font != null && !FONT_CSS[el.font]) delete el.font;
     if (el.kind === "text") {
@@ -1459,6 +1502,14 @@ function normalizeDesign(design) {
     }
   }
   if (design.kind === "countdown" && !design.targetDate) design.targetDate = isoInDays(30);
+  // Upgrade Shortcuts-bounce links to direct app schemes whenever the app is
+  // now in the known-schemes table — direct links open with no detour.
+  for (const app of design.apps) {
+    if ((app.url || "").indexOf("shortcuts://run-shortcut") === 0) {
+      const scheme = schemeForName(app.label || "");
+      if (scheme) app.url = scheme;
+    }
+  }
   return design;
 }
 
@@ -3027,8 +3078,17 @@ function jsonp(url) {
 }
 function schemeForName(name) {
   const lower = name.toLowerCase();
-  for (const key of Object.keys(APP_PRESETS)) {
-    if (lower.includes(key)) return APP_PRESETS[key].url;
+  // Combined scheme table, longest keys first so "netflix" wins over "x"
+  // and "uber eats" wins over "uber".
+  const table = {};
+  for (const key of Object.keys(APP_PRESETS)) table[key] = APP_PRESETS[key].url;
+  for (const key of Object.keys(EXTRA_SCHEMES)) table[key] = EXTRA_SCHEMES[key];
+  const keys = Object.keys(table).sort(function (a, b) { return b.length - a.length; });
+  const words = lower.split(/[^a-z0-9+]+/);
+  for (const key of keys) {
+    // Short keys ("x") must match a whole word; longer ones may match inside.
+    const hit = key.length <= 2 ? words.includes(key) : lower.includes(key);
+    if (hit) return table[key];
   }
   return null;
 }
