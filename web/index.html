@@ -238,7 +238,19 @@
         <div class="hint" id="shortcutHint" style="display:none;margin-top:8px"></div>
         <p class="hint" style="margin-top:6px">Heads-up: iOS only allows multiple tap targets on <b>Medium and Large</b> widgets. On a Small widget, tapping anywhere opens the first app.</p>
       </div>
-      <div class="field"><label>Theme</label><div class="swatches" id="themeSwatches"></div></div>
+      <div class="field">
+        <label>Background</label>
+        <div class="row kind-buttons" id="bgButtons"></div>
+        <div class="row" id="glassTintRow" style="display:none;margin-top:8px">
+          <span style="font-size:12px;color:var(--muted)">Frost</span>
+          <select id="glassTint" style="flex:1">
+            <option value="dark">Dark frost</option>
+            <option value="light">Light frost</option>
+          </select>
+        </div>
+        <p class="hint" id="bgHint" style="display:none;margin-top:6px"></p>
+      </div>
+      <div class="field" id="themeField"><label>Theme</label><div class="swatches" id="themeSwatches"></div></div>
       <div class="field" id="customTheme" style="display:none">
         <label>Custom gradient — pick any two colors</label>
         <div class="row">
@@ -246,7 +258,7 @@
           <input type="color" id="bg2" value="#8f52fa">
         </div>
       </div>
-      <div class="field">
+      <div class="field" id="gradDirField">
         <label>Gradient direction</label>
         <div class="row" id="gradDirRow"></div>
       </div>
@@ -294,6 +306,7 @@
     <li>In Scriptable, tap <b>+</b>, paste, and name it <b>WidgetKing</b>.</li>
     <li>Long-press your Home Screen → <b>Edit → Add Widget</b> → search <b>Scriptable</b> → add a widget (use <b>Medium/Large</b> for launchers so every icon is tappable).</li>
     <li>Long-press the widget → <b>Edit Widget</b> → Script: <b>WidgetKing</b>, and set <b>Parameter</b> to a design's name. Different widgets can show different designs.</li>
+    <li><b>Glass / Clear backgrounds (one-time):</b> long-press your Home Screen, swipe to the last empty page, take a screenshot. Then open the WidgetKing script <i>inside</i> Scriptable, run it (▶), choose <b>Set wallpaper photo…</b> and pick that screenshot. For pixel-perfect <b>Clear</b> widgets, set the widget Parameter to <b>Name | position</b> — e.g. <b>My Clock | top-left</b> (small: top/middle/bottom-left/right; medium &amp; large: top, middle, bottom). Glass looks great without a position.</li>
     <li>Changed your designs? Copy the script again and paste over the old one.</li>
   </ol>
   <p class="hint">iOS refreshes Scriptable widgets on its own schedule (every few minutes), so clock and battery values are close but not live to-the-second. Everything runs on your devices — nothing is uploaded anywhere.</p>
@@ -354,24 +367,127 @@ function rgbToHex(rgb) {
     return Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0");
   }).join("");
 }
-function drawFreestyle(design, family) {
+
+// ---- Transparent / glass backgrounds (wallpaper slice, Koco-style) ----
+function wallpaperPath() {
+  const fm = FileManager.local();
+  return fm.joinPath(fm.documentsDirectory(), "widgetking-wallpaper.jpg");
+}
+function loadWallpaper() {
+  try {
+    const fm = FileManager.local();
+    const path = wallpaperPath();
+    if (fm.fileExists(path)) return fm.readImage(path);
+  } catch (e) {}
+  return null;
+}
+// Approximate iOS widget frames as proportions of the wallpaper screenshot.
+// Clear mode looks best when the widget's position parameter is set.
+function widgetRect(imgW, imgH, family, position) {
+  const sw = Math.round(imgW * 0.402);
+  const gap = Math.round((imgW - 2 * sw) / 3);
+  const mw = imgW - 2 * gap;
+  const top = Math.round(imgH * 0.0965);
+  const rowStep = sw + gap;
+  const rows = { top: top, middle: top + rowStep, bottom: top + 2 * rowStep };
+  const pos = position || (family === "small" ? "top-left" : "top");
+  const posParts = pos.split("-");
+  const row = posParts[0] || "top";
+  const side = posParts[1] || "left";
+  let x = gap;
+  let y = rows[row] != null ? rows[row] : rows.top;
+  let w = sw, h = sw;
+  if (family === "small") {
+    x = side === "right" ? gap * 2 + sw : gap;
+  } else if (family === "medium") {
+    w = mw;
+  } else {
+    w = mw; h = sw * 2 + gap;
+    if (row === "bottom") y = rows.middle;
+  }
+  if (y + h > imgH) y = Math.max(0, imgH - h);
+  return new Rect(x, y, w, h);
+}
+function cropImage(img, rect) {
+  const ctx = new DrawContext();
+  ctx.size = new Size(rect.width, rect.height);
+  ctx.opaque = true;
+  ctx.respectScreenScale = false;
+  ctx.drawImageAtPoint(img, new Point(-rect.x, -rect.y));
+  return ctx.getImage();
+}
+// Poor-man's gaussian: downscale then upscale.
+function blurImage(img) {
+  const w = img.size.width, h = img.size.height;
+  const smallCtx = new DrawContext();
+  const dw = Math.max(2, Math.round(w / 16));
+  const dh = Math.max(2, Math.round(h / 16));
+  smallCtx.size = new Size(dw, dh);
+  smallCtx.opaque = true;
+  smallCtx.respectScreenScale = false;
+  smallCtx.drawImageInRect(img, new Rect(0, 0, dw, dh));
+  const soft = smallCtx.getImage();
+  const bigCtx = new DrawContext();
+  bigCtx.size = new Size(w, h);
+  bigCtx.opaque = true;
+  bigCtx.respectScreenScale = false;
+  bigCtx.drawImageInRect(soft, new Rect(0, 0, w, h));
+  return bigCtx.getImage();
+}
+function tintImage(img, dark) {
+  const ctx = new DrawContext();
+  ctx.size = img.size;
+  ctx.opaque = true;
+  ctx.respectScreenScale = false;
+  ctx.drawImageInRect(img, new Rect(0, 0, img.size.width, img.size.height));
+  ctx.setFillColor(dark ? new Color("#101018", 0.32) : new Color("#FFFFFF", 0.25));
+  ctx.fillRect(new Rect(0, 0, img.size.width, img.size.height));
+  return ctx.getImage();
+}
+function backgroundImageFor(design, family, position) {
+  if (design.background !== "glass" && design.background !== "clear") return null;
+  const wall = loadWallpaper();
+  if (!wall) return null;
+  let rect;
+  if (position) {
+    rect = widgetRect(wall.size.width, wall.size.height, family, position);
+  } else {
+    const aspect = family === "medium" ? 2.14 : family === "large" ? 0.955 : 1;
+    let w = wall.size.width * 0.86;
+    let h = w / aspect;
+    if (h > wall.size.height * 0.8) { h = wall.size.height * 0.8; w = h * aspect; }
+    rect = new Rect((wall.size.width - w) / 2, (wall.size.height - h) / 2, w, h);
+  }
+  let img = cropImage(wall, rect);
+  if (design.background === "glass") {
+    img = blurImage(img);
+    img = tintImage(img, (design.glassTint || "dark") !== "light");
+  }
+  return img;
+}
+
+function drawFreestyle(design, family, bgImg) {
   const sizes = { small: [474, 474], medium: [1014, 474], large: [1014, 1062] };
   const dims = sizes[family] || sizes.small;
   const W = dims[0], H = dims[1];
   const ctx = new DrawContext();
   ctx.size = new Size(W, H); ctx.opaque = false; ctx.respectScreenScale = false;
-  const colors = themeColors(design);
-  const c1 = hexToRgb(colors[0]); const c2 = hexToRgb(colors[1]);
-  const steps = 60;
-  const horizontal = design.gradientDir === "horizontal";
-  for (let i = 0; i < steps; i++) {
-    const t = i / (steps - 1);
-    const mix = [0, 1, 2].map(function (j) { return c1[j] + (c2[j] - c1[j]) * t; });
-    ctx.setFillColor(new Color(rgbToHex(mix)));
-    if (horizontal) {
-      ctx.fillRect(new Rect(Math.floor((W * i) / steps), 0, Math.ceil(W / steps) + 1, H));
-    } else {
-      ctx.fillRect(new Rect(0, Math.floor((H * i) / steps), W, Math.ceil(H / steps) + 1));
+  if (bgImg) {
+    ctx.drawImageInRect(bgImg, new Rect(0, 0, W, H));
+  } else {
+    const colors = themeColors(design);
+    const c1 = hexToRgb(colors[0]); const c2 = hexToRgb(colors[1]);
+    const steps = 60;
+    const horizontal = design.gradientDir === "horizontal";
+    for (let i = 0; i < steps; i++) {
+      const t = i / (steps - 1);
+      const mix = [0, 1, 2].map(function (j) { return c1[j] + (c2[j] - c1[j]) * t; });
+      ctx.setFillColor(new Color(rgbToHex(mix)));
+      if (horizontal) {
+        ctx.fillRect(new Rect(Math.floor((W * i) / steps), 0, Math.ceil(W / steps) + 1, H));
+      } else {
+        ctx.fillRect(new Rect(0, Math.floor((H * i) / steps), W, Math.ceil(H / steps) + 1));
+      }
     }
   }
   const scale = Math.min(W, H) / 158;
@@ -479,24 +595,29 @@ async function buildLauncher(w, design, family, tc, style) {
   }
   w.addSpacer();
 }
-async function buildWidget(design) {
+async function buildWidget(design, position) {
   const family = config.widgetFamily || "small";
   const w = new ListWidget();
   w.setPadding(12, 12, 12, 12);
-  const colors = themeColors(design);
-  const g = new LinearGradient();
-  g.colors = [new Color(colors[0]), new Color(colors[1])];
-  g.locations = [0, 1];
-  g.startPoint = new Point(0, 0);
-  g.endPoint = design.gradientDir === "vertical" ? new Point(0, 1)
-    : design.gradientDir === "horizontal" ? new Point(1, 0) : new Point(1, 1);
-  w.backgroundGradient = g;
+  const bgImg = backgroundImageFor(design, family, position);
+  if (bgImg && design.kind !== "freestyle") {
+    w.backgroundImage = bgImg;
+  } else if (!bgImg) {
+    const colors = themeColors(design);
+    const g = new LinearGradient();
+    g.colors = [new Color(colors[0]), new Color(colors[1])];
+    g.locations = [0, 1];
+    g.startPoint = new Point(0, 0);
+    g.endPoint = design.gradientDir === "vertical" ? new Point(0, 1)
+      : design.gradientDir === "horizontal" ? new Point(1, 0) : new Point(1, 1);
+    w.backgroundGradient = g;
+  }
   const tc = new Color(design.textColorHex || "#FFFFFF");
   const style = design.fontStyle || "rounded";
   if (design.tapUrl) w.url = design.tapUrl;
   if (design.kind === "freestyle") {
     w.setPadding(0, 0, 0, 0);
-    w.backgroundImage = drawFreestyle(design, family);
+    w.backgroundImage = drawFreestyle(design, family, bgImg);
     w.refreshAfterDate = new Date(Date.now() + 5 * 60 * 1000);
     return w;
   }
@@ -554,16 +675,50 @@ async function buildWidget(design) {
   w.refreshAfterDate = new Date(Date.now() + 5 * 60 * 1000);
   return w;
 }
-const parameter = (args.widgetParameter || "").trim().toLowerCase();
-let design = DESIGNS.find(function (d) { return (d.name || "").toLowerCase() === parameter; });
-if (!design) design = DESIGNS[0];
-if (!design) {
-  const w = new ListWidget();
-  w.addText("No designs yet — build one in the WidgetKing designer.");
-  if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentSmall(); }
-} else {
-  const w = await buildWidget(design);
-  if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentMedium(); }
+// Widget parameter: "Design Name" or "Design Name | position" where position
+// aligns Clear/Glass wallpaper slices (small: top/middle/bottom-left/right;
+// medium & large: top, middle, bottom).
+const rawParameter = String(args.widgetParameter || "");
+const paramParts = rawParameter.split("|");
+const parameter = (paramParts[0] || "").trim().toLowerCase();
+const widgetPosition = (paramParts[1] || "").trim().toLowerCase();
+
+let runPreview = true;
+if (config.runsInApp) {
+  const menu = new Alert();
+  menu.title = "WidgetKing";
+  menu.message = "Glass and Clear widgets show your wallpaper. One-time setup: long-press the Home Screen, swipe to the last empty page, screenshot it — then pick that screenshot here.";
+  menu.addAction("Preview a widget");
+  menu.addAction("Set wallpaper photo…");
+  menu.addCancelAction("Cancel");
+  const choice = await menu.presentAlert();
+  if (choice === 1) {
+    runPreview = false;
+    try {
+      const img = await Photos.fromLibrary();
+      FileManager.local().writeImage(wallpaperPath(), img);
+      const done = new Alert();
+      done.title = "Wallpaper saved ✓";
+      done.message = "Glass and Clear widgets will now use it. For pixel-perfect Clear widgets, set each widget's Parameter to: Design Name | position (e.g. My Clock | top-left).";
+      done.addAction("OK");
+      await done.presentAlert();
+    } catch (e) {}
+  } else if (choice === -1) {
+    runPreview = false;
+  }
+}
+
+if (config.runsInWidget || runPreview) {
+  let design = DESIGNS.find(function (d) { return (d.name || "").toLowerCase() === parameter; });
+  if (!design) design = DESIGNS[0];
+  if (!design) {
+    const w = new ListWidget();
+    w.addText("No designs yet — build one in the WidgetKing designer.");
+    if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentSmall(); }
+  } else {
+    const w = await buildWidget(design, widgetPosition);
+    if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentMedium(); }
+  }
 }
 Script.complete();
 </script>
@@ -653,6 +808,7 @@ function newDesign() {
     fontStyle: "rounded", textColorHex: "#FFFFFF", primaryText: "",
     secondaryText: "", targetDate: "", canvasElements: [], apps: [],
     customColors: null, tapUrl: "", gradientDir: "diagonal",
+    background: "gradient", glassTint: "dark",
     launcherStyle: { iconSize: 30, shape: "rounded", labels: true }
   };
 }
@@ -697,6 +853,8 @@ function normalizeDesign(design) {
   }
   if (design.tapUrl == null) design.tapUrl = "";
   if (!design.gradientDir) design.gradientDir = "diagonal";
+  if (!["gradient", "glass", "clear"].includes(design.background)) design.background = "gradient";
+  if (design.glassTint !== "light") design.glassTint = "dark";
   design.launcherStyle = launcherStyleOf(design);
   for (const el of design.canvasElements) {
     if (!el.id) el.id = uid();
@@ -985,6 +1143,8 @@ const AI_SCHEMA = {
     primaryText: { type: "string", description: "Quote/note text or countdown title; empty if unused" },
     secondaryText: { type: "string", description: "Quote author; empty if unused" },
     targetDate: { type: "string", description: "yyyy-MM-dd for countdowns; empty otherwise" },
+    background: { type: "string", "enum": ["gradient", "glass", "clear"], description: "gradient = colored; glass = frosted blurred wallpaper; clear = fully transparent (shows wallpaper). Use glass/clear when the user asks for transparent, see-through, frosted, glassy, or minimal-blends-with-wallpaper looks" },
+    glassTint: { type: "string", "enum": ["dark", "light"], description: "Frost tint for glass backgrounds" },
     backgroundColors: {
       type: "array",
       description: "Exactly two #RRGGBB colors for a custom gradient background when the preset themes don't match the request; empty array to use themeID",
@@ -1028,13 +1188,14 @@ const AI_SCHEMA = {
       }
     }
   },
-  required: ["name", "kind", "themeID", "fontStyle", "textColorHex", "primaryText", "secondaryText", "targetDate", "backgroundColors", "tapUrl", "apps", "canvasElements"],
+  required: ["name", "kind", "themeID", "fontStyle", "textColorHex", "primaryText", "secondaryText", "targetDate", "background", "glassTint", "backgroundColors", "tapUrl", "apps", "canvasElements"],
   additionalProperties: false
 };
 
 const AI_EXAMPLE = {
   name: "Cozy Night", kind: "freestyle", themeID: "midnight", fontStyle: "rounded",
   textColorHex: "#FFFFFF", primaryText: "", secondaryText: "", targetDate: "",
+  background: "gradient", glassTint: "dark",
   backgroundColors: [], tapUrl: "", apps: [],
   canvasElements: [
     { kind: "shape", text: "", x: 0.5, y: 0.5, size: 0, colorHex: "#FFFFFF", opacity: 0.16, shape: "pill", w: 0.84, h: 0.46, dateISO: "" },
@@ -1053,6 +1214,7 @@ function aiSystemPrompt() {
     "freestyle (compose elements on a canvas — prefer it for creative or decorated requests).\n" +
     "Themes: " + Object.keys(THEMES).join(", ") + ". 'paper' is light (use dark text like #333333); the rest are dark (use light text). " +
     "If the requested colors don't match a preset, set backgroundColors to two #RRGGBB colors for a custom gradient. " +
+    "Backgrounds: background=glass gives a frosted blurred wallpaper look (choose glassTint dark or light); background=clear makes the widget fully transparent against the wallpaper — use these when the user says transparent, see-through, frosted, glass, or wants it to blend with their wallpaper; otherwise background=gradient. " +
     "Set tapUrl when the user wants the widget to open an app on tap.\n" +
     "Design principles for freestyle: one focal element (size 30-44); secondary text 11-16; decorations 13-24; " +
     "keep every element inside x/y 0.08-0.92; use a translucent shape (white or black, opacity 0.15-0.35, pill or rect) " +
@@ -1112,6 +1274,8 @@ function specToDesign(spec) {
     design.themeID = "custom";
     design.customColors = [bg[0].toUpperCase(), bg[1].toUpperCase()];
   }
+  if (["gradient", "glass", "clear"].includes(spec.background)) design.background = spec.background;
+  if (spec.glassTint === "light") design.glassTint = "light";
   design.tapUrl = (spec.tapUrl || "").trim();
   design.apps = (spec.apps || []).slice(0, 8).map(function (app) {
     return { emoji: app.emoji || "🌐", label: (app.label || "App").slice(0, 12), url: app.url || "" };
@@ -1168,8 +1332,22 @@ function esc(str) {
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 function applyDesignBackground(node, design) {
-  const theme = themeOf(design);
-  node.style.background = "linear-gradient(" + gradientAngle(design) + ", " + theme[0] + ", " + theme[1] + ")";
+  if (design.background === "clear") {
+    // Checkerboard = "transparent" preview convention; on-device it shows
+    // your actual wallpaper slice.
+    node.style.background = "repeating-conic-gradient(#26262e 0% 25%, #1b1b22 0% 50%) 0 0 / 16px 16px";
+  } else if (design.background === "glass") {
+    const overlay = design.glassTint === "light"
+      ? "linear-gradient(135deg, rgba(255,255,255,.38), rgba(255,255,255,.18))"
+      : "linear-gradient(135deg, rgba(16,16,24,.55), rgba(16,16,24,.35))";
+    node.style.background = overlay +
+      ", radial-gradient(circle at 22% 24%, #7b6cf6, transparent 55%)" +
+      ", radial-gradient(circle at 80% 18%, #f672b5, transparent 50%)" +
+      ", radial-gradient(circle at 60% 82%, #4dd0e1, transparent 55%), #191922";
+  } else {
+    const theme = themeOf(design);
+    node.style.background = "linear-gradient(" + gradientAngle(design) + ", " + theme[0] + ", " + theme[1] + ")";
+  }
   node.style.color = design.textColorHex;
   node.style.fontFamily = FONT_CSS[design.fontStyle] || FONT_CSS.rounded;
 }
@@ -1703,6 +1881,11 @@ function buildTemplates() {
       { kind: "emoji", text: "✨", x: 0.16, y: 0.19, size: 13, colorHex: "#FFFFFF", opacity: 1 }
     ] } },
     { category: "Clocks", design: { name: "Paper Minimal", kind: "clock", themeID: "paper", fontStyle: "classic", textColorHex: "#333333" } },
+    { category: "Clocks", design: { name: "Frosted Clock", kind: "clock", background: "glass", glassTint: "dark", fontStyle: "rounded", textColorHex: "#FFFFFF" } },
+    { category: "Launchers", design: { name: "Ghost Launcher", kind: "launcher", background: "clear", fontStyle: "rounded", textColorHex: "#FFFFFF", launcherStyle: { iconSize: 32, shape: "rounded", labels: false }, apps: [
+      Object.assign({}, APP_PRESETS.phone), Object.assign({}, APP_PRESETS.messages),
+      Object.assign({}, APP_PRESETS.instagram), Object.assign({}, APP_PRESETS.spotify)
+    ] } },
     { category: "Clocks", design: { name: "Neon Time", kind: "freestyle", themeID: "custom", customColors: ["#0F0C29", "#F72585"], gradientDir: "vertical", fontStyle: "mono", textColorHex: "#FFFFFF", canvasElements: [
       { kind: "clock", x: 0.5, y: 0.44, size: 34, colorHex: "#FFFFFF", opacity: 1 },
       { kind: "text", text: "N E O N", x: 0.5, y: 0.63, size: 10, colorHex: "#FF8FAB", opacity: 1 },
@@ -1823,6 +2006,31 @@ function renderControls() {
   document.getElementById("fCountdown").style.display = current.kind === "countdown" ? "block" : "none";
   document.getElementById("fQuote").style.display = current.kind === "quote" ? "block" : "none";
   document.getElementById("fNote").style.display = current.kind === "note" ? "block" : "none";
+
+  const bgButtons = document.getElementById("bgButtons");
+  bgButtons.innerHTML = "";
+  for (const [bg, label] of [["gradient", "🎨 Gradient"], ["glass", "🧊 Glass"], ["clear", "🫥 Clear"]]) {
+    const button = document.createElement("button");
+    button.textContent = label;
+    if ((current.background || "gradient") === bg) button.className = "active";
+    button.onclick = function () { current.background = bg; renderAll(); };
+    bgButtons.appendChild(button);
+  }
+  const isGradient = (current.background || "gradient") === "gradient";
+  document.getElementById("themeField").style.display = isGradient ? "block" : "none";
+  document.getElementById("gradDirField").style.display = isGradient ? "block" : "none";
+  document.getElementById("glassTintRow").style.display = current.background === "glass" ? "flex" : "none";
+  document.getElementById("glassTint").value = current.glassTint || "dark";
+  const bgHint = document.getElementById("bgHint");
+  if (current.background === "glass") {
+    bgHint.style.display = "block";
+    bgHint.innerHTML = "🧊 Glass shows a frosted, blurred slice of <b>your wallpaper</b> behind the widget (the preview here is a stand-in). One-time setup on your iPhone: screenshot your empty wallpaper page, then run the WidgetKing script inside Scriptable and choose <b>Set wallpaper photo…</b>";
+  } else if (current.background === "clear") {
+    bgHint.style.display = "block";
+    bgHint.innerHTML = "🫥 Clear shows the exact wallpaper slice behind the widget so it looks fully transparent. Needs the same one-time wallpaper setup as Glass, plus the widget's <b>Parameter</b> set to <b>Name | position</b> (e.g. <b>My Clock | top-left</b>) for pixel-perfect alignment.";
+  } else {
+    bgHint.style.display = "none";
+  }
 
   const swatches = document.getElementById("themeSwatches");
   swatches.innerHTML = "";
@@ -2019,6 +2227,10 @@ const tapPreset = document.getElementById("tapPreset");
 tapPreset.onchange = function () {
   current.tapUrl = tapPreset.value;
   document.getElementById("tapUrlInput").value = tapPreset.value;
+};
+document.getElementById("glassTint").onchange = function (e) {
+  current.glassTint = e.target.value;
+  renderPreview();
 };
 document.getElementById("tapUrlInput").oninput = function (e) { current.tapUrl = e.target.value.trim(); };
 
