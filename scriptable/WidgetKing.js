@@ -269,6 +269,20 @@ function drawFreestyle(design, family, bgImg) {
       ctx.fillPath();
       continue;
     }
+    if (el.kind === "photo") {
+      // Photos arrive pre-baked from the designer: crop shape and opacity are
+      // already burned into the PNG's pixels/alpha, so we just draw it.
+      if (el.b64) {
+        try {
+          const img = Image.fromData(Data.fromBase64String(el.b64));
+          let wPx, hPx;
+          if (el.shape === "circle") { wPx = hPx = (el.w || 0.55) * Math.min(W, H); }
+          else { wPx = (el.w || 0.55) * W; hPx = wPx * (el.aspect || 1); }
+          ctx.drawImageInRect(img, new Rect(px - wPx / 2, py - hPx / 2, wPx, hPx));
+        } catch (e) {}
+      }
+      continue;
+    }
     let text;
     if (el.kind === "clock") { const df = new DateFormatter(); df.useShortTimeStyle(); text = df.string(new Date()); }
     else if (el.kind === "date") { const df = new DateFormatter(); df.dateFormat = "EEE MMM d"; text = df.string(new Date()); }
@@ -276,10 +290,20 @@ function drawFreestyle(design, family, bgImg) {
     else if (el.kind === "countdown") { text = String(Math.abs(daysUntil(el.dateISO))); }
     else if (el.kind === "symbol") { text = SYMBOL_EMOJI[el.symbolName] || "⭐"; }
     else { text = el.text || "Text"; }
-    ctx.setFont(fontFor(design.fontStyle, fs, true));
+    const isBold = el.kind !== "text" || el.bold !== false;
+    ctx.setFont(fontFor(design.fontStyle, fs, isBold));
     ctx.setTextColor(new Color(el.colorHex || "#FFFFFF", el.kind === "emoji" ? 1 : op));
-    ctx.setTextAlignedCenter();
-    ctx.drawTextInRect(text, new Rect(px - W / 2, py - fs * 0.72, W, fs * 1.7));
+    if (el.kind === "text" && el.w > 0) {
+      // Text box: fixed width, wraps, top-anchored — mirrors the designer.
+      if (el.align === "left") { ctx.setTextAlignedLeft(); }
+      else if (el.align === "right") { ctx.setTextAlignedRight(); }
+      else { ctx.setTextAlignedCenter(); }
+      const boxW = el.w * W;
+      ctx.drawTextInRect(text, new Rect(px - boxW / 2, py - fs * 0.72, boxW, H));
+    } else {
+      ctx.setTextAlignedCenter();
+      ctx.drawTextInRect(text, new Rect(px - W / 2, py - fs * 0.72, W, fs * 1.7));
+    }
   }
   return ctx.getImage();
 }

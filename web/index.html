@@ -84,6 +84,31 @@
   .cel.selected { outline: 1.5px dashed rgba(255,255,255,.9); outline-offset: 3px; border-radius: 6px; }
   .cel-shape { pointer-events: auto; }
   .snap-guide { position: absolute; background: rgba(255,255,255,.75); pointer-events: none; z-index: 5; }
+  .cel-photo img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+  #studio { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: none;
+    flex-direction: column; overscroll-behavior: contain; }
+  #studio.open { display: flex; }
+  #studioHead { display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+    border-bottom: 1px solid #26262e; flex-wrap: wrap; }
+  #studioHead .title { font-weight: 700; font-size: 15px; margin-right: auto; }
+  #studioStage { flex: 1; min-height: 120px; display: flex; align-items: center; justify-content: center;
+    padding: 14px; overflow: hidden;
+    background: repeating-conic-gradient(#1b1b22 0% 25%, #17171d 0% 50%) 0 0 / 22px 22px; }
+  #studioCanvas { border-radius: 22px; overflow: hidden; position: relative;
+    box-shadow: 0 12px 36px rgba(0,0,0,.55); flex-shrink: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; user-select: none; -webkit-user-select: none; }
+  #studioPanel { max-height: 46vh; overflow-y: auto; padding: 10px 14px 18px;
+    border-top: 1px solid #26262e; -webkit-overflow-scrolling: touch; }
+  #studioLayers { display: flex; gap: 6px; overflow-x: auto; padding: 6px 0;
+    -webkit-overflow-scrolling: touch; }
+  .layer-chip { flex-shrink: 0; display: flex; align-items: center; gap: 5px; font-size: 12px;
+    background: var(--card2); border: 1px solid #34343f; border-radius: 999px; padding: 5px 11px; cursor: pointer; }
+  .layer-chip.active { border-color: var(--accent); background: var(--accent); font-weight: 600; }
+  .layer-chip img { width: 16px; height: 16px; border-radius: 4px; object-fit: cover; }
+  #studioInspector { background: var(--card2); border-radius: 12px; padding: 12px; margin-top: 8px; }
+  #studioInspector .row { margin-bottom: 8px; }
+  .align-buttons button.active { background: var(--accent); border-color: var(--accent); }
   .launch-grid { display: grid; gap: 10px; padding: 10px; }
   .launch-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
   .launch-icon { border-radius: 12px; background: rgba(255,255,255,.18);
@@ -175,17 +200,35 @@
   </details>
 </section>
 
+<div id="studio">
+  <div id="studioHead">
+    <span class="title">🎨 Studio</span>
+    <div class="row size-buttons" id="studioSizeButtons" style="margin:0"></div>
+    <button id="studioSaveBtn" class="primary">💾 Save</button>
+    <button id="studioCloseBtn">✕ Done</button>
+  </div>
+  <div id="studioStage"><div id="studioCanvas"></div></div>
+  <div id="studioPanel">
+    <div class="chips" id="studioPalette"></div>
+    <div id="studioLayers"></div>
+    <div id="studioInspector" style="display:none"></div>
+    <p class="hint" id="studioHint">Add elements above, drag them on the canvas (they snap to center lines), tap one to fine-tune it. Layers run left → right, back → front.</p>
+  </div>
+</div>
+
 <section id="editorSection">
   <h2><span class="step">2</span> Make it yours</h2>
   <div class="editor-grid">
     <div id="canvasWrap">
       <div id="canvas"></div>
       <div class="row size-buttons" id="sizeButtons"></div>
+      <button id="openStudioBtn" style="width:100%;max-width:380px">🎨 Open Studio — full-screen drag &amp; drop editor</button>
       <div id="freestyleTools" style="display:none; width: 100%; max-width: 380px;">
         <div class="chips" id="palette"></div>
         <div id="inspector" style="display:none;"></div>
         <p class="hint" id="freestyleHint">Tap a chip to add an element, then drag it anywhere — it snaps to center lines. Click an element to edit, layer, and fine-tune it.</p>
       </div>
+      <input type="file" id="photoInput" accept="image/*" style="display:none">
     </div>
     <div>
       <div class="field"><label>Name</label><input type="text" id="nameInput"></div>
@@ -573,6 +616,20 @@ function drawFreestyle(design, family, bgImg) {
       ctx.fillPath();
       continue;
     }
+    if (el.kind === "photo") {
+      // Photos arrive pre-baked from the designer: crop shape and opacity are
+      // already burned into the PNG's pixels/alpha, so we just draw it.
+      if (el.b64) {
+        try {
+          const img = Image.fromData(Data.fromBase64String(el.b64));
+          let wPx, hPx;
+          if (el.shape === "circle") { wPx = hPx = (el.w || 0.55) * Math.min(W, H); }
+          else { wPx = (el.w || 0.55) * W; hPx = wPx * (el.aspect || 1); }
+          ctx.drawImageInRect(img, new Rect(px - wPx / 2, py - hPx / 2, wPx, hPx));
+        } catch (e) {}
+      }
+      continue;
+    }
     let text;
     if (el.kind === "clock") { const df = new DateFormatter(); df.useShortTimeStyle(); text = df.string(new Date()); }
     else if (el.kind === "date") { const df = new DateFormatter(); df.dateFormat = "EEE MMM d"; text = df.string(new Date()); }
@@ -580,10 +637,20 @@ function drawFreestyle(design, family, bgImg) {
     else if (el.kind === "countdown") { text = String(Math.abs(daysUntil(el.dateISO))); }
     else if (el.kind === "symbol") { text = SYMBOL_EMOJI[el.symbolName] || "⭐"; }
     else { text = el.text || "Text"; }
-    ctx.setFont(fontFor(design.fontStyle, fs, true));
+    const isBold = el.kind !== "text" || el.bold !== false;
+    ctx.setFont(fontFor(design.fontStyle, fs, isBold));
     ctx.setTextColor(new Color(el.colorHex || "#FFFFFF", el.kind === "emoji" ? 1 : op));
-    ctx.setTextAlignedCenter();
-    ctx.drawTextInRect(text, new Rect(px - W / 2, py - fs * 0.72, W, fs * 1.7));
+    if (el.kind === "text" && el.w > 0) {
+      // Text box: fixed width, wraps, top-anchored — mirrors the designer.
+      if (el.align === "left") { ctx.setTextAlignedLeft(); }
+      else if (el.align === "right") { ctx.setTextAlignedRight(); }
+      else { ctx.setTextAlignedCenter(); }
+      const boxW = el.w * W;
+      ctx.drawTextInRect(text, new Rect(px - boxW / 2, py - fs * 0.72, boxW, H));
+    } else {
+      ctx.setTextAlignedCenter();
+      ctx.drawTextInRect(text, new Rect(px - W / 2, py - fs * 0.72, W, fs * 1.7));
+    }
   }
   return ctx.getImage();
 }
@@ -949,6 +1016,17 @@ function normalizeDesign(design) {
       if (typeof el.w !== "number" || el.w <= 0) el.w = 0.5;
       if (typeof el.h !== "number" || el.h <= 0) el.h = 0.25;
     }
+    if (el.kind === "photo") {
+      if (typeof el.dataUrl !== "string") el.dataUrl = "";
+      if (!["rect", "rounded", "circle"].includes(el.shape)) el.shape = "rounded";
+      if (typeof el.w !== "number" || el.w <= 0) el.w = 0.55;
+      if (typeof el.aspect !== "number" || el.aspect <= 0) el.aspect = 1;
+    }
+    if (el.kind === "text") {
+      if (typeof el.w !== "number" || el.w < 0 || el.w > 1) el.w = 0;
+      if (!["left", "center", "right"].includes(el.align)) el.align = "center";
+      if (typeof el.bold !== "boolean") el.bold = true;
+    }
     if (el.kind === "countdown" && !/^\d{4}-\d{2}-\d{2}$/.test(el.dateISO || "")) {
       el.dateISO = isoInDays(30);
     }
@@ -969,7 +1047,13 @@ function loadDesigns() {
     return (Array.isArray(parsed) ? parsed : []).map(normalizeDesign);
   } catch (e) { return []; }
 }
-function persist() { localStorage.setItem("widgetking.designs", JSON.stringify(designs)); }
+function persist() {
+  try {
+    localStorage.setItem("widgetking.designs", JSON.stringify(designs));
+  } catch (e) {
+    toast("⚠️ Storage is full — photos take space. Delete a design or use smaller photos.");
+  }
+}
 function toast(message) {
   const el = document.getElementById("toast");
   el.textContent = message;
@@ -1257,11 +1341,13 @@ const AI_SCHEMA = {
           colorHex: { type: "string" },
           opacity: { type: "number", description: "0.05-1; use 0.15-0.35 for card shapes, 1 for text" },
           shape: { type: "string", "enum": ["", "rect", "pill", "circle"], description: "Only for kind=shape; empty otherwise" },
-          w: { type: "number", description: "Shape width 0-1 of canvas; 0 when unused" },
+          w: { type: "number", description: "Shape width 0-1 of canvas (0 when unused). For kind=text: 0 = auto single line, >0 = wrapping text box of that width — use ~0.8 for quotes/long text" },
           h: { type: "number", description: "Shape height 0-1 of canvas; 0 when unused (ignored for circles)" },
+          align: { type: "string", "enum": ["", "left", "center", "right"], description: "Text-box alignment when kind=text and w>0; empty otherwise" },
+          bold: { type: "boolean", description: "For kind=text: false for lighter body text; true otherwise" },
           dateISO: { type: "string", description: "yyyy-MM-dd for countdown elements; empty otherwise" }
         },
-        required: ["kind", "text", "x", "y", "size", "colorHex", "opacity", "shape", "w", "h", "dateISO"],
+        required: ["kind", "text", "x", "y", "size", "colorHex", "opacity", "shape", "w", "h", "align", "bold", "dateISO"],
         additionalProperties: false
       }
     }
@@ -1276,11 +1362,11 @@ const AI_EXAMPLE = {
   background: "gradient", glassTint: "dark",
   backgroundColors: [], tapUrl: "", apps: [],
   canvasElements: [
-    { kind: "shape", text: "", x: 0.5, y: 0.5, size: 0, colorHex: "#FFFFFF", opacity: 0.16, shape: "pill", w: 0.84, h: 0.46, dateISO: "" },
-    { kind: "clock", text: "", x: 0.5, y: 0.44, size: 34, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, dateISO: "" },
-    { kind: "text", text: "sweet dreams", x: 0.5, y: 0.62, size: 11, colorHex: "#D8CFFF", opacity: 0.9, shape: "", w: 0, h: 0, dateISO: "" },
-    { kind: "emoji", text: "🌙", x: 0.83, y: 0.15, size: 20, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, dateISO: "" },
-    { kind: "emoji", text: "✨", x: 0.15, y: 0.2, size: 13, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, dateISO: "" }
+    { kind: "shape", text: "", x: 0.5, y: 0.5, size: 0, colorHex: "#FFFFFF", opacity: 0.16, shape: "pill", w: 0.84, h: 0.46, align: "", bold: true, dateISO: "" },
+    { kind: "clock", text: "", x: 0.5, y: 0.44, size: 34, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, dateISO: "" },
+    { kind: "text", text: "sweet dreams", x: 0.5, y: 0.62, size: 11, colorHex: "#D8CFFF", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, dateISO: "" },
+    { kind: "emoji", text: "🌙", x: 0.83, y: 0.15, size: 20, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, dateISO: "" },
+    { kind: "emoji", text: "✨", x: 0.15, y: 0.2, size: 13, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, dateISO: "" }
   ]
 };
 
@@ -1297,7 +1383,8 @@ function aiSystemPrompt() {
     "Design principles for freestyle: one focal element (size 30-44); secondary text 11-16; decorations 13-24; " +
     "keep every element inside x/y 0.08-0.92; use a translucent shape (white or black, opacity 0.15-0.35, pill or rect) " +
     "as a card behind the main content; shapes come EARLIER in the array so they render underneath; " +
-    "center compositions on x=0.5; ensure text contrasts with the background.\n" +
+    "center compositions on x=0.5; ensure text contrasts with the background. " +
+    "For long text (quotes, sentences) set w to ~0.8 on the text element so it wraps as a box (w=0 = auto single line), with align and bold as fits.\n" +
     "Example — idea: 'cozy night clock with a moon' -> " + JSON.stringify(AI_EXAMPLE) + "\n" +
     "Common app URL schemes: instagram://, spotify://, youtube://, tiktok://, twitter://, snapchat://, whatsapp://, fb://, reddit://, googlegmail://, googlechrome://, nflx://, music://, maps://, calshow://, mobilenotes://, shortcuts://, tel://, sms://, mailto:, photos-redirect://, camera://.\n" +
     "Today is " + today + ". Resolve relative dates to yyyy-MM-dd. Keep names under 24 chars. Fill unused fields with empty strings, 0, or empty arrays.";
@@ -1360,7 +1447,8 @@ function specToDesign(spec) {
   });
   design.canvasElements = (spec.canvasElements || []).slice(0, 12).map(function (el) {
     const kind = ["text","clock","date","emoji","shape","battery","countdown"].includes(el.kind) ? el.kind : "text";
-    return {
+    const rawW = Number(el.w) || 0;
+    const out = {
       id: uid(),
       kind: kind,
       text: el.text || "", symbolName: "star.fill",
@@ -1369,11 +1457,20 @@ function specToDesign(spec) {
       size: Math.min(Math.max(Number(el.size) || 18, 6), 90),
       colorHex: /^#[0-9a-fA-F]{6}$/.test(el.colorHex || "") ? el.colorHex.toUpperCase() : "#FFFFFF",
       opacity: Math.min(Math.max(Number(el.opacity) || 1, 0.05), 1),
-      shape: ["rect","pill","circle"].includes(el.shape) ? el.shape : "rect",
-      w: Math.min(Math.max(Number(el.w) || 0.5, 0.02), 1),
-      h: Math.min(Math.max(Number(el.h) || 0.25, 0.02), 1),
       dateISO: /^\d{4}-\d{2}-\d{2}$/.test(el.dateISO || "") ? el.dateISO : ""
     };
+    if (kind === "shape") {
+      out.shape = ["rect","pill","circle"].includes(el.shape) ? el.shape : "rect";
+      out.w = Math.min(Math.max(rawW || 0.5, 0.02), 1);
+      out.h = Math.min(Math.max(Number(el.h) || 0.25, 0.02), 1);
+    }
+    if (kind === "text") {
+      // w=0 keeps auto-width single-line text; >0 makes a wrapping box.
+      out.w = Math.min(Math.max(rawW, 0), 1);
+      out.align = ["left","center","right"].includes(el.align) ? el.align : "center";
+      out.bold = el.bold !== false;
+    }
+    return out;
   });
   return normalizeDesign(design);
 }
@@ -1505,11 +1602,38 @@ function renderFreestyleInto(node, design, w, h, interactive) {
         : (6 * scale) + "px";
       div.style.opacity = el.opacity;
       div.classList.add("cel-shape");
+    } else if (el.kind === "photo") {
+      let wPx, hPx;
+      if (el.shape === "circle") { wPx = hPx = (el.w || 0.55) * Math.min(w, h); }
+      else { wPx = (el.w || 0.55) * w; hPx = wPx * (el.aspect || 1); }
+      div.style.width = wPx + "px";
+      div.style.height = hPx + "px";
+      div.style.borderRadius = el.shape === "circle" ? "50%"
+        : el.shape === "rounded" ? Math.round(Math.min(wPx, hPx) * 0.14) + "px" : "0";
+      div.style.overflow = "hidden";
+      div.style.opacity = el.opacity;
+      div.classList.add("cel-photo");
+      if (el.dataUrl) {
+        const img = document.createElement("img");
+        img.src = el.dataUrl;
+        div.appendChild(img);
+      } else {
+        div.style.background = "rgba(255,255,255,.15)";
+        div.textContent = "🖼";
+      }
     } else {
       div.style.fontSize = (el.size * scale) + "px";
-      div.style.fontWeight = "600";
+      div.style.fontWeight = (el.kind === "text" && el.bold === false) ? "400" : "600";
       div.style.color = el.colorHex;
       if (el.kind !== "emoji") div.style.opacity = el.opacity;
+      if (el.kind === "text" && el.w > 0) {
+        // Text box: fixed width, wraps, top-anchored at its y position.
+        div.style.width = (el.w * w) + "px";
+        div.style.whiteSpace = "pre-wrap";
+        div.style.wordBreak = "break-word";
+        div.style.textAlign = el.align || "center";
+        div.style.transform = "translate(-50%, " + (-0.72 * el.size * scale) + "px)";
+      }
       if (el.kind === "clock") div.textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
       else if (el.kind === "date") div.textContent = now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
       else if (el.kind === "battery") div.textContent = "82%";
@@ -1563,14 +1687,23 @@ function makeThumb(design, scale) {
   return outer;
 }
 
+// Re-render helpers shared by the inline editor and the Studio overlay.
+function refreshCanvases() {
+  renderPreview();
+  if (studioOpen) renderStudioCanvas();
+}
+function refreshEditors() {
+  renderFreestyleUI();
+  if (studioOpen) renderStudioUI();
+  refreshCanvases();
+}
 function attachDrag(div, el) {
   div.addEventListener("pointerdown", function (event) {
     event.preventDefault();
+    const canvasNode = div.parentElement;
     selectedElId = el.id;
-    renderFreestyleUI();
-    renderPreview();
-    const canvas = document.getElementById("canvas");
-    const rect = canvas.getBoundingClientRect();
+    refreshEditors();
+    const rect = canvasNode.getBoundingClientRect();
     function move(ev) {
       let nx = (ev.clientX - rect.left) / rect.width;
       let ny = (ev.clientY - rect.top) / rect.height;
@@ -1580,11 +1713,11 @@ function attachDrag(div, el) {
       if (snapGuides.y) ny = 0.5;
       el.x = Math.min(Math.max(nx, 0), 1);
       el.y = Math.min(Math.max(ny, 0), 1);
-      renderPreview();
+      refreshCanvases();
     }
     function up() {
       snapGuides = { x: false, y: false };
-      renderPreview();
+      refreshCanvases();
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
     }
@@ -1594,7 +1727,18 @@ function attachDrag(div, el) {
 }
 
 // ==================== Freestyle palette & inspector ====================
+const ELEMENT_PALETTE = [["text", "Text"], ["photo", "🖼 Photo"], ["clock", "🕐 Clock"],
+  ["date", "📅 Date"], ["emoji", "✨ Emoji"], ["shape", "▢ Shape"],
+  ["battery", "🔋 Battery"], ["countdown", "⏳ Countdown"]];
+
+let pendingPhoto = null; // {mode:"new"} or {mode:"replace", el}
+
 function addElement(kind) {
+  if (kind === "photo") {
+    pendingPhoto = { mode: "new" };
+    document.getElementById("photoInput").click();
+    return;
+  }
   const el = {
     id: uid(), kind: kind, text: kind === "emoji" ? "✨" : "Your text",
     symbolName: "star.fill", x: 0.5, y: 0.5,
@@ -1603,34 +1747,81 @@ function addElement(kind) {
     colorHex: "#FFFFFF", opacity: kind === "shape" ? 0.25 : 1
   };
   if (kind === "shape") { el.shape = "rect"; el.w = 0.5; el.h = 0.25; }
+  if (kind === "text") { el.w = 0; el.align = "center"; el.bold = true; }
   if (kind === "countdown") { el.dateISO = isoInDays(30); }
   current.canvasElements.push(el);
   selectedElId = el.id;
-  renderFreestyleUI();
-  renderPreview();
+  refreshEditors();
 }
-function renderFreestyleUI() {
-  const tools = document.getElementById("freestyleTools");
-  tools.style.display = current.kind === "freestyle" ? "block" : "none";
-  if (current.kind !== "freestyle") return;
 
-  const palette = document.getElementById("palette");
-  palette.innerHTML = "";
-  for (const [kind, label] of [["text", "Text"], ["clock", "🕐 Clock"], ["date", "📅 Date"],
-       ["emoji", "✨ Emoji"], ["shape", "▢ Shape"], ["battery", "🔋 Battery"], ["countdown", "⏳ Countdown"]]) {
+document.getElementById("photoInput").onchange = function (event) {
+  const file = event.target.files[0];
+  event.target.value = "";
+  if (!file || !pendingPhoto) { pendingPhoto = null; return; }
+  const job = pendingPhoto;
+  pendingPhoto = null;
+  const reader = new FileReader();
+  reader.onload = function () {
+    const img = new Image();
+    img.onload = function () {
+      // Downscale so designs stay small enough for localStorage + Scriptable.
+      const maxSide = 512;
+      const ratio = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const cw = Math.max(1, Math.round(img.width * ratio));
+      const ch = Math.max(1, Math.round(img.height * ratio));
+      const c = document.createElement("canvas");
+      c.width = cw; c.height = ch;
+      c.getContext("2d").drawImage(img, 0, 0, cw, ch);
+      const dataUrl = c.toDataURL("image/jpeg", 0.82);
+      if (job.mode === "replace" && job.el) {
+        job.el.dataUrl = dataUrl;
+        job.el.aspect = ch / cw;
+      } else {
+        const el = {
+          id: uid(), kind: "photo", dataUrl: dataUrl, aspect: ch / cw,
+          x: 0.5, y: 0.5, w: 0.55, shape: "rounded", opacity: 1,
+          size: 18, text: "", symbolName: "star.fill", colorHex: "#FFFFFF"
+        };
+        current.canvasElements.push(el);
+        selectedElId = el.id;
+      }
+      refreshEditors();
+      toast("Photo added — drag it into place 🖼");
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+};
+
+function labelForElement(el) {
+  if (el.kind === "text") return "🅃 " + (el.text || "Text").slice(0, 10);
+  if (el.kind === "photo") return "🖼 Photo";
+  if (el.kind === "clock") return "🕐 Clock";
+  if (el.kind === "date") return "📅 Date";
+  if (el.kind === "emoji") return el.text || "✨";
+  if (el.kind === "symbol") return SYMBOL_EMOJI[el.symbolName] || "⭐";
+  if (el.kind === "shape") return "▢ Shape";
+  if (el.kind === "battery") return "🔋";
+  if (el.kind === "countdown") return "⏳";
+  return el.kind;
+}
+
+function buildPalette(container) {
+  container.innerHTML = "";
+  for (const pair of ELEMENT_PALETTE) {
     const button = document.createElement("button");
-    button.textContent = "+ " + label;
-    button.onclick = function () { addElement(kind); };
-    palette.appendChild(button);
+    button.textContent = "+ " + pair[1];
+    button.onclick = function () { addElement(pair[0]); };
+    container.appendChild(button);
   }
+}
 
-  const inspector = document.getElementById("inspector");
-  const hint = document.getElementById("freestyleHint");
+// Builds the full property editor for the selected element into `inspector`.
+// Shared between the inline editor and the fullscreen Studio.
+function buildInspectorContent(inspector) {
   const index = current.canvasElements.findIndex(function (e) { return e.id === selectedElId; });
   const el = index >= 0 ? current.canvasElements[index] : null;
-  if (!el) { inspector.style.display = "none"; hint.style.display = "block"; return; }
-  inspector.style.display = "block";
-  hint.style.display = "none";
+  if (!el) return false;
   inspector.innerHTML = "";
 
   function sliderRow(label, min, max, value, onInput) {
@@ -1641,7 +1832,7 @@ function renderFreestyleUI() {
     span.style.cssText = "font-size:12px;color:var(--muted);width:52px";
     const slider = document.createElement("input");
     slider.type = "range"; slider.min = min; slider.max = max; slider.value = value;
-    slider.oninput = function () { onInput(Number(slider.value)); renderPreview(); };
+    slider.oninput = function () { onInput(Number(slider.value)); refreshCanvases(); };
     row.append(span, slider);
     inspector.appendChild(row);
     return row;
@@ -1651,7 +1842,7 @@ function renderFreestyleUI() {
     const input = document.createElement("input");
     input.type = "text";
     input.value = el.text;
-    input.oninput = function () { el.text = input.value; renderPreview(); };
+    input.oninput = function () { el.text = input.value; refreshCanvases(); };
     inspector.appendChild(input);
     if (el.kind === "emoji") {
       const row = document.createElement("div");
@@ -1659,18 +1850,45 @@ function renderFreestyleUI() {
       for (const emoji of EMOJI_PICKS) {
         const button = document.createElement("button");
         button.textContent = emoji;
-        button.onclick = function () { el.text = emoji; input.value = emoji; renderPreview(); };
+        button.onclick = function () { el.text = emoji; input.value = emoji; refreshCanvases(); };
         row.appendChild(button);
       }
       inspector.appendChild(row);
     }
   }
 
+  if (el.kind === "text") {
+    // Text box: width 0 = auto single line; >0 wraps inside the box.
+    sliderRow("Box", 0, 100, Math.round((el.w || 0) * 100), function (v) { el.w = v / 100; });
+    const alignRow = document.createElement("div");
+    alignRow.className = "row align-buttons";
+    const alignLabel = document.createElement("span");
+    alignLabel.textContent = "Align";
+    alignLabel.style.cssText = "font-size:12px;color:var(--muted);width:52px";
+    alignRow.appendChild(alignLabel);
+    for (const pair of [["left", "⬅"], ["center", "⏺"], ["right", "➡"]]) {
+      const button = document.createElement("button");
+      button.textContent = pair[1];
+      button.className = (el.align || "center") === pair[0] ? "active" : "";
+      button.onclick = function () { el.align = pair[0]; refreshEditors(); };
+      alignRow.appendChild(button);
+    }
+    const boldLabel = document.createElement("label");
+    boldLabel.style.cssText = "font-size:12px;display:flex;align-items:center;gap:4px";
+    const boldCheck = document.createElement("input");
+    boldCheck.type = "checkbox";
+    boldCheck.checked = el.bold !== false;
+    boldCheck.onchange = function () { el.bold = boldCheck.checked; refreshCanvases(); };
+    boldLabel.append(boldCheck, document.createTextNode("Bold"));
+    alignRow.appendChild(boldLabel);
+    inspector.appendChild(alignRow);
+  }
+
   if (el.kind === "countdown") {
     const dateInput = document.createElement("input");
     dateInput.type = "date";
     dateInput.value = el.dateISO || "";
-    dateInput.onchange = function () { el.dateISO = dateInput.value; renderPreview(); };
+    dateInput.onchange = function () { el.dateISO = dateInput.value; refreshCanvases(); };
     inspector.appendChild(dateInput);
   }
 
@@ -1685,19 +1903,39 @@ function renderFreestyleUI() {
       shapeSelect.appendChild(option);
     }
     shapeSelect.value = el.shape || "rect";
-    shapeSelect.onchange = function () { el.shape = shapeSelect.value; renderFreestyleUI(); renderPreview(); };
+    shapeSelect.onchange = function () { el.shape = shapeSelect.value; refreshEditors(); };
     shapeRow.appendChild(shapeSelect);
     inspector.appendChild(shapeRow);
     sliderRow("Width", 2, 100, Math.round((el.w || 0.5) * 100), function (v) { el.w = v / 100; });
     if (el.shape !== "circle") {
       sliderRow("Height", 2, 100, Math.round((el.h || 0.25) * 100), function (v) { el.h = v / 100; });
     }
+  } else if (el.kind === "photo") {
+    const shapeRow = document.createElement("div");
+    shapeRow.className = "row";
+    shapeRow.style.marginTop = "8px";
+    const shapeSelect = document.createElement("select");
+    for (const [value, label] of [["rounded", "▢ Rounded"], ["rect", "◻ Square corners"], ["circle", "◯ Circle"]]) {
+      const option = document.createElement("option");
+      option.value = value; option.textContent = label;
+      shapeSelect.appendChild(option);
+    }
+    shapeSelect.value = el.shape || "rounded";
+    shapeSelect.onchange = function () { el.shape = shapeSelect.value; refreshEditors(); };
+    const replaceBtn = document.createElement("button");
+    replaceBtn.textContent = "🔄 Change photo";
+    replaceBtn.onclick = function () {
+      pendingPhoto = { mode: "replace", el: el };
+      document.getElementById("photoInput").click();
+    };
+    shapeRow.append(shapeSelect, replaceBtn);
+    inspector.appendChild(shapeRow);
+    sliderRow("Width", 5, 100, Math.round((el.w || 0.55) * 100), function (v) { el.w = v / 100; });
   } else {
     sliderRow("Size", 8, 80, el.size, function (v) { el.size = v; });
   }
 
-  if (el.kind !== "emoji") {
-    sliderRow("Opacity", 5, 100, Math.round((el.opacity || 1) * 100), function (v) { el.opacity = v / 100; });
+  if (el.kind !== "emoji" && el.kind !== "photo") {
     const colorRow = document.createElement("div");
     colorRow.className = "row";
     const colorLabel = document.createElement("span");
@@ -1706,15 +1944,19 @@ function renderFreestyleUI() {
     const colorInput = document.createElement("input");
     colorInput.type = "color";
     colorInput.value = /^#[0-9a-fA-F]{6}$/.test(el.colorHex) ? el.colorHex.toLowerCase() : "#ffffff";
-    colorInput.oninput = function () { el.colorHex = colorInput.value.toUpperCase(); renderPreview(); };
+    colorInput.oninput = function () { el.colorHex = colorInput.value.toUpperCase(); refreshCanvases(); };
     colorRow.append(colorLabel, colorInput);
     inspector.appendChild(colorRow);
+  }
+  if (el.kind !== "emoji") {
+    sliderRow("Opacity", 5, 100, Math.round((el.opacity || 1) * 100), function (v) { el.opacity = v / 100; });
   }
 
   // Layer / arrange / nudge controls.
   const arrangeRow = document.createElement("div");
   arrangeRow.className = "row";
   arrangeRow.style.marginTop = "8px";
+  arrangeRow.style.flexWrap = "wrap";
   function smallButton(label, title, disabled, onClick) {
     const button = document.createElement("button");
     button.textContent = label;
@@ -1731,32 +1973,167 @@ function renderFreestyleUI() {
       copy.y = Math.min(copy.y + 0.05, 1);
       current.canvasElements.push(copy);
       selectedElId = copy.id;
-      renderFreestyleUI(); renderPreview();
+      refreshEditors();
     }),
     smallButton("⬆︎", "Bring forward", index === current.canvasElements.length - 1, function () {
       const t = current.canvasElements[index + 1];
       current.canvasElements[index + 1] = current.canvasElements[index];
       current.canvasElements[index] = t;
-      renderFreestyleUI(); renderPreview();
+      refreshEditors();
     }),
     smallButton("⬇︎", "Send back", index === 0, function () {
       const t = current.canvasElements[index - 1];
       current.canvasElements[index - 1] = current.canvasElements[index];
       current.canvasElements[index] = t;
-      renderFreestyleUI(); renderPreview();
+      refreshEditors();
     }),
-    smallButton("◀", "Nudge left", false, function () { el.x = Math.max(el.x - 0.01, 0); renderPreview(); }),
-    smallButton("▲", "Nudge up", false, function () { el.y = Math.max(el.y - 0.01, 0); renderPreview(); }),
-    smallButton("▼", "Nudge down", false, function () { el.y = Math.min(el.y + 0.01, 1); renderPreview(); }),
-    smallButton("▶", "Nudge right", false, function () { el.x = Math.min(el.x + 0.01, 1); renderPreview(); }),
+    smallButton("◀", "Nudge left", false, function () { el.x = Math.max(el.x - 0.01, 0); refreshCanvases(); }),
+    smallButton("▲", "Nudge up", false, function () { el.y = Math.max(el.y - 0.01, 0); refreshCanvases(); }),
+    smallButton("▼", "Nudge down", false, function () { el.y = Math.min(el.y + 0.01, 1); refreshCanvases(); }),
+    smallButton("▶", "Nudge right", false, function () { el.x = Math.min(el.x + 0.01, 1); refreshCanvases(); }),
     smallButton("🗑", "Delete", false, function () {
       current.canvasElements.splice(index, 1);
       selectedElId = null;
-      renderFreestyleUI(); renderPreview();
+      refreshEditors();
     })
   );
   inspector.appendChild(arrangeRow);
+  return true;
 }
+
+function renderFreestyleUI() {
+  const tools = document.getElementById("freestyleTools");
+  tools.style.display = current.kind === "freestyle" ? "block" : "none";
+  if (current.kind !== "freestyle") return;
+  buildPalette(document.getElementById("palette"));
+  const inspector = document.getElementById("inspector");
+  const hint = document.getElementById("freestyleHint");
+  const hasSelection = buildInspectorContent(inspector);
+  inspector.style.display = hasSelection ? "block" : "none";
+  hint.style.display = hasSelection ? "none" : "block";
+}
+
+// ==================== Studio (fullscreen editor) ====================
+let studioOpen = false;
+let studioSize = "small";
+
+function studioScaleFor(dims) {
+  const stage = document.getElementById("studioStage");
+  const availW = (stage.clientWidth || window.innerWidth) - 28;
+  const availH = (stage.clientHeight || window.innerHeight * 0.4) - 28;
+  return Math.max(0.8, Math.min(availW / dims[0], availH / dims[1], 2.6));
+}
+function renderStudioCanvas() {
+  const canvas = document.getElementById("studioCanvas");
+  const dims = SIZES[studioSize];
+  const scale = studioScaleFor(dims);
+  const w = Math.round(dims[0] * scale);
+  const h = Math.round(dims[1] * scale);
+  canvas.style.width = w + "px";
+  canvas.style.height = h + "px";
+  canvas.style.borderRadius = Math.round(28 * scale * 0.75) + "px";
+  applyDesignBackground(canvas, current);
+  renderFreestyleInto(canvas, current, w, h, true);
+}
+function renderStudioUI() {
+  buildPalette(document.getElementById("studioPalette"));
+  const sizeRow = document.getElementById("studioSizeButtons");
+  sizeRow.innerHTML = "";
+  for (const key of ["small", "medium", "large"]) {
+    const button = document.createElement("button");
+    button.textContent = key === "small" ? "S" : key === "medium" ? "M" : "L";
+    button.className = studioSize === key ? "active" : "";
+    button.onclick = function () { studioSize = key; renderStudioUI(); renderStudioCanvas(); };
+    sizeRow.appendChild(button);
+  }
+  const layers = document.getElementById("studioLayers");
+  layers.innerHTML = "";
+  current.canvasElements.forEach(function (el) {
+    const chip = document.createElement("div");
+    chip.className = "layer-chip" + (el.id === selectedElId ? " active" : "");
+    if (el.kind === "photo" && el.dataUrl) {
+      const img = document.createElement("img");
+      img.src = el.dataUrl;
+      chip.appendChild(img);
+      chip.appendChild(document.createTextNode("Photo"));
+    } else {
+      chip.textContent = labelForElement(el);
+    }
+    chip.onclick = function () {
+      selectedElId = el.id === selectedElId ? null : el.id;
+      refreshEditors();
+    };
+    layers.appendChild(chip);
+  });
+  const inspector = document.getElementById("studioInspector");
+  const hint = document.getElementById("studioHint");
+  const hasSelection = buildInspectorContent(inspector);
+  inspector.style.display = hasSelection ? "block" : "none";
+  hint.style.display = hasSelection ? "none" : "block";
+}
+
+// Turn any simple widget kind into equivalent freestyle elements so the
+// Studio can edit every design.
+function convertToFreestyle(design) {
+  if (design.kind === "freestyle") return false;
+  const els = [];
+  const tc = design.textColorHex || "#FFFFFF";
+  function add(extra) {
+    els.push(Object.assign({ id: uid(), kind: "text", text: "", symbolName: "star.fill",
+      x: 0.5, y: 0.5, size: 18, colorHex: tc, opacity: 1 }, extra));
+  }
+  if (design.kind === "clock") {
+    add({ kind: "clock", y: 0.44, size: 38 });
+    add({ kind: "date", y: 0.62, size: 13 });
+  } else if (design.kind === "date") {
+    add({ kind: "date", y: 0.5, size: 17 });
+  } else if (design.kind === "countdown") {
+    add({ text: design.primaryText || design.name || "Countdown", y: 0.24, size: 13, opacity: 0.85 });
+    add({ kind: "countdown", dateISO: design.targetDate || isoInDays(30), y: 0.48, size: 44 });
+    add({ text: "days to go", y: 0.68, size: 11, opacity: 0.75 });
+  } else if (design.kind === "quote") {
+    add({ text: design.primaryText || "Add a quote", y: 0.42, size: 15, w: 0.84, align: "center", bold: true });
+    if (design.secondaryText) add({ text: "— " + design.secondaryText, y: 0.72, size: 11, opacity: 0.75 });
+  } else if (design.kind === "battery") {
+    add({ kind: "battery", y: 0.5, size: 38 });
+  } else {
+    add({ text: design.primaryText || design.name || "Your text", y: 0.5, size: 18, w: 0.84, align: "center", bold: true });
+  }
+  design.kind = "freestyle";
+  design.canvasElements = els;
+  return true;
+}
+
+function openStudio() {
+  if (current.kind === "launcher") {
+    toast("Launchers have their own editor below — Studio is for freestyle designs");
+    return;
+  }
+  const converted = convertToFreestyle(current);
+  studioOpen = true;
+  studioSize = previewSize;
+  document.getElementById("studio").classList.add("open");
+  document.body.style.overflow = "hidden";
+  refreshEditors();
+  if (converted) toast("Opened in Studio — every part is now a drag-and-drop element ✨");
+}
+function closeStudio() {
+  studioOpen = false;
+  document.getElementById("studio").classList.remove("open");
+  document.body.style.overflow = "";
+  syncControls();
+  renderAll();
+}
+document.getElementById("openStudioBtn").onclick = openStudio;
+document.getElementById("studioCanvas").addEventListener("pointerdown", function (event) {
+  if (event.target === this) { selectedElId = null; refreshEditors(); }
+});
+document.getElementById("studioCloseBtn").onclick = closeStudio;
+document.getElementById("studioSaveBtn").onclick = function () {
+  document.getElementById("saveBtn").onclick();
+  toast("Saved ✓ — find it in My Widgets");
+};
+window.addEventListener("resize", function () { if (studioOpen) renderStudioCanvas(); });
 
 // ==================== Launcher editor ====================
 let editingIconUrl = "";
@@ -2231,6 +2608,7 @@ function renderAll() {
   renderLauncherUI();
   renderPreview();
   updateMagicHint();
+  document.getElementById("openStudioBtn").style.display = current.kind === "launcher" ? "none" : "block";
 }
 function updateMagicHint() {
   document.getElementById("magicHint").textContent = getApiKey()
@@ -2397,13 +2775,65 @@ document.getElementById("remixBtn").onclick = async function () {
   }
 };
 
-function buildScript() {
+// Bakes a photo element's crop shape + opacity into a PNG so the Scriptable
+// renderer (which has no clipping or image alpha) can draw it directly.
+function bakePhoto(el) {
+  return new Promise(function (resolve) {
+    if (!el.dataUrl) { resolve(""); return; }
+    if (el.shape === "rect" && (el.opacity == null || el.opacity >= 0.999)) {
+      resolve(el.dataUrl.split(",")[1] || "");
+      return;
+    }
+    const img = new Image();
+    img.onload = function () {
+      try {
+        let sx = 0, sy = 0, sw = img.width, sh = img.height;
+        if (el.shape === "circle") {
+          const side = Math.min(sw, sh);
+          sx = (sw - side) / 2; sy = (sh - side) / 2; sw = sh = side;
+        }
+        const c = document.createElement("canvas");
+        c.width = sw; c.height = sh;
+        const ctx = c.getContext("2d");
+        ctx.globalAlpha = (el.opacity == null) ? 1 : el.opacity;
+        ctx.beginPath();
+        if (el.shape === "circle") {
+          ctx.arc(sw / 2, sh / 2, sw / 2, 0, Math.PI * 2);
+        } else if (el.shape === "rounded") {
+          const r = Math.min(sw, sh) * 0.14;
+          if (ctx.roundRect) { ctx.roundRect(0, 0, sw, sh, r); }
+          else { ctx.rect(0, 0, sw, sh); }
+        } else {
+          ctx.rect(0, 0, sw, sh);
+        }
+        ctx.clip();
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+        resolve(c.toDataURL("image/png").split(",")[1] || "");
+      } catch (e) { resolve(el.dataUrl.split(",")[1] || ""); }
+    };
+    img.onerror = function () { resolve(""); };
+    img.src = el.dataUrl;
+  });
+}
+async function buildScript() {
   const template = document.getElementById("scriptableTemplate").textContent;
-  const list = designs.length ? designs : [Object.assign(newDesign(), { name: "Clock" })];
+  const source = designs.length ? designs : [Object.assign(newDesign(), { name: "Clock" })];
+  const list = JSON.parse(JSON.stringify(source));
+  for (const design of list) {
+    for (const el of design.canvasElements || []) {
+      if (el.kind === "photo") {
+        el.b64 = await bakePhoto(el);
+        delete el.dataUrl;
+      }
+    }
+  }
   return template.replace('"__DESIGNS__"', JSON.stringify(list, null, 2)).trim() + "\n";
 }
-document.getElementById("copyScriptBtn").onclick = function () {
-  const script = buildScript();
+document.getElementById("copyScriptBtn").onclick = async function () {
+  const script = await buildScript();
+  if (script.length > 3500000) {
+    toast("⚠️ Script is very large — consider fewer/smaller photos");
+  }
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(script).then(
       function () { toast("Script copied — paste it into Scriptable"); },
@@ -2420,8 +2850,8 @@ function fallbackCopy(text) {
   area.remove();
   toast("Script copied — paste it into Scriptable");
 }
-document.getElementById("downloadScriptBtn").onclick = function () {
-  download("WidgetKing.js", buildScript(), "text/javascript");
+document.getElementById("downloadScriptBtn").onclick = async function () {
+  download("WidgetKing.js", await buildScript(), "text/javascript");
 };
 document.getElementById("exportJsonBtn").onclick = function () {
   download("widgetking-designs.json", JSON.stringify(designs, null, 2), "application/json");
