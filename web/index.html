@@ -412,7 +412,8 @@
           <span class="hint" style="flex:1">Big icons + many rows can overflow — the preview shows what fits.</span>
         </div>
         <div class="hint" id="shortcutHint" style="display:none;margin-top:8px"></div>
-        <p class="hint" style="margin-top:6px">Heads-up: iOS only allows multiple tap targets on <b>Medium and Large</b> widgets. On a Small widget, tapping anywhere opens the first app.</p>
+        <p class="hint" style="margin-top:6px">Heads-up: iOS only allows multiple tap targets on <b>Medium and Large</b> widgets. On a Small widget, tapping anywhere opens the first app. Widget taps always flash through Scriptable for a moment — that's an Apple rule for <i>every</i> widget app. For instant, no-flash launching:</p>
+        <button id="toIconMakerBtn" style="width:100%">⚡ Make these zero-flash Home Screen icons instead</button>
       </div>
       <div class="field">
         <label>Background</label>
@@ -3035,7 +3036,7 @@ function buildInspectorContent(inspector) {
     inspector.appendChild(optRow);
     const tapHint = document.createElement("p");
     tapHint.className = "hint";
-    tapHint.innerHTML = "Tappable on <b>Medium/Large</b> widgets; a Small widget opens its first app. shortcuts:// links need the one-time Shortcut setup (see the Launcher section).";
+    tapHint.innerHTML = "Tappable on <b>Medium/Large</b> widgets; a Small widget opens its first app. Widget taps flash through Scriptable for a moment (an Apple rule for every widget app) — for instant opening, use the <b>App Icon Maker</b> in the Install tab. shortcuts:// links need the one-time Shortcut setup (see the Launcher section).";
     inspector.appendChild(tapHint);
   }
 
@@ -3580,6 +3581,17 @@ function renderLauncherUI() {
   });
 }
 function setupLauncherControls() {
+  document.getElementById("toIconMakerBtn").onclick = function () {
+    const apps = current.apps || [];
+    if (apps.length === 0) { toast("Add some apps first 👇"); return; }
+    iconMakerApps = apps.map(function (app) {
+      return { label: app.label || "App", emoji: app.emoji || "" };
+    });
+    renderIconMaker();
+    switchTab("install");
+    document.getElementById("iconMakerSection").scrollIntoView({ behavior: "smooth" });
+    toast("⚡ Your apps are in the Icon Maker — pick a style, save, done");
+  };
   document.getElementById("appSearchBtn").onclick = searchAppStore;
   document.getElementById("appSearch").addEventListener("keydown", function (event) {
     if (event.key === "Enter") { event.preventDefault(); searchAppStore(); }
