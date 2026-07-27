@@ -53,6 +53,9 @@ function fontFor(style, size, bold) {
 }
 
 function themeColors(design) {
+  if (design.themeID === "custom" && design.customColors && design.customColors.length === 2) {
+    return design.customColors;
+  }
   return THEMES[design.themeID] || THEMES.midnight;
 }
 
@@ -148,7 +151,7 @@ function buildLauncher(w, design, family, tc, style) {
   const perRow = family === "small" ? 2 : 4;
   // iOS allows only one tap target on small widgets — the whole widget opens
   // the first app there; medium/large get per-icon tap targets.
-  if (family === "small" && apps[0].url) w.url = apps[0].url;
+  if (family === "small" && apps[0].url && !w.url) w.url = apps[0].url;
   w.addSpacer();
   for (let i = 0; i < apps.length; i += perRow) {
     const row = w.addStack();
@@ -194,6 +197,7 @@ function buildWidget(design) {
 
   const tc = new Color(design.textColorHex || "#FFFFFF");
   const style = design.fontStyle || "rounded";
+  if (design.tapUrl) w.url = design.tapUrl;
 
   if (design.kind === "freestyle") {
     w.setPadding(0, 0, 0, 0);

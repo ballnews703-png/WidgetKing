@@ -120,6 +120,13 @@
       browser.
     </p>
     <input type="password" id="apiKeyInput" placeholder="sk-ant-…" autocomplete="off">
+    <div class="row" style="margin-top:8px">
+      <span style="font-size:12px;color:var(--muted)">Model</span>
+      <select id="aiModel" style="flex:1">
+        <option value="claude-opus-5">Best quality — Claude Opus (~1–4¢ per widget)</option>
+        <option value="claude-haiku-4-5">Fast &amp; cheap — Claude Haiku (a fraction of a cent)</option>
+      </select>
+    </div>
   </details>
 </section>
 
@@ -168,11 +175,25 @@
         <p class="hint" style="margin-top:6px">Heads-up: iOS only allows multiple tap targets on <b>Medium and Large</b> widgets. On a Small widget, tapping anywhere opens the first app.</p>
       </div>
       <div class="field"><label>Theme</label><div class="swatches" id="themeSwatches"></div></div>
+      <div class="field" id="customTheme" style="display:none">
+        <label>Custom gradient — pick any two colors</label>
+        <div class="row">
+          <input type="color" id="bg1" value="#232526">
+          <input type="color" id="bg2" value="#8f52fa">
+        </div>
+      </div>
       <div class="field"><label>Font</label><select id="fontSelect">
         <option value="classic">Classic</option><option value="rounded" selected>Rounded</option>
         <option value="serif">Serif</option><option value="mono">Mono</option>
       </select></div>
       <div class="field"><label>Text color</label><input type="color" id="textColor" value="#ffffff"></div>
+      <div class="field" id="fTap">
+        <label>Tap action — open an app when the widget is tapped (optional)</label>
+        <div class="row">
+          <select id="tapPreset" style="flex:1"><option value="">None</option></select>
+          <input type="text" id="tapUrlInput" placeholder="or custom URL / scheme" style="flex:1.4">
+        </div>
+      </div>
       <div class="row">
         <button class="primary" id="saveBtn">Save design</button>
         <button id="newBtn">New</button>
@@ -235,7 +256,10 @@ function fontFor(style, size, bold) {
   if (style === "classic") return bold ? Font.boldSystemFont(size) : Font.systemFont(size);
   return bold ? Font.boldRoundedSystemFont(size) : Font.regularRoundedSystemFont(size);
 }
-function themeColors(d) { return THEMES[d.themeID] || THEMES.midnight; }
+function themeColors(d) {
+  if (d.themeID === "custom" && d.customColors && d.customColors.length === 2) return d.customColors;
+  return THEMES[d.themeID] || THEMES.midnight;
+}
 function daysUntil(iso) {
   if (!iso) return 0;
   const p = iso.split("-").map(Number);
@@ -293,7 +317,7 @@ function buildLauncher(w, design, family, tc, style) {
   const apps = (design.apps || []).slice(0, 12);
   if (apps.length === 0) { centeredText(w, "Add apps in the designer", fontFor(style, 13, true), tc); return; }
   const perRow = family === "small" ? 2 : 4;
-  if (family === "small" && apps[0].url) w.url = apps[0].url;
+  if (family === "small" && apps[0].url && !w.url) w.url = apps[0].url;
   w.addSpacer();
   for (let i = 0; i < apps.length; i += perRow) {
     const row = w.addStack();
@@ -336,6 +360,7 @@ function buildWidget(design) {
   w.backgroundGradient = g;
   const tc = new Color(design.textColorHex || "#FFFFFF");
   const style = design.fontStyle || "rounded";
+  if (design.tapUrl) w.url = design.tapUrl;
   if (design.kind === "freestyle") {
     w.setPadding(0, 0, 0, 0);
     w.backgroundImage = drawFreestyle(design, family);
@@ -496,8 +521,15 @@ function newDesign() {
   return {
     id: uid(), name: "My Widget", kind: "clock", themeID: "midnight",
     fontStyle: "rounded", textColorHex: "#FFFFFF", primaryText: "",
-    secondaryText: "", targetDate: "", canvasElements: [], apps: []
+    secondaryText: "", targetDate: "", canvasElements: [], apps: [],
+    customColors: null, tapUrl: ""
   };
+}
+function themeOf(design) {
+  if (design.themeID === "custom" && design.customColors && design.customColors.length === 2) {
+    return design.customColors;
+  }
+  return THEMES[design.themeID] || THEMES.midnight;
 }
 
 let designs = loadDesigns();
@@ -731,6 +763,12 @@ const AI_SCHEMA = {
     primaryText: { type: "string", description: "Quote/note text or countdown title; empty if unused" },
     secondaryText: { type: "string", description: "Quote author; empty if unused" },
     targetDate: { type: "string", description: "yyyy-MM-dd for countdowns; empty otherwise" },
+    backgroundColors: {
+      type: "array",
+      description: "Exactly two #RRGGBB colors for a custom gradient background when the preset themes don't match the request; empty array to use themeID",
+      items: { type: "string" }
+    },
+    tapUrl: { type: "string", description: "Optional URL scheme to open when the whole widget is tapped (e.g. spotify://); empty if none" },
     apps: {
       type: "array",
       description: "For launcher widgets only, max 8; empty otherwise",
@@ -763,7 +801,7 @@ const AI_SCHEMA = {
       }
     }
   },
-  required: ["name", "kind", "themeID", "fontStyle", "textColorHex", "primaryText", "secondaryText", "targetDate", "apps", "canvasElements"],
+  required: ["name", "kind", "themeID", "fontStyle", "textColorHex", "primaryText", "secondaryText", "targetDate", "backgroundColors", "tapUrl", "apps", "canvasElements"],
   additionalProperties: false
 };
 
@@ -775,6 +813,8 @@ function aiSystemPrompt() {
     "freestyle (compose elements on a canvas — use it for creative/decorated requests, placing elements thoughtfully with normalized 0-1 coordinates).\n" +
     "Themes: " + Object.keys(THEMES).join(", ") + ". 'paper' is light (use dark text like #333333); the rest are dark (use light text).\n" +
     "Common app URL schemes: instagram://, spotify://, youtube://, tiktok://, twitter://, snapchat://, whatsapp://, fb://, reddit://, googlegmail://, googlechrome://, nflx://, music://, maps://, calshow://, mobilenotes://, shortcuts://, tel://, sms://, mailto:, photos-redirect://, camera://.\n" +
+    "If the requested colors don't match a preset theme, set backgroundColors to two #RRGGBB colors for a custom gradient. " +
+    "Set tapUrl when the user wants the widget to open an app on tap.\n" +
     "Today is " + today + ". Resolve relative dates to yyyy-MM-dd. Keep names under 24 chars. Fill unused fields with empty strings or empty arrays.";
 }
 
@@ -788,7 +828,7 @@ async function callClaude(idea, key) {
       "anthropic-dangerous-direct-browser-access": "true"
     },
     body: JSON.stringify({
-      model: "claude-opus-5",
+      model: localStorage.getItem("widgetking.aimodel") || "claude-opus-5",
       max_tokens: 16000,
       system: aiSystemPrompt(),
       output_config: { format: { type: "json_schema", schema: AI_SCHEMA } },
@@ -817,6 +857,12 @@ function specToDesign(spec) {
   design.primaryText = spec.primaryText || "";
   design.secondaryText = spec.secondaryText || "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(spec.targetDate || "")) design.targetDate = spec.targetDate;
+  const bg = (spec.backgroundColors || []).filter(function (c) { return /^#[0-9a-fA-F]{6}$/.test(c); });
+  if (bg.length === 2) {
+    design.themeID = "custom";
+    design.customColors = [bg[0].toUpperCase(), bg[1].toUpperCase()];
+  }
+  design.tapUrl = (spec.tapUrl || "").trim();
   design.apps = (spec.apps || []).slice(0, 8).map(function (app) {
     return { emoji: app.emoji || "🌐", label: (app.label || "App").slice(0, 12), url: app.url || "" };
   });
@@ -843,7 +889,7 @@ function renderPreview() {
   const [w, h] = SIZES[previewSize];
   canvas.style.width = w + "px";
   canvas.style.height = h + "px";
-  const theme = THEMES[current.themeID] || THEMES.midnight;
+  const theme = themeOf(current);
   canvas.style.background = "linear-gradient(135deg, " + theme[0] + ", " + theme[1] + ")";
   canvas.style.color = current.textColorHex;
   canvas.style.fontFamily = FONT_CSS[current.fontStyle] || FONT_CSS.rounded;
@@ -1031,7 +1077,38 @@ function renderLauncherUI() {
   (current.apps || []).forEach(function (app, index) {
     const tag = document.createElement("div");
     tag.className = "app-tag";
-    tag.append(document.createTextNode((app.emoji || "🌐") + " " + (app.label || "App")));
+    const textSpan = document.createElement("span");
+    textSpan.textContent = (app.emoji || "🌐") + " " + (app.label || "App");
+    textSpan.style.cursor = "pointer";
+    textSpan.title = "Tap to edit";
+    textSpan.onclick = function () {
+      document.getElementById("customEmoji").value = app.emoji || "";
+      document.getElementById("customLabel").value = app.label || "";
+      document.getElementById("customUrl").value = app.url || "";
+      current.apps.splice(index, 1);
+      renderLauncherUI();
+      renderPreview();
+      toast("Editing " + (app.label || "app") + " — tweak the fields below and press Add");
+    };
+    tag.appendChild(textSpan);
+    const left = document.createElement("button");
+    left.textContent = "◀";
+    left.disabled = index === 0;
+    left.onclick = function () {
+      const t = current.apps[index - 1];
+      current.apps[index - 1] = current.apps[index];
+      current.apps[index] = t;
+      renderLauncherUI(); renderPreview();
+    };
+    const right = document.createElement("button");
+    right.textContent = "▶";
+    right.disabled = index === current.apps.length - 1;
+    right.onclick = function () {
+      const t = current.apps[index + 1];
+      current.apps[index + 1] = current.apps[index];
+      current.apps[index] = t;
+      renderLauncherUI(); renderPreview();
+    };
     const remove = document.createElement("button");
     remove.textContent = "✕";
     remove.onclick = function () {
@@ -1039,7 +1116,7 @@ function renderLauncherUI() {
       renderLauncherUI();
       renderPreview();
     };
-    tag.appendChild(remove);
+    tag.append(left, right, remove);
     list.appendChild(tag);
   });
 }
@@ -1096,6 +1173,8 @@ function syncControls() {
   document.getElementById("quoteText").value = current.kind === "quote" ? current.primaryText : "";
   document.getElementById("quoteAuthor").value = current.secondaryText || "";
   document.getElementById("noteText").value = current.kind === "note" ? current.primaryText : "";
+  document.getElementById("tapUrlInput").value = current.tapUrl || "";
+  document.getElementById("tapPreset").value = "";
 }
 function renderControls() {
   const kindButtons = document.getElementById("kindButtons");
@@ -1133,6 +1212,22 @@ function renderControls() {
     swatch.onclick = function () { current.themeID = id; renderAll(); };
     swatches.appendChild(swatch);
   }
+  const customSwatch = document.createElement("div");
+  customSwatch.className = "swatch" + (current.themeID === "custom" ? " active" : "");
+  customSwatch.title = "Custom colors";
+  customSwatch.style.background = "conic-gradient(#ff5f5f, #ffd75f, #6dff8a, #5fd0ff, #b06dff, #ff5f5f)";
+  customSwatch.onclick = function () {
+    current.themeID = "custom";
+    if (!current.customColors) current.customColors = ["#232526", "#8F52FA"];
+    renderAll();
+  };
+  swatches.appendChild(customSwatch);
+  document.getElementById("customTheme").style.display = current.themeID === "custom" ? "block" : "none";
+  if (current.themeID === "custom" && current.customColors) {
+    document.getElementById("bg1").value = current.customColors[0].toLowerCase();
+    document.getElementById("bg2").value = current.customColors[1].toLowerCase();
+  }
+  document.getElementById("fTap").style.display = current.kind === "launcher" ? "none" : "block";
 
   const sizeButtons = document.getElementById("sizeButtons");
   sizeButtons.innerHTML = "";
@@ -1154,7 +1249,7 @@ function renderLibrary() {
   for (const design of designs) {
     const item = document.createElement("div");
     item.className = "lib-item";
-    const theme = THEMES[design.themeID] || THEMES.midnight;
+    const theme = themeOf(design);
     item.innerHTML =
       '<div class="lib-thumb" style="background:linear-gradient(135deg,' + theme[0] + "," + theme[1] + ')">' + (KIND_ICONS[design.kind] || "🧩") + '</div>' +
       '<div><div class="name">' + esc(design.name) + '</div><div class="kind">' + esc(design.kind) + '</div></div>' +
@@ -1224,6 +1319,39 @@ apiKeyInput.oninput = function () {
   localStorage.setItem("widgetking.apikey", apiKeyInput.value.trim());
   updateMagicHint();
 };
+const aiModelSelect = document.getElementById("aiModel");
+aiModelSelect.value = localStorage.getItem("widgetking.aimodel") || "claude-opus-5";
+aiModelSelect.onchange = function () {
+  localStorage.setItem("widgetking.aimodel", aiModelSelect.value);
+};
+
+function setCustomColor(index, value) {
+  if (!current.customColors) current.customColors = ["#232526", "#8F52FA"];
+  current.customColors[index] = value.toUpperCase();
+  renderPreview();
+  renderLibrary();
+}
+document.getElementById("bg1").oninput = function (e) { setCustomColor(0, e.target.value); };
+document.getElementById("bg2").oninput = function (e) { setCustomColor(1, e.target.value); };
+
+const tapPreset = document.getElementById("tapPreset");
+(function () {
+  const added = new Set();
+  for (const key of Object.keys(APP_PRESETS)) {
+    const preset = APP_PRESETS[key];
+    if (added.has(preset.label)) continue;
+    added.add(preset.label);
+    const option = document.createElement("option");
+    option.value = preset.url;
+    option.textContent = preset.emoji + " " + preset.label;
+    tapPreset.appendChild(option);
+  }
+})();
+tapPreset.onchange = function () {
+  current.tapUrl = tapPreset.value;
+  document.getElementById("tapUrlInput").value = tapPreset.value;
+};
+document.getElementById("tapUrlInput").oninput = function (e) { current.tapUrl = e.target.value.trim(); };
 
 const magicChips = document.getElementById("magicChips");
 for (const example of EXAMPLES) {
