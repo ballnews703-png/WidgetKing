@@ -209,6 +209,8 @@
   <div id="studioHead">
     <span class="title">🎨 Studio</span>
     <div class="row size-buttons" id="studioSizeButtons" style="margin:0"></div>
+    <button id="studioUndoBtn" disabled>↩︎</button>
+    <button id="studioRedoBtn" disabled>↪︎</button>
     <button id="studioSaveBtn" class="primary">💾 Save</button>
     <button id="studioCloseBtn">✕ Done</button>
   </div>
@@ -227,6 +229,10 @@
     <div id="canvasWrap">
       <div id="canvas"></div>
       <div class="row size-buttons" id="sizeButtons"></div>
+      <div class="row" style="justify-content:center">
+        <button id="undoBtn" disabled>↩︎ Undo</button>
+        <button id="redoBtn" disabled>↪︎ Redo</button>
+      </div>
       <button id="openStudioBtn" style="width:100%;max-width:380px">🎨 Open Studio — full-screen drag &amp; drop editor</button>
       <div id="freestyleTools" style="display:none; width: 100%; max-width: 380px;">
         <div class="chips" id="palette"></div>
@@ -1997,6 +2003,7 @@ function renderFreestyleInto(node, design, w, h, interactive) {
   }
 }
 function renderPreview() {
+  recordHistory();
   const canvas = document.getElementById("canvas");
   const dims = SIZES[previewSize];
   canvas.style.width = dims[0] + "px";
@@ -2025,6 +2032,75 @@ function makeThumb(design, scale) {
   outer.appendChild(inner);
   return outer;
 }
+
+// ==================== Undo / redo ====================
+// Snapshot history of the design being edited. Every mutation path ends in
+// renderPreview(), which schedules a debounced capture — so a drag, a slider
+// sweep, or a burst of typing collapses into one undo step.
+let undoStack = [], redoStack = [];
+let lastCommitted = null;
+let historyTimer = null;
+const HISTORY_MAX = 60;
+
+function recordHistory() {
+  clearTimeout(historyTimer);
+  historyTimer = setTimeout(function () {
+    const snap = JSON.stringify(current);
+    if (lastCommitted === null) { lastCommitted = snap; updateUndoUI(); return; }
+    if (snap === lastCommitted) return;
+    undoStack.push(lastCommitted);
+    if (undoStack.length > HISTORY_MAX) undoStack.shift();
+    redoStack = [];
+    lastCommitted = snap;
+    updateUndoUI();
+  }, 350);
+}
+function restoreSnapshot(snap) {
+  current = normalizeDesign(JSON.parse(snap));
+  lastCommitted = snap;
+  selectedElId = null;
+  syncControls();
+  renderAll();
+  if (studioOpen) { renderStudioUI(); renderStudioCanvas(); }
+  updateUndoUI();
+}
+function doUndo() {
+  clearTimeout(historyTimer);
+  const snap = JSON.stringify(current);
+  if (lastCommitted !== null && snap !== lastCommitted) {
+    // Uncommitted edits pending — undo returns to the last committed state.
+    redoStack.push(snap);
+    restoreSnapshot(lastCommitted);
+    return;
+  }
+  if (undoStack.length === 0) return;
+  redoStack.push(snap);
+  restoreSnapshot(undoStack.pop());
+}
+function doRedo() {
+  clearTimeout(historyTimer);
+  if (redoStack.length === 0) return;
+  undoStack.push(JSON.stringify(current));
+  restoreSnapshot(redoStack.pop());
+}
+function updateUndoUI() {
+  const pending = lastCommitted !== null && JSON.stringify(current) !== lastCommitted;
+  const canUndo = undoStack.length > 0 || pending;
+  const canRedo = redoStack.length > 0;
+  for (const id of ["undoBtn", "studioUndoBtn"]) document.getElementById(id).disabled = !canUndo;
+  for (const id of ["redoBtn", "studioRedoBtn"]) document.getElementById(id).disabled = !canRedo;
+}
+document.getElementById("undoBtn").onclick = doUndo;
+document.getElementById("redoBtn").onclick = doRedo;
+document.getElementById("studioUndoBtn").onclick = doUndo;
+document.getElementById("studioRedoBtn").onclick = doRedo;
+window.addEventListener("keydown", function (event) {
+  if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z") return;
+  const tag = (document.activeElement && document.activeElement.tagName) || "";
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+  event.preventDefault();
+  if (event.shiftKey) doRedo(); else doUndo();
+});
 
 // Re-render helpers shared by the inline editor and the Studio overlay.
 function refreshCanvases() {
