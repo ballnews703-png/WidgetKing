@@ -130,6 +130,18 @@
         <option value="claude-haiku-4-5">Fast &amp; cheap — Claude Haiku (a fraction of a cent)</option>
       </select>
     </div>
+    <div class="row" style="margin-top:8px">
+      <span style="font-size:12px;color:var(--muted)">Budget $</span>
+      <input type="text" id="budgetInput" inputmode="decimal" style="width:64px">
+      <span id="spendReadout" style="font-size:12px;color:var(--muted);flex:1"></span>
+      <button id="resetSpend">Reset</button>
+    </div>
+    <p class="hint" style="margin-top:6px">
+      The designer tallies each request's real token usage and stops calling
+      Claude once your budget is reached. For a hard guarantee, load only $5 of
+      credit in your Anthropic account and leave auto-reload off — prepaid
+      credits can never overspend.
+    </p>
   </details>
 </section>
 
@@ -619,6 +631,30 @@ function toast(message) {
 }
 function getApiKey() { return (localStorage.getItem("widgetking.apikey") || "").trim(); }
 
+// ==================== AI budget tracking ====================
+// Per-million-token prices [input, output] in USD.
+const PRICES = { "claude-opus-5": [5, 25], "claude-haiku-4-5": [1, 5] };
+function getSpend() { return Number(localStorage.getItem("widgetking.spend") || 0) || 0; }
+function getBudget() {
+  const budget = Number(localStorage.getItem("widgetking.budget"));
+  return isFinite(budget) && budget > 0 ? budget : 5;
+}
+function addSpend(model, usage) {
+  const price = PRICES[model] || PRICES["claude-opus-5"];
+  const cost = (
+    (usage.input_tokens || 0) * price[0] +
+    (usage.output_tokens || 0) * price[1] +
+    (usage.cache_read_input_tokens || 0) * price[0] * 0.1 +
+    (usage.cache_creation_input_tokens || 0) * price[0] * 1.25
+  ) / 1e6;
+  localStorage.setItem("widgetking.spend", String(getSpend() + cost));
+  updateSpendUI();
+}
+function updateSpendUI() {
+  const readout = document.getElementById("spendReadout");
+  if (readout) readout.textContent = "spent ≈ $" + getSpend().toFixed(3) + " of $" + getBudget().toFixed(2);
+}
+
 // ==================== Magic: local parser ====================
 function parseIdea(idea) {
   const lower = idea.toLowerCase();
@@ -888,6 +924,10 @@ function aiSystemPrompt() {
 }
 
 async function callClaude(idea, key) {
+  if (getSpend() >= getBudget()) {
+    throw new Error("AI budget reached ($" + getBudget().toFixed(2) + ") — raise the budget in the AI section to keep using Claude");
+  }
+  const model = localStorage.getItem("widgetking.aimodel") || "claude-opus-5";
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -897,7 +937,7 @@ async function callClaude(idea, key) {
       "anthropic-dangerous-direct-browser-access": "true"
     },
     body: JSON.stringify({
-      model: localStorage.getItem("widgetking.aimodel") || "claude-opus-5",
+      model: model,
       max_tokens: 16000,
       system: aiSystemPrompt(),
       output_config: { format: { type: "json_schema", schema: AI_SCHEMA } },
@@ -910,6 +950,7 @@ async function callClaude(idea, key) {
     throw new Error(message);
   }
   const data = await response.json();
+  if (data.usage) addSpend(model, data.usage);
   if (data.stop_reason === "refusal") throw new Error("Claude declined this request");
   const block = (data.content || []).find(function (b) { return b.type === "text"; });
   if (!block) throw new Error("Empty response from Claude");
@@ -1517,6 +1558,23 @@ aiModelSelect.value = localStorage.getItem("widgetking.aimodel") || "claude-opus
 aiModelSelect.onchange = function () {
   localStorage.setItem("widgetking.aimodel", aiModelSelect.value);
 };
+
+const budgetInput = document.getElementById("budgetInput");
+budgetInput.value = getBudget().toFixed(2);
+budgetInput.onchange = function () {
+  const value = Number(budgetInput.value);
+  if (isFinite(value) && value > 0) {
+    localStorage.setItem("widgetking.budget", String(value));
+  }
+  budgetInput.value = getBudget().toFixed(2);
+  updateSpendUI();
+};
+document.getElementById("resetSpend").onclick = function () {
+  localStorage.setItem("widgetking.spend", "0");
+  updateSpendUI();
+  toast("Spend counter reset");
+};
+updateSpendUI();
 
 function setCustomColor(index, value) {
   if (!current.customColors) current.customColors = ["#232526", "#8F52FA"];
