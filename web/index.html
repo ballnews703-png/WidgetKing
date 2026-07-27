@@ -500,6 +500,27 @@ function loadPrefs() {
 function savePrefs(prefs) {
   try { FileManager.local().writeString(prefsPath(), JSON.stringify(prefs)); } catch (e) {}
 }
+// True widget dimensions in points for THIS device, derived from the
+// measured pixel frames (frame px / screen scale). Assuming a generic size
+// makes iOS stretch the layout — the spacing then looks nothing like the
+// designer preview.
+function widgetPointSizes(family) {
+  try {
+    const scale = Device.screenScale();
+    const size = Device.screenSize();
+    const hPx = Math.round(Math.max(size.width, size.height) * scale);
+    const entry = SCREEN_FRAMES[String(hPx)];
+    if (entry) {
+      const f = (loadPrefs().iconLabels === false && entry.nolabels) ? entry.nolabels : entry.labels;
+      const small = f[0] / scale, med = f[1] / scale, large = f[2] / scale;
+      if (family === "medium") return [med, small];
+      if (family === "large") return [med, large];
+      return [small, small];
+    }
+  } catch (e) {}
+  const PT = { small: [155, 155], medium: [329, 155], large: [329, 345] };
+  return PT[family] || PT.small;
+}
 function widgetRect(imgW, imgH, family, position) {
   const pos = position || (family === "small" ? "top-left" : "top");
   const posParts = pos.split("-");
@@ -642,9 +663,11 @@ function backgroundImageFor(design, family, position) {
 }
 
 function drawFreestyle(design, family, bgImg) {
-  const sizes = { small: [474, 474], medium: [1014, 474], large: [1014, 1062] };
-  const dims = sizes[family] || sizes.small;
-  const W = dims[0], H = dims[1];
+  // Draw at the device's true widget size (in pixels) so nothing stretches.
+  const pts = widgetPointSizes(family);
+  let s = 3;
+  try { s = Device.screenScale() || 3; } catch (e) {}
+  const W = Math.round(pts[0] * s), H = Math.round(pts[1] * s);
   const ctx = new DrawContext();
   ctx.size = new Size(W, H); ctx.opaque = false; ctx.respectScreenScale = false;
   if (bgImg) {
@@ -733,8 +756,7 @@ function drawFreestyle(design, family, bgImg) {
 async function addFreestyleApps(w, design, family) {
   const apps = (design.canvasElements || []).filter(function (el) { return el.kind === "app"; });
   if (apps.length === 0) return;
-  const PT = { small: [155, 155], medium: [329, 155], large: [329, 345] };
-  const dims = PT[family] || PT.small;
+  const dims = widgetPointSizes(family);
   const W = dims[0], H = dims[1];
   if (family === "small" && !w.url && apps[0].url) w.url = apps[0].url;
   // Group into rows: elements whose vertical centers overlap share a row.
@@ -831,8 +853,7 @@ async function buildLauncher(w, design, family, tc, style) {
   // Deterministic layout: every margin and gap is a computed fixed number of
   // points — the same math the designer preview uses — because flexible
   // spacers distribute differently across iOS versions (preview mismatch).
-  const PT = { small: [155, 155], medium: [329, 155], large: [329, 345] };
-  const dims = PT[family] || PT.small;
+  const dims = widgetPointSizes(family);
   const W = dims[0], H = dims[1];
   const pad = 12;
   const rowGap = 10;
