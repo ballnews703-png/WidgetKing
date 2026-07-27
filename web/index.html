@@ -226,14 +226,28 @@
         <label style="margin-top:10px">Icon style</label>
         <div class="row">
           <span style="font-size:12px;color:var(--muted)">Size</span>
-          <input type="range" id="iconSize" min="22" max="44" style="flex:1">
+          <input type="range" id="iconSize" min="16" max="96" style="flex:1">
+          <span id="iconSizeVal" style="font-size:12px;color:var(--muted);min-width:30px;text-align:right">30</span>
           <select id="iconShape" style="width:110px">
             <option value="rounded">Rounded</option>
             <option value="circle">Circle</option>
           </select>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <span style="font-size:12px;color:var(--muted)">Per row</span>
+          <select id="iconColumns" style="width:90px">
+            <option value="0">Auto</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+          </select>
           <label style="font-size:12px;display:flex;align-items:center;gap:4px">
             <input type="checkbox" id="showLabels" checked> Labels
           </label>
+          <span class="hint" style="flex:1">Big icons + many rows can overflow — the preview shows what fits.</span>
         </div>
         <div class="hint" id="shortcutHint" style="display:none;margin-top:8px"></div>
         <p class="hint" style="margin-top:6px">Heads-up: iOS only allows multiple tap targets on <b>Medium and Large</b> widgets. On a Small widget, tapping anywhere opens the first app.</p>
@@ -381,30 +395,77 @@ function loadWallpaper() {
   } catch (e) {}
   return null;
 }
-// Approximate iOS widget frames as proportions of the wallpaper screenshot.
-// Clear mode looks best when the widget's position parameter is set.
+// Exact widget frames per iPhone, measured by the Scriptable community
+// (mzeryck's Widget Blur data), keyed by the screenshot's pixel height.
+// Each frame: [small, medium, large, left, right, top, middle, bottom].
+// "labels" = normal Home Screen; "nolabels" = iOS Large-icons mode (labels
+// hidden), which shifts the whole grid — toggle it in the in-app menu.
+const SCREEN_FRAMES = {
+  "2868": { labels: [510, 1092, 1146, 114, 696, 276, 912, 1548], nolabels: [530, 1138, 1136, 91, 699, 276, 882, 1488] },
+  "2796": { labels: [510, 1092, 1146, 98, 681, 252, 888, 1524], nolabels: [530, 1139, 1136, 75, 684, 252, 858, 1464] },
+  "2622": { labels: [486, 1032, 1098, 87, 633, 261, 872, 1485], nolabels: [495, 1037, 1035, 84, 626, 270, 810, 1350] },
+  "2556": { labels: [474, 1017, 1062, 81, 624, 240, 828, 1416], nolabels: [495, 1047, 1047, 66, 618, 243, 795, 1347] },
+  "2778": { labels: [510, 1092, 1146, 96, 678, 246, 882, 1518] },
+  "2688": { labels: [507, 1080, 1137, 81, 654, 228, 858, 1488] },
+  "2532": { labels: [474, 1014, 1062, 78, 618, 231, 819, 1407] },
+  "2436": { labels: [465, 987, 1035, 69, 591, 213, 783, 1353] },
+  "2079": { labels: [423, 875, 933, 42, 494, 186, 696, 1206] },
+  "1792": { labels: [338, 720, 758, 55, 437, 159, 579, 999] },
+  "1624": { labels: [310, 658, 690, 46, 394, 142, 522, 902] },
+  "1334": { labels: [296, 642, 648, 54, 400, 60, 412, 764], nolabels: [309, 667, 667, 41, 399, 67, 425, 783] }
+};
+function prefsPath() {
+  const fm = FileManager.local();
+  return fm.joinPath(fm.documentsDirectory(), "widgetking-prefs.json");
+}
+function loadPrefs() {
+  try {
+    const fm = FileManager.local();
+    if (fm.fileExists(prefsPath())) return JSON.parse(fm.readString(prefsPath())) || {};
+  } catch (e) {}
+  return {};
+}
+function savePrefs(prefs) {
+  try { FileManager.local().writeString(prefsPath(), JSON.stringify(prefs)); } catch (e) {}
+}
 function widgetRect(imgW, imgH, family, position) {
-  const sw = Math.round(imgW * 0.402);
-  const gap = Math.round((imgW - 2 * sw) / 3);
-  const mw = imgW - 2 * gap;
-  const top = Math.round(imgH * 0.0965);
-  const rowStep = sw + gap;
-  const rows = { top: top, middle: top + rowStep, bottom: top + 2 * rowStep };
   const pos = position || (family === "small" ? "top-left" : "top");
   const posParts = pos.split("-");
   const row = posParts[0] || "top";
   const side = posParts[1] || "left";
-  let x = gap;
-  let y = rows[row] != null ? rows[row] : rows.top;
-  let w = sw, h = sw;
-  if (family === "small") {
-    x = side === "right" ? gap * 2 + sw : gap;
-  } else if (family === "medium") {
-    w = mw;
+  const entry = SCREEN_FRAMES[String(Math.round(imgH))];
+  let x, y, w, h, rows;
+  if (entry) {
+    const f = (loadPrefs().iconLabels === false && entry.nolabels) ? entry.nolabels : entry.labels;
+    rows = { top: f[5], middle: f[6], bottom: f[7] };
+    x = f[3];
+    w = h = f[0];
+    if (family === "small") {
+      x = side === "right" ? f[4] : f[3];
+    } else if (family === "medium") {
+      w = f[1];
+    } else if (family === "large") {
+      w = f[1]; h = f[2];
+    }
   } else {
-    w = mw; h = sw * 2 + gap;
-    if (row === "bottom") y = rows.middle;
+    // Unknown screenshot size (e.g. a scaled photo) — proportional fallback.
+    const sw = Math.round(imgW * 0.402);
+    const gap = Math.round((imgW - 2 * sw) / 3);
+    const rowStep = sw + gap;
+    const top = Math.round(imgH * 0.0965);
+    rows = { top: top, middle: top + rowStep, bottom: top + 2 * rowStep };
+    x = gap;
+    w = h = sw;
+    if (family === "small") {
+      x = side === "right" ? gap * 2 + sw : gap;
+    } else if (family === "medium") {
+      w = imgW - 2 * gap;
+    } else if (family === "large") {
+      w = imgW - 2 * gap; h = sw * 2 + gap;
+    }
   }
+  y = rows[row] != null ? rows[row] : rows.top;
+  if (family === "large" && row === "bottom") y = rows.middle;
   if (y + h > imgH) y = Math.max(0, imgH - h);
   return new Rect(x, y, w, h);
 }
@@ -549,10 +610,12 @@ async function buildLauncher(w, design, family, tc, style) {
   const apps = (design.apps || []).slice(0, 12);
   if (apps.length === 0) { centeredText(w, "Add apps in the designer", fontFor(style, 13, true), tc); return; }
   const ls = design.launcherStyle || {};
-  const iconPt = Math.min(Math.max(Number(ls.iconSize) || 30, 20), 48);
+  const iconPt = Math.min(Math.max(Number(ls.iconSize) || 30, 16), 120);
   const showLabels = ls.labels !== false;
   const radius = ls.shape === "circle" ? iconPt / 2 : Math.round(iconPt * 0.24);
-  const perRow = family === "small" ? 2 : 4;
+  const columns = Math.min(Math.max(Math.round(Number(ls.columns) || 0), 0), 6);
+  const perRow = columns > 0 ? columns : (family === "small" ? 2 : 4);
+  const labelPt = Math.min(13, Math.max(9, Math.round(iconPt * 0.22)));
   if (family === "small" && apps[0].url && !w.url) w.url = apps[0].url;
   w.addSpacer();
   for (let i = 0; i < apps.length; i += perRow) {
@@ -583,7 +646,7 @@ async function buildLauncher(w, design, family, tc, style) {
         labelRow.layoutHorizontally();
         labelRow.addSpacer();
         const label = labelRow.addText(app.label || "App");
-        label.font = fontFor(style, 9, false);
+        label.font = fontFor(style, labelPt, false);
         label.textColor = tc;
         label.textOpacity = 0.85;
         label.lineLimit = 1;
@@ -685,11 +748,14 @@ const widgetPosition = (paramParts[1] || "").trim().toLowerCase();
 
 let runPreview = true;
 if (config.runsInApp) {
+  const prefs = loadPrefs();
+  const labelsShown = prefs.iconLabels !== false;
   const menu = new Alert();
   menu.title = "WidgetKing";
   menu.message = "Glass and Clear widgets show your wallpaper. One-time setup: long-press the Home Screen, swipe to the last empty page, screenshot it — then pick that screenshot here.";
   menu.addAction("Preview a widget");
   menu.addAction("Set wallpaper photo…");
+  menu.addAction("Icon labels on Home Screen: " + (labelsShown ? "Shown" : "Hidden"));
   menu.addCancelAction("Cancel");
   const choice = await menu.presentAlert();
   if (choice === 1) {
@@ -703,6 +769,17 @@ if (config.runsInApp) {
       done.addAction("OK");
       await done.presentAlert();
     } catch (e) {}
+  } else if (choice === 2) {
+    runPreview = false;
+    prefs.iconLabels = !labelsShown;
+    savePrefs(prefs);
+    const done = new Alert();
+    done.title = "Alignment updated ✓";
+    done.message = prefs.iconLabels === false
+      ? "Clear widgets now align to the Large-icons Home Screen (labels hidden). Flip this back if you show labels again."
+      : "Clear widgets now align to the standard Home Screen (labels shown under icons).";
+    done.addAction("OK");
+    await done.presentAlert();
   } else if (choice === -1) {
     runPreview = false;
   }
@@ -809,15 +886,16 @@ function newDesign() {
     secondaryText: "", targetDate: "", canvasElements: [], apps: [],
     customColors: null, tapUrl: "", gradientDir: "diagonal",
     background: "gradient", glassTint: "dark",
-    launcherStyle: { iconSize: 30, shape: "rounded", labels: true }
+    launcherStyle: { iconSize: 30, shape: "rounded", labels: true, columns: 0 }
   };
 }
 function launcherStyleOf(design) {
   const style = design.launcherStyle || {};
   return {
-    iconSize: Math.min(Math.max(Number(style.iconSize) || 30, 22), 44),
+    iconSize: Math.min(Math.max(Number(style.iconSize) || 30, 16), 120),
     shape: style.shape === "circle" ? "circle" : "rounded",
-    labels: style.labels !== false
+    labels: style.labels !== false,
+    columns: Math.min(Math.max(Math.round(Number(style.columns) || 0), 0), 6)
   };
 }
 function themeOf(design) {
@@ -1391,7 +1469,7 @@ function designPreviewHTML(design, sizeKey) {
     const radius = style.shape === "circle" ? "50%" : Math.round(style.iconSize * 0.24) + "px";
     const iconCss = "width:" + style.iconSize + "px;height:" + style.iconSize + "px;border-radius:" + radius +
       ";font-size:" + Math.round(style.iconSize * 0.6) + "px";
-    const perRow = sizeKey === "small" ? 2 : 4;
+    const perRow = style.columns > 0 ? style.columns : (sizeKey === "small" ? 2 : 4);
     let grid = '<div class="launch-grid" style="grid-template-columns:repeat(' + perRow + ',1fr)">';
     for (const app of apps.slice(0, 12)) {
       const inner = app.iconUrl
@@ -1743,8 +1821,10 @@ function renderLauncherUI() {
 
   const style = launcherStyleOf(current);
   document.getElementById("iconSize").value = style.iconSize;
+  document.getElementById("iconSizeVal").textContent = style.iconSize;
   document.getElementById("iconShape").value = style.shape;
   document.getElementById("showLabels").checked = style.labels;
+  document.getElementById("iconColumns").value = String(style.columns);
 
   const shortcutApps = (current.apps || []).filter(function (app) {
     return (app.url || "").indexOf("shortcuts://run-shortcut") === 0;
@@ -1822,6 +1902,12 @@ function setupLauncherControls() {
   document.getElementById("iconSize").oninput = function (e) {
     current.launcherStyle = launcherStyleOf(current);
     current.launcherStyle.iconSize = Number(e.target.value);
+    document.getElementById("iconSizeVal").textContent = e.target.value;
+    renderPreview();
+  };
+  document.getElementById("iconColumns").onchange = function (e) {
+    current.launcherStyle = launcherStyleOf(current);
+    current.launcherStyle.columns = Number(e.target.value);
     renderPreview();
   };
   document.getElementById("iconShape").onchange = function (e) {
@@ -2027,7 +2113,7 @@ function renderControls() {
     bgHint.innerHTML = "🧊 Glass shows a frosted, blurred slice of <b>your wallpaper</b> behind the widget (the preview here is a stand-in). One-time setup on your iPhone: screenshot your empty wallpaper page, then run the WidgetKing script inside Scriptable and choose <b>Set wallpaper photo…</b>";
   } else if (current.background === "clear") {
     bgHint.style.display = "block";
-    bgHint.innerHTML = "🫥 Clear shows the exact wallpaper slice behind the widget so it looks fully transparent. Needs the same one-time wallpaper setup as Glass, plus the widget's <b>Parameter</b> set to <b>Name | position</b> (e.g. <b>My Clock | top-left</b>) for pixel-perfect alignment.";
+    bgHint.innerHTML = "🫥 Clear shows the exact wallpaper slice behind the widget so it looks fully transparent. Needs the same one-time wallpaper setup as Glass, plus the widget's <b>Parameter</b> set to <b>Name | position</b> (e.g. <b>My Clock | top-left</b>) for pixel-perfect alignment. Alignment uses exact per-iPhone measurements — if your Home Screen <b>hides app labels</b> (Large icons), flip the toggle in the script's in-app menu.";
   } else {
     bgHint.style.display = "none";
   }
