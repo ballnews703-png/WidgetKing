@@ -145,9 +145,26 @@ function drawFreestyle(design, family) {
   return ctx.getImage();
 }
 
-function buildLauncher(w, design, family, tc, style) {
+async function loadIcon(url) {
+  try {
+    const fm = FileManager.local();
+    const dir = fm.cacheDirectory();
+    const name = "wk_" + url.replace(/[^a-zA-Z0-9]/g, "").slice(-40) + ".png";
+    const path = fm.joinPath(dir, name);
+    if (fm.fileExists(path)) return fm.readImage(path);
+    const img = await new Request(url).loadImage();
+    fm.writeImage(path, img);
+    return img;
+  } catch (e) { return null; }
+}
+
+async function buildLauncher(w, design, family, tc, style) {
   const apps = (design.apps || []).slice(0, 12);
   if (apps.length === 0) { centeredText(w, "Add apps in the designer", fontFor(style, 13, true), tc); return; }
+  const ls = design.launcherStyle || {};
+  const iconPt = Math.min(Math.max(Number(ls.iconSize) || 30, 20), 48);
+  const showLabels = ls.labels !== false;
+  const radius = ls.shape === "circle" ? iconPt / 2 : Math.round(iconPt * 0.24);
   const perRow = family === "small" ? 2 : 4;
   // iOS allows only one tap target on small widgets — the whole widget opens
   // the first app there; medium/large get per-icon tap targets.
@@ -165,18 +182,28 @@ function buildLauncher(w, design, family, tc, style) {
       const iconRow = cell.addStack();
       iconRow.layoutHorizontally();
       iconRow.addSpacer();
-      const icon = iconRow.addText(app.emoji || "🌐");
-      icon.font = Font.systemFont(family === "small" ? 26 : 30);
+      let realIcon = null;
+      if (app.iconUrl) realIcon = await loadIcon(app.iconUrl);
+      if (realIcon) {
+        const img = iconRow.addImage(realIcon);
+        img.imageSize = new Size(iconPt, iconPt);
+        img.cornerRadius = radius;
+      } else {
+        const icon = iconRow.addText(app.emoji || "🌐");
+        icon.font = Font.systemFont(Math.round(iconPt * 0.9));
+      }
       iconRow.addSpacer();
-      const labelRow = cell.addStack();
-      labelRow.layoutHorizontally();
-      labelRow.addSpacer();
-      const label = labelRow.addText(app.label || "App");
-      label.font = fontFor(style, 9, false);
-      label.textColor = tc;
-      label.textOpacity = 0.85;
-      label.lineLimit = 1;
-      labelRow.addSpacer();
+      if (showLabels) {
+        const labelRow = cell.addStack();
+        labelRow.layoutHorizontally();
+        labelRow.addSpacer();
+        const label = labelRow.addText(app.label || "App");
+        label.font = fontFor(style, 9, false);
+        label.textColor = tc;
+        label.textOpacity = 0.85;
+        label.lineLimit = 1;
+        labelRow.addSpacer();
+      }
       row.addSpacer();
     }
     if (i + perRow < apps.length) w.addSpacer(10);
@@ -184,7 +211,7 @@ function buildLauncher(w, design, family, tc, style) {
   w.addSpacer();
 }
 
-function buildWidget(design) {
+async function buildWidget(design) {
   const family = config.widgetFamily || "small";
   const w = new ListWidget();
   w.setPadding(12, 12, 12, 12);
@@ -193,6 +220,9 @@ function buildWidget(design) {
   const gradient = new LinearGradient();
   gradient.colors = [new Color(colors[0]), new Color(colors[1])];
   gradient.locations = [0, 1];
+  gradient.startPoint = new Point(0, 0);
+  gradient.endPoint = design.gradientDir === "vertical" ? new Point(0, 1)
+    : design.gradientDir === "horizontal" ? new Point(1, 0) : new Point(1, 1);
   w.backgroundGradient = gradient;
 
   const tc = new Color(design.textColorHex || "#FFFFFF");
@@ -207,7 +237,7 @@ function buildWidget(design) {
   }
 
   if (design.kind === "launcher") {
-    buildLauncher(w, design, family, tc, style);
+    await buildLauncher(w, design, family, tc, style);
     return w;
   }
 
@@ -284,7 +314,7 @@ if (!design) {
   w.addText("No designs yet — build one in the WidgetKing designer.");
   if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentSmall(); }
 } else {
-  const w = buildWidget(design);
-  if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentSmall(); }
+  const w = await buildWidget(design);
+  if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentMedium(); }
 }
 Script.complete();

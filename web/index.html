@@ -68,9 +68,12 @@
   #canvas .cel.selected { outline: 1.5px dashed rgba(255,255,255,.9); outline-offset: 3px; border-radius: 6px; }
   .launch-grid { display: grid; gap: 10px; padding: 10px; }
   .launch-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-  .launch-icon { width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,.18);
-    display: flex; align-items: center; justify-content: center; font-size: 22px; }
+  .launch-icon { border-radius: 12px; background: rgba(255,255,255,.18);
+    display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .launch-icon img { width: 100%; height: 100%; display: block; object-fit: cover; }
   .launch-label { font-size: 9px; opacity: .85; }
+  #appSearchResults button { display: flex; align-items: center; gap: 6px; }
+  #appSearchResults img { width: 22px; height: 22px; border-radius: 6px; }
   #inspector { background: var(--card2); border-radius: 12px; padding: 12px; margin-top: 10px; }
   input[type=range] { flex: 1; }
   input[type=color] { width: 44px; height: 32px; border: none; background: none; padding: 0; cursor: pointer; }
@@ -160,7 +163,13 @@
         <input type="text" id="noteText" placeholder="Your text">
       </div>
       <div class="field" id="fLauncher" style="display:none">
-        <label>Apps (tap a widget icon to open the app)</label>
+        <label>Add any app with its real App Store icon</label>
+        <div class="row" style="margin-bottom:6px">
+          <input type="text" id="appSearch" placeholder="Search the App Store… (e.g. Spotify)" style="flex:1">
+          <button id="appSearchBtn">🔍 Search</button>
+        </div>
+        <div class="chips" id="appSearchResults"></div>
+        <label style="margin-top:8px">Your apps (tap a chip to edit, ◀ ▶ to reorder)</label>
         <div class="app-list" id="appList"></div>
         <div class="row" style="margin-bottom:8px">
           <select id="appPreset" style="flex:1"></select>
@@ -172,6 +181,19 @@
           <input type="text" id="customUrl" placeholder="URL or app scheme (e.g. spotify://)" style="flex:2">
           <button id="addCustomApp">Add</button>
         </div>
+        <label style="margin-top:10px">Icon style</label>
+        <div class="row">
+          <span style="font-size:12px;color:var(--muted)">Size</span>
+          <input type="range" id="iconSize" min="22" max="44" style="flex:1">
+          <select id="iconShape" style="width:110px">
+            <option value="rounded">Rounded</option>
+            <option value="circle">Circle</option>
+          </select>
+          <label style="font-size:12px;display:flex;align-items:center;gap:4px">
+            <input type="checkbox" id="showLabels" checked> Labels
+          </label>
+        </div>
+        <div class="hint" id="shortcutHint" style="display:none;margin-top:8px"></div>
         <p class="hint" style="margin-top:6px">Heads-up: iOS only allows multiple tap targets on <b>Medium and Large</b> widgets. On a Small widget, tapping anywhere opens the first app.</p>
       </div>
       <div class="field"><label>Theme</label><div class="swatches" id="themeSwatches"></div></div>
@@ -181,6 +203,10 @@
           <input type="color" id="bg1" value="#232526">
           <input type="color" id="bg2" value="#8f52fa">
         </div>
+      </div>
+      <div class="field">
+        <label>Gradient direction</label>
+        <div class="row" id="gradDirRow"></div>
       </div>
       <div class="field"><label>Font</label><select id="fontSelect">
         <option value="classic">Classic</option><option value="rounded" selected>Rounded</option>
@@ -313,9 +339,25 @@ function drawFreestyle(design, family) {
   }
   return ctx.getImage();
 }
-function buildLauncher(w, design, family, tc, style) {
+async function loadIcon(url) {
+  try {
+    const fm = FileManager.local();
+    const dir = fm.cacheDirectory();
+    const name = "wk_" + url.replace(/[^a-zA-Z0-9]/g, "").slice(-40) + ".png";
+    const path = fm.joinPath(dir, name);
+    if (fm.fileExists(path)) return fm.readImage(path);
+    const img = await new Request(url).loadImage();
+    fm.writeImage(path, img);
+    return img;
+  } catch (e) { return null; }
+}
+async function buildLauncher(w, design, family, tc, style) {
   const apps = (design.apps || []).slice(0, 12);
   if (apps.length === 0) { centeredText(w, "Add apps in the designer", fontFor(style, 13, true), tc); return; }
+  const ls = design.launcherStyle || {};
+  const iconPt = Math.min(Math.max(Number(ls.iconSize) || 30, 20), 48);
+  const showLabels = ls.labels !== false;
+  const radius = ls.shape === "circle" ? iconPt / 2 : Math.round(iconPt * 0.24);
   const perRow = family === "small" ? 2 : 4;
   if (family === "small" && apps[0].url && !w.url) w.url = apps[0].url;
   w.addSpacer();
@@ -331,25 +373,35 @@ function buildLauncher(w, design, family, tc, style) {
       const iconRow = cell.addStack();
       iconRow.layoutHorizontally();
       iconRow.addSpacer();
-      const icon = iconRow.addText(app.emoji || "🌐");
-      icon.font = Font.systemFont(family === "small" ? 26 : 30);
+      let realIcon = null;
+      if (app.iconUrl) realIcon = await loadIcon(app.iconUrl);
+      if (realIcon) {
+        const img = iconRow.addImage(realIcon);
+        img.imageSize = new Size(iconPt, iconPt);
+        img.cornerRadius = radius;
+      } else {
+        const icon = iconRow.addText(app.emoji || "🌐");
+        icon.font = Font.systemFont(Math.round(iconPt * 0.9));
+      }
       iconRow.addSpacer();
-      const labelRow = cell.addStack();
-      labelRow.layoutHorizontally();
-      labelRow.addSpacer();
-      const label = labelRow.addText(app.label || "App");
-      label.font = fontFor(style, 9, false);
-      label.textColor = tc;
-      label.textOpacity = 0.85;
-      label.lineLimit = 1;
-      labelRow.addSpacer();
+      if (showLabels) {
+        const labelRow = cell.addStack();
+        labelRow.layoutHorizontally();
+        labelRow.addSpacer();
+        const label = labelRow.addText(app.label || "App");
+        label.font = fontFor(style, 9, false);
+        label.textColor = tc;
+        label.textOpacity = 0.85;
+        label.lineLimit = 1;
+        labelRow.addSpacer();
+      }
       row.addSpacer();
     }
     if (i + perRow < apps.length) w.addSpacer(10);
   }
   w.addSpacer();
 }
-function buildWidget(design) {
+async function buildWidget(design) {
   const family = config.widgetFamily || "small";
   const w = new ListWidget();
   w.setPadding(12, 12, 12, 12);
@@ -357,6 +409,9 @@ function buildWidget(design) {
   const g = new LinearGradient();
   g.colors = [new Color(colors[0]), new Color(colors[1])];
   g.locations = [0, 1];
+  g.startPoint = new Point(0, 0);
+  g.endPoint = design.gradientDir === "vertical" ? new Point(0, 1)
+    : design.gradientDir === "horizontal" ? new Point(1, 0) : new Point(1, 1);
   w.backgroundGradient = g;
   const tc = new Color(design.textColorHex || "#FFFFFF");
   const style = design.fontStyle || "rounded";
@@ -368,7 +423,7 @@ function buildWidget(design) {
     return w;
   }
   if (design.kind === "launcher") {
-    buildLauncher(w, design, family, tc, style);
+    await buildLauncher(w, design, family, tc, style);
     return w;
   }
   w.addSpacer();
@@ -429,7 +484,7 @@ if (!design) {
   w.addText("No designs yet — build one in the WidgetKing designer.");
   if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentSmall(); }
 } else {
-  const w = buildWidget(design);
+  const w = await buildWidget(design);
   if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentMedium(); }
 }
 Script.complete();
@@ -522,8 +577,22 @@ function newDesign() {
     id: uid(), name: "My Widget", kind: "clock", themeID: "midnight",
     fontStyle: "rounded", textColorHex: "#FFFFFF", primaryText: "",
     secondaryText: "", targetDate: "", canvasElements: [], apps: [],
-    customColors: null, tapUrl: ""
+    customColors: null, tapUrl: "", gradientDir: "diagonal",
+    launcherStyle: { iconSize: 30, shape: "rounded", labels: true }
   };
+}
+function launcherStyleOf(design) {
+  const style = design.launcherStyle || {};
+  return {
+    iconSize: Math.min(Math.max(Number(style.iconSize) || 30, 22), 44),
+    shape: style.shape === "circle" ? "circle" : "rounded",
+    labels: style.labels !== false
+  };
+}
+function gradientAngle(design) {
+  if (design.gradientDir === "vertical") return "180deg";
+  if (design.gradientDir === "horizontal") return "90deg";
+  return "135deg";
 }
 function themeOf(design) {
   if (design.themeID === "custom" && design.customColors && design.customColors.length === 2) {
@@ -890,7 +959,7 @@ function renderPreview() {
   canvas.style.width = w + "px";
   canvas.style.height = h + "px";
   const theme = themeOf(current);
-  canvas.style.background = "linear-gradient(135deg, " + theme[0] + ", " + theme[1] + ")";
+  canvas.style.background = "linear-gradient(" + gradientAngle(current) + ", " + theme[0] + ", " + theme[1] + ")";
   canvas.style.color = current.textColorHex;
   canvas.style.fontFamily = FONT_CSS[current.fontStyle] || FONT_CSS.rounded;
 
@@ -933,11 +1002,18 @@ function renderPreview() {
     if (apps.length === 0) {
       html = '<div style="font-size:13px;font-weight:600;padding:0 14px">Add apps below 👇</div>';
     } else {
+      const style = launcherStyleOf(current);
+      const radius = style.shape === "circle" ? "50%" : Math.round(style.iconSize * 0.24) + "px";
+      const iconCss = "width:" + style.iconSize + "px;height:" + style.iconSize + "px;border-radius:" + radius +
+        ";font-size:" + Math.round(style.iconSize * 0.6) + "px";
       const perRow = previewSize === "small" ? 2 : 4;
       let grid = '<div class="launch-grid" style="grid-template-columns:repeat(' + perRow + ',1fr)">';
       for (const app of apps.slice(0, 12)) {
-        grid += '<div class="launch-cell"><div class="launch-icon">' + esc(app.emoji || "🌐") + '</div>' +
-                '<div class="launch-label">' + esc(app.label || "App") + '</div></div>';
+        const inner = app.iconUrl
+          ? '<img src="' + esc(app.iconUrl) + '" alt="">'
+          : esc(app.emoji || "🌐");
+        grid += '<div class="launch-cell"><div class="launch-icon" style="' + iconCss + '">' + inner + '</div>' +
+                (style.labels ? '<div class="launch-label">' + esc(app.label || "App") + '</div>' : '') + '</div>';
       }
       grid += '</div>';
       html = grid;
@@ -1072,6 +1148,31 @@ function renderFreestyleUI() {
 function renderLauncherUI() {
   document.getElementById("fLauncher").style.display = current.kind === "launcher" ? "block" : "none";
   if (current.kind !== "launcher") return;
+
+  const style = launcherStyleOf(current);
+  document.getElementById("iconSize").value = style.iconSize;
+  document.getElementById("iconShape").value = style.shape;
+  document.getElementById("showLabels").checked = style.labels;
+
+  const shortcutApps = (current.apps || []).filter(function (app) {
+    return (app.url || "").indexOf("shortcuts://run-shortcut") === 0;
+  });
+  const hint = document.getElementById("shortcutHint");
+  if (shortcutApps.length > 0) {
+    const names = shortcutApps.map(function (app) {
+      try {
+        const match = app.url.match(/name=([^&]+)/);
+        return match ? decodeURIComponent(match[1]) : "Open " + app.label;
+      } catch (e) { return "Open " + app.label; }
+    });
+    hint.style.display = "block";
+    hint.innerHTML = "⚡ <b>One-time Shortcut setup</b> (makes these buttons work for any app, Koco-style): " +
+      "open the <b>Shortcuts</b> app on your iPhone and create one shortcut per app — name it exactly as shown, " +
+      "with a single <b>“Open App”</b> action pointed at that app: <b>" + names.map(esc).join("</b>, <b>") + "</b>.";
+  } else {
+    hint.style.display = "none";
+  }
+
   const list = document.getElementById("appList");
   list.innerHTML = "";
   (current.apps || []).forEach(function (app, index) {
@@ -1085,6 +1186,7 @@ function renderLauncherUI() {
       document.getElementById("customEmoji").value = app.emoji || "";
       document.getElementById("customLabel").value = app.label || "";
       document.getElementById("customUrl").value = app.url || "";
+      editingIconUrl = app.iconUrl || "";
       current.apps.splice(index, 1);
       renderLauncherUI();
       renderPreview();
@@ -1120,7 +1222,83 @@ function renderLauncherUI() {
     list.appendChild(tag);
   });
 }
+let editingIconUrl = "";
+
+function jsonp(url) {
+  return new Promise(function (resolve, reject) {
+    const cb = "wk_cb_" + Math.floor(Math.random() * 1e9);
+    const script = document.createElement("script");
+    window[cb] = function (data) { resolve(data); delete window[cb]; script.remove(); };
+    script.onerror = function () { reject(new Error("search failed")); delete window[cb]; script.remove(); };
+    script.src = url + "&callback=" + cb;
+    document.body.appendChild(script);
+  });
+}
+function schemeForName(name) {
+  const lower = name.toLowerCase();
+  for (const key of Object.keys(APP_PRESETS)) {
+    if (lower.includes(key)) return APP_PRESETS[key].url;
+  }
+  return null;
+}
+async function searchAppStore() {
+  const term = document.getElementById("appSearch").value.trim();
+  if (!term) return;
+  const resultsDiv = document.getElementById("appSearchResults");
+  resultsDiv.innerHTML = '<span class="hint">Searching…</span>';
+  try {
+    const data = await jsonp("https://itunes.apple.com/search?media=software&entity=software&limit=6&term=" + encodeURIComponent(term));
+    resultsDiv.innerHTML = "";
+    if (!data.results || data.results.length === 0) {
+      resultsDiv.innerHTML = '<span class="hint">No apps found.</span>';
+      return;
+    }
+    for (const result of data.results) {
+      const button = document.createElement("button");
+      const img = document.createElement("img");
+      img.src = result.artworkUrl100 || result.artworkUrl60 || "";
+      const label = (result.trackName || "App").split(/[–—:|-]/)[0].trim().slice(0, 14);
+      button.appendChild(img);
+      button.appendChild(document.createTextNode(label));
+      button.onclick = function () {
+        const scheme = schemeForName(result.trackName || "");
+        const url = scheme || ("shortcuts://run-shortcut?name=" + encodeURIComponent("Open " + label));
+        current.apps = current.apps || [];
+        current.apps.push({
+          emoji: "📱", label: label, url: url,
+          iconUrl: result.artworkUrl512 || result.artworkUrl100 || ""
+        });
+        renderLauncherUI();
+        renderPreview();
+        toast(scheme ? ("Added " + label) : ("Added " + label + " via Shortcut — see the ⚡ note"));
+      };
+      resultsDiv.appendChild(button);
+    }
+  } catch (error) {
+    resultsDiv.innerHTML = '<span class="hint">Search failed — check your connection.</span>';
+  }
+}
+
 function setupLauncherControls() {
+  document.getElementById("appSearchBtn").onclick = searchAppStore;
+  document.getElementById("appSearch").addEventListener("keydown", function (event) {
+    if (event.key === "Enter") { event.preventDefault(); searchAppStore(); }
+  });
+  document.getElementById("iconSize").oninput = function (e) {
+    current.launcherStyle = launcherStyleOf(current);
+    current.launcherStyle.iconSize = Number(e.target.value);
+    renderPreview();
+  };
+  document.getElementById("iconShape").onchange = function (e) {
+    current.launcherStyle = launcherStyleOf(current);
+    current.launcherStyle.shape = e.target.value;
+    renderPreview();
+  };
+  document.getElementById("showLabels").onchange = function (e) {
+    current.launcherStyle = launcherStyleOf(current);
+    current.launcherStyle.labels = e.target.checked;
+    renderPreview();
+  };
   const select = document.getElementById("appPreset");
   const added = new Set();
   for (const key of Object.keys(APP_PRESETS)) {
@@ -1146,7 +1324,9 @@ function setupLauncherControls() {
     const url = document.getElementById("customUrl").value.trim();
     if (!url) { toast("Enter a URL or app scheme"); return; }
     current.apps = current.apps || [];
-    current.apps.push({ emoji: emoji, label: label, url: url });
+    const app = { emoji: emoji, label: label, url: url };
+    if (editingIconUrl) { app.iconUrl = editingIconUrl; editingIconUrl = ""; }
+    current.apps.push(app);
     document.getElementById("customEmoji").value = "";
     document.getElementById("customLabel").value = "";
     document.getElementById("customUrl").value = "";
@@ -1160,6 +1340,8 @@ function loadIntoEditor(design) {
   current = JSON.parse(JSON.stringify(design));
   if (!current.canvasElements) current.canvasElements = [];
   if (!current.apps) current.apps = [];
+  if (!current.gradientDir) current.gradientDir = "diagonal";
+  current.launcherStyle = launcherStyleOf(current);
   selectedElId = null;
   syncControls();
   renderAll();
@@ -1228,6 +1410,17 @@ function renderControls() {
     document.getElementById("bg2").value = current.customColors[1].toLowerCase();
   }
   document.getElementById("fTap").style.display = current.kind === "launcher" ? "none" : "block";
+
+  const gradDirRow = document.getElementById("gradDirRow");
+  gradDirRow.innerHTML = "";
+  for (const [dir, label] of [["diagonal", "↘ Diagonal"], ["vertical", "↓ Vertical"], ["horizontal", "→ Horizontal"]]) {
+    const button = document.createElement("button");
+    button.textContent = label;
+    if ((current.gradientDir || "diagonal") === dir) button.className = "active";
+    button.onclick = function () { current.gradientDir = dir; renderAll(); };
+    gradDirRow.appendChild(button);
+  }
+  gradDirRow.className = "row kind-buttons";
 
   const sizeButtons = document.getElementById("sizeButtons");
   sizeButtons.innerHTML = "";
