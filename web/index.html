@@ -115,6 +115,7 @@
     gap: 10px; width: 100%; height: 100%; padding: 12px; }
   .launch-row { display: flex; justify-content: space-evenly; align-items: flex-start; width: 100%; }
   .launch-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .launch-label { white-space: nowrap; overflow: hidden; max-width: 100%; }
   .launch-icon { border-radius: 12px; background: rgba(255,255,255,.18);
     display: flex; align-items: center; justify-content: center; overflow: hidden; }
   .launch-icon img { width: 100%; height: 100%; display: block; object-fit: cover; }
@@ -308,6 +309,11 @@
             <option value="dark">Dark frost</option>
             <option value="light">Light frost</option>
           </select>
+        </div>
+        <div class="row" id="bgOpacityRow" style="display:none;margin-top:8px">
+          <span style="font-size:12px;color:var(--muted)">Opacity</span>
+          <input type="range" id="bgOpacity" min="10" max="100" style="flex:1">
+          <span id="bgOpacityVal" style="font-size:12px;color:var(--muted);min-width:38px;text-align:right">100%</span>
         </div>
         <p class="hint" id="bgHint" style="display:none;margin-top:6px"></p>
       </div>
@@ -567,18 +573,52 @@ function blurImage(img) {
   bigCtx.drawImageInRect(soft, new Rect(0, 0, w, h));
   return bigCtx.getImage();
 }
-function tintImage(img, dark) {
+function tintImage(img, dark, strength) {
+  const s = (typeof strength === "number" && strength >= 0.1 && strength <= 1) ? strength : 1;
   const ctx = new DrawContext();
   ctx.size = img.size;
   ctx.opaque = true;
   ctx.respectScreenScale = false;
   ctx.drawImageInRect(img, new Rect(0, 0, img.size.width, img.size.height));
-  ctx.setFillColor(dark ? new Color("#101018", 0.32) : new Color("#FFFFFF", 0.25));
+  ctx.setFillColor(dark ? new Color("#101018", 0.32 * s) : new Color("#FFFFFF", 0.25 * s));
   ctx.fillRect(new Rect(0, 0, img.size.width, img.size.height));
   return ctx.getImage();
 }
+// Paints the design's gradient at partial opacity over a wallpaper slice —
+// the "see-through gradient" background. Strips must not overlap or the
+// seams double-blend into visible lines.
+function gradientOver(img, design, alpha) {
+  const w = img.size.width, h = img.size.height;
+  const ctx = new DrawContext();
+  ctx.size = img.size;
+  ctx.opaque = true;
+  ctx.respectScreenScale = false;
+  ctx.drawImageInRect(img, new Rect(0, 0, w, h));
+  const colors = themeColors(design);
+  const c1 = hexToRgb(colors[0]); const c2 = hexToRgb(colors[1]);
+  const steps = 60;
+  const horizontal = design.gradientDir === "horizontal";
+  const span = horizontal ? w : h;
+  for (let i = 0; i < steps; i++) {
+    const t = i / (steps - 1);
+    const mix = [0, 1, 2].map(function (j) { return c1[j] + (c2[j] - c1[j]) * t; });
+    ctx.setFillColor(new Color(rgbToHex(mix), alpha));
+    const a = Math.floor((span * i) / steps);
+    const b = Math.floor((span * (i + 1)) / steps);
+    if (horizontal) { ctx.fillRect(new Rect(a, 0, b - a, h)); }
+    else { ctx.fillRect(new Rect(0, a, w, b - a)); }
+  }
+  return ctx.getImage();
+}
+function bgOpacityOf(design) {
+  const op = Number(design.bgOpacity);
+  return (isFinite(op) && op >= 0.1 && op < 1) ? op : 1;
+}
 function backgroundImageFor(design, family, position) {
-  if (design.background !== "glass" && design.background !== "clear") return null;
+  const op = bgOpacityOf(design);
+  const glassy = design.background === "glass" || design.background === "clear";
+  const blend = design.background === "gradient" && op < 1;
+  if (!glassy && !blend) return null;
   const wall = loadWallpaper();
   if (!wall) return null;
   let rect;
@@ -594,7 +634,9 @@ function backgroundImageFor(design, family, position) {
   let img = cropImage(wall, rect);
   if (design.background === "glass") {
     img = blurImage(img);
-    img = tintImage(img, (design.glassTint || "dark") !== "light");
+    img = tintImage(img, (design.glassTint || "dark") !== "light", op);
+  } else if (blend) {
+    img = gradientOver(img, design, op);
   }
   return img;
 }
@@ -786,46 +828,65 @@ async function buildLauncher(w, design, family, tc, style) {
   const perRow = columns > 0 ? columns : (family === "small" ? 2 : 4);
   const labelPt = Math.min(13, Math.max(9, Math.round(iconPt * 0.22)));
   if (family === "small" && apps[0].url && !w.url) w.url = apps[0].url;
-  w.addSpacer();
+  // Deterministic layout: every margin and gap is a computed fixed number of
+  // points — the same math the designer preview uses — because flexible
+  // spacers distribute differently across iOS versions (preview mismatch).
+  const PT = { small: [155, 155], medium: [329, 155], large: [329, 345] };
+  const dims = PT[family] || PT.small;
+  const W = dims[0], H = dims[1];
+  const pad = 12;
+  const rowGap = 10;
+  w.setPadding(0, 0, 0, 0);
+  const root = w.addStack();
+  root.layoutVertically();
+  root.size = new Size(W, H);
+  const cellH = iconPt + (showLabels ? labelPt + 3 : 0);
+  const rowCount = Math.ceil(apps.length / perRow);
+  const contentH = rowCount * cellH + (rowCount - 1) * rowGap;
+  root.addSpacer(Math.max(0, (H - contentH) / 2));
   for (let i = 0; i < apps.length; i += perRow) {
-    const row = w.addStack();
-    row.layoutHorizontally();
-    row.addSpacer();
-    for (const app of apps.slice(i, i + perRow)) {
-      const cell = row.addStack();
+    if (i > 0) root.addSpacer(rowGap);
+    const rowApps = apps.slice(i, i + perRow);
+    const n = rowApps.length;
+    const gap = Math.max(0, (W - 2 * pad - n * iconPt) / (n + 1));
+    const rowStack = root.addStack();
+    rowStack.layoutHorizontally();
+    rowStack.topAlignContent();
+    rowStack.size = new Size(W, cellH);
+    rowStack.addSpacer(pad + gap);
+    for (let j = 0; j < n; j++) {
+      const app = rowApps[j];
+      if (j > 0) rowStack.addSpacer(gap);
+      const cell = rowStack.addStack();
       cell.layoutVertically();
       cell.centerAlignContent();
+      cell.size = new Size(iconPt, cellH);
       if (app.url) cell.url = app.url;
-      const iconRow = cell.addStack();
-      iconRow.layoutHorizontally();
-      iconRow.addSpacer();
       let realIcon = null;
       if (app.iconUrl) realIcon = await loadIcon(app.iconUrl);
       if (realIcon) {
-        const img = iconRow.addImage(realIcon);
+        const img = cell.addImage(realIcon);
         img.imageSize = new Size(iconPt, iconPt);
         img.cornerRadius = radius;
       } else {
-        const icon = iconRow.addText(app.emoji || "🌐");
+        const icon = cell.addText(app.emoji || "🌐");
         icon.font = Font.systemFont(Math.round(iconPt * 0.9));
+        icon.centerAlignText();
       }
-      iconRow.addSpacer();
       if (showLabels) {
-        const labelRow = cell.addStack();
-        labelRow.layoutHorizontally();
-        labelRow.addSpacer();
-        const label = labelRow.addText(app.label || "App");
+        cell.addSpacer(3);
+        const label = cell.addText(app.label || "App");
         label.font = fontFor(style, labelPt, false);
         label.textColor = tc;
         label.textOpacity = 0.85;
         label.lineLimit = 1;
-        labelRow.addSpacer();
+        label.minimumScaleFactor = 0.6;
+        label.centerAlignText();
       }
-      row.addSpacer();
     }
-    if (i + perRow < apps.length) w.addSpacer(10);
+    rowStack.addSpacer(pad + gap);
   }
-  w.addSpacer();
+  root.addSpacer(Math.max(0, (H - contentH) / 2));
 }
 async function buildWidget(design, position) {
   const family = config.widgetFamily || "small";
@@ -1126,7 +1187,7 @@ function newDesign() {
     fontStyle: "rounded", textColorHex: "#FFFFFF", primaryText: "",
     secondaryText: "", targetDate: "", canvasElements: [], apps: [],
     customColors: null, tapUrl: "", gradientDir: "diagonal",
-    background: "gradient", glassTint: "dark",
+    background: "gradient", glassTint: "dark", bgOpacity: 1,
     launcherStyle: { iconSize: 30, shape: "rounded", labels: true, columns: 0 }
   };
 }
@@ -1174,6 +1235,7 @@ function normalizeDesign(design) {
   if (!design.gradientDir) design.gradientDir = "diagonal";
   if (!["gradient", "glass", "clear"].includes(design.background)) design.background = "gradient";
   if (design.glassTint !== "light") design.glassTint = "dark";
+  if (typeof design.bgOpacity !== "number" || design.bgOpacity < 0.1 || design.bgOpacity > 1) design.bgOpacity = 1;
   design.launcherStyle = launcherStyleOf(design);
   for (const el of design.canvasElements) {
     if (!el.id) el.id = uid();
@@ -1492,6 +1554,7 @@ const AI_SCHEMA = {
     targetDate: { type: "string", description: "yyyy-MM-dd for countdowns; empty otherwise" },
     background: { type: "string", "enum": ["gradient", "glass", "clear"], description: "gradient = colored; glass = frosted blurred wallpaper; clear = fully transparent (shows wallpaper). Use glass/clear when the user asks for transparent, see-through, frosted, glassy, or minimal-blends-with-wallpaper looks" },
     glassTint: { type: "string", "enum": ["dark", "light"], description: "Frost tint for glass backgrounds" },
+    bgOpacity: { type: "number", description: "Background opacity 0.1-1. Below 1: gradient blends see-through over the wallpaper (tinted glass); for glass it scales frost strength. Use 1 unless the user wants see-through/subtle." },
     backgroundColors: {
       type: "array",
       description: "Exactly two #RRGGBB colors for a custom gradient background when the preset themes don't match the request; empty array to use themeID",
@@ -1540,14 +1603,14 @@ const AI_SCHEMA = {
       }
     }
   },
-  required: ["name", "kind", "themeID", "fontStyle", "textColorHex", "primaryText", "secondaryText", "targetDate", "background", "glassTint", "backgroundColors", "tapUrl", "apps", "canvasElements"],
+  required: ["name", "kind", "themeID", "fontStyle", "textColorHex", "primaryText", "secondaryText", "targetDate", "background", "glassTint", "bgOpacity", "backgroundColors", "tapUrl", "apps", "canvasElements"],
   additionalProperties: false
 };
 
 const AI_EXAMPLE = {
   name: "Cozy Night", kind: "freestyle", themeID: "midnight", fontStyle: "rounded",
   textColorHex: "#FFFFFF", primaryText: "", secondaryText: "", targetDate: "",
-  background: "gradient", glassTint: "dark",
+  background: "gradient", glassTint: "dark", bgOpacity: 1,
   backgroundColors: [], tapUrl: "", apps: [],
   canvasElements: [
     { kind: "shape", text: "", label: "", url: "", font: "", x: 0.5, y: 0.5, size: 0, colorHex: "#FFFFFF", opacity: 0.16, shape: "pill", w: 0.84, h: 0.46, align: "", bold: true, dateISO: "" },
@@ -1570,7 +1633,7 @@ function aiSystemPrompt() {
     "kind=app is a tappable app icon: set label and url (the real icon is fetched automatically); space them like a launcher grid.\n" +
     "Themes: " + Object.keys(THEMES).join(", ") + ". 'paper' is light (use dark text like #333333); the rest are dark (use light text). " +
     "If the requested colors don't match a preset, set backgroundColors to two #RRGGBB colors for a custom gradient. " +
-    "Backgrounds: background=glass gives a frosted blurred wallpaper look (choose glassTint dark or light); background=clear makes the widget fully transparent against the wallpaper — use these when the user says transparent, see-through, frosted, glass, or wants it to blend with their wallpaper; otherwise background=gradient. " +
+    "Backgrounds: background=glass gives a frosted blurred wallpaper look (choose glassTint dark or light); background=clear makes the widget fully transparent against the wallpaper — use these when the user says transparent, see-through, frosted, glass, or wants it to blend with their wallpaper; otherwise background=gradient. bgOpacity below 1 (e.g. 0.5) makes a gradient blend see-through over the wallpaper like tinted glass. " +
     "Set tapUrl when the user wants the widget to open an app on tap.\n" +
     "Design principles for freestyle: one focal element (size 30-44); secondary text 11-16; decorations 13-24; " +
     "keep every element inside x/y 0.08-0.92; use a translucent shape (white or black, opacity 0.15-0.35, pill or rect) " +
@@ -1633,6 +1696,8 @@ function specToDesign(spec) {
   }
   if (["gradient", "glass", "clear"].includes(spec.background)) design.background = spec.background;
   if (spec.glassTint === "light") design.glassTint = "light";
+  const specOp = Number(spec.bgOpacity);
+  if (isFinite(specOp) && specOp >= 0.1 && specOp < 1) design.bgOpacity = specOp;
   design.tapUrl = (spec.tapUrl || "").trim();
   design.apps = (spec.apps || []).slice(0, 8).map(function (app) {
     return { emoji: app.emoji || "🌐", label: (app.label || "App").slice(0, 12), url: app.url || "" };
@@ -1710,19 +1775,37 @@ async function fetchIconsForApps(design) {
 function esc(str) {
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
+function hexToRgba(hex, alpha) {
+  const c = hex.replace("#", "");
+  const r = parseInt(c.substring(0, 2), 16), g = parseInt(c.substring(2, 4), 16), b = parseInt(c.substring(4, 6), 16);
+  return "rgba(" + r + "," + g + "," + b + "," + alpha + ")";
+}
+// Faux-wallpaper backdrop used wherever the real wallpaper shows through.
+const WALLPAPER_STANDIN =
+  "radial-gradient(circle at 22% 24%, #7b6cf6, transparent 55%)" +
+  ", radial-gradient(circle at 80% 18%, #f672b5, transparent 50%)" +
+  ", radial-gradient(circle at 60% 82%, #4dd0e1, transparent 55%), #191922";
+function bgOpacityOf(design) {
+  const op = Number(design.bgOpacity);
+  return isFinite(op) && op >= 0.1 && op < 1 ? op : 1;
+}
 function applyDesignBackground(node, design) {
+  const op = bgOpacityOf(design);
   if (design.background === "clear") {
     // Checkerboard = "transparent" preview convention; on-device it shows
     // your actual wallpaper slice.
     node.style.background = "repeating-conic-gradient(#26262e 0% 25%, #1b1b22 0% 50%) 0 0 / 16px 16px";
   } else if (design.background === "glass") {
+    const strength = op;
     const overlay = design.glassTint === "light"
-      ? "linear-gradient(135deg, rgba(255,255,255,.38), rgba(255,255,255,.18))"
-      : "linear-gradient(135deg, rgba(16,16,24,.55), rgba(16,16,24,.35))";
-    node.style.background = overlay +
-      ", radial-gradient(circle at 22% 24%, #7b6cf6, transparent 55%)" +
-      ", radial-gradient(circle at 80% 18%, #f672b5, transparent 50%)" +
-      ", radial-gradient(circle at 60% 82%, #4dd0e1, transparent 55%), #191922";
+      ? "linear-gradient(135deg, " + hexToRgba("#FFFFFF", 0.38 * strength) + ", " + hexToRgba("#FFFFFF", 0.18 * strength) + ")"
+      : "linear-gradient(135deg, " + hexToRgba("#101018", 0.55 * strength) + ", " + hexToRgba("#101018", 0.35 * strength) + ")";
+    node.style.background = overlay + ", " + WALLPAPER_STANDIN;
+  } else if (op < 1) {
+    // See-through gradient: colors blend over the wallpaper slice on-device.
+    const theme = themeOf(design);
+    node.style.background = "linear-gradient(" + gradientAngle(design) + ", " +
+      hexToRgba(theme[0], op) + ", " + hexToRgba(theme[1], op) + "), " + WALLPAPER_STANDIN;
   } else {
     const theme = themeOf(design);
     node.style.background = "linear-gradient(" + gradientAngle(design) + ", " + theme[0] + ", " + theme[1] + ")";
@@ -1779,7 +1862,7 @@ function designPreviewHTML(design, sizeKey) {
         const inner = app.iconUrl
           ? '<img src="' + esc(app.iconUrl) + '" alt="">'
           : esc(app.emoji || "🌐");
-        grid += '<div class="launch-cell"><div class="launch-icon" style="' + iconCss + '">' + inner + '</div>' +
+        grid += '<div class="launch-cell" style="width:' + style.iconSize + 'px"><div class="launch-icon" style="' + iconCss + '">' + inner + '</div>' +
                 (style.labels ? '<div class="launch-label">' + esc(app.label || "App") + '</div>' : '') + '</div>';
       }
       grid += '</div>';
@@ -2861,10 +2944,17 @@ function renderControls() {
   document.getElementById("gradDirField").style.display = isGradient ? "block" : "none";
   document.getElementById("glassTintRow").style.display = current.background === "glass" ? "flex" : "none";
   document.getElementById("glassTint").value = current.glassTint || "dark";
+  document.getElementById("bgOpacityRow").style.display = current.background === "clear" ? "none" : "flex";
+  const opPct = Math.round((bgOpacityOf(current)) * 100);
+  document.getElementById("bgOpacity").value = opPct;
+  document.getElementById("bgOpacityVal").textContent = opPct + "%";
   const bgHint = document.getElementById("bgHint");
-  if (current.background === "glass") {
+  if (current.background === "gradient" && bgOpacityOf(current) < 1) {
     bgHint.style.display = "block";
-    bgHint.innerHTML = "🧊 Glass shows a frosted, blurred slice of <b>your wallpaper</b> behind the widget (the preview here is a stand-in). One-time setup on your iPhone: screenshot your empty wallpaper page, then run the WidgetKing script inside Scriptable and choose <b>Set wallpaper photo…</b>";
+    bgHint.innerHTML = "🎨 With opacity under 100%, your gradient blends over <b>your wallpaper</b> like tinted glass. Needs the same one-time wallpaper setup as Glass (run the script in Scriptable → <b>Set wallpaper photo…</b>); without it, the widget falls back to a solid gradient.";
+  } else if (current.background === "glass") {
+    bgHint.style.display = "block";
+    bgHint.innerHTML = "🧊 Glass shows a frosted, blurred slice of <b>your wallpaper</b> behind the widget (the preview here is a stand-in). Opacity controls the frost strength. One-time setup on your iPhone: screenshot your empty wallpaper page, then run the WidgetKing script inside Scriptable and choose <b>Set wallpaper photo…</b>";
   } else if (current.background === "clear") {
     bgHint.style.display = "block";
     bgHint.innerHTML = "🫥 Clear shows the exact wallpaper slice behind the widget so it looks fully transparent. Needs the same one-time wallpaper setup as Glass, plus the widget's <b>Parameter</b> set to <b>Name | position</b> (e.g. <b>My Clock | top-left</b>) for pixel-perfect alignment. Alignment uses exact per-iPhone measurements — if your Home Screen <b>hides app labels</b> (Large icons), flip the toggle in the script's in-app menu.";
@@ -3071,6 +3161,13 @@ tapPreset.onchange = function () {
 document.getElementById("glassTint").onchange = function (e) {
   current.glassTint = e.target.value;
   renderPreview();
+};
+document.getElementById("bgOpacity").oninput = function (e) {
+  current.bgOpacity = Number(e.target.value) / 100;
+  document.getElementById("bgOpacityVal").textContent = e.target.value + "%";
+  const showHint = current.background === "gradient";
+  refreshCanvases();
+  if (showHint) renderControls();
 };
 document.getElementById("tapUrlInput").oninput = function (e) { current.tapUrl = e.target.value.trim(); };
 
