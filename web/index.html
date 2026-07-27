@@ -2,8 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>WidgetKing Designer</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="WidgetKing">
+<meta name="theme-color" content="#131318">
 <style>
   :root {
     --bg: #101014;
@@ -109,6 +116,23 @@
   #studioInspector { background: var(--card2); border-radius: 12px; padding: 12px; margin-top: 8px; }
   #studioInspector .row { margin-bottom: 8px; }
   .align-buttons button.active { background: var(--accent); border-color: var(--accent); }
+  #setupWizard { position: fixed; inset: 0; z-index: 60; background: var(--bg); display: none;
+    flex-direction: column; overscroll-behavior: contain; }
+  #setupWizard.open { display: flex; }
+  #wizardHead { display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-bottom: 1px solid #26262e; }
+  #wizardHead .title { font-weight: 700; font-size: 17px; }
+  #wizardBody { flex: 1; overflow-y: auto; padding: 16px; -webkit-overflow-scrolling: touch; }
+  .wiz-card { display: flex; gap: 14px; background: var(--card); border-radius: 16px;
+    padding: 16px; margin-bottom: 12px; }
+  .wiz-num { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
+    background: var(--accent); display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 15px; }
+  .wiz-text { flex: 1; }
+  .wiz-text p { font-size: 14px; color: var(--muted); margin: 6px 0 10px; line-height: 1.5; }
+  .wiz-action { display: inline-block; background: var(--accent); color: var(--text);
+    border: none; border-radius: 10px; padding: 11px 16px; font-size: 14px; font-weight: 600;
+    text-decoration: none; cursor: pointer; }
   /* Mirrors the Scriptable layout: rows distributed space-evenly, column
      centered with fixed 10px gaps, 12px padding — so preview == widget. */
   .launch-flex { display: flex; flex-direction: column; justify-content: center;
@@ -332,7 +356,13 @@
         </div>
         <p class="hint" id="bgHint" style="display:none;margin-top:6px"></p>
       </div>
-      <div class="field" id="themeField"><label>Theme</label><div class="swatches" id="themeSwatches"></div></div>
+      <div class="field" id="themeField">
+        <div class="row" style="justify-content:space-between;margin-bottom:5px">
+          <label style="margin:0">Theme</label>
+          <button id="surpriseBtn" style="font-size:12px;padding:6px 12px">🎲 Surprise me</button>
+        </div>
+        <div class="swatches" id="themeSwatches"></div>
+      </div>
       <div class="field" id="customTheme" style="display:none">
         <label>Custom gradient — pick any two colors</label>
         <div class="row">
@@ -384,7 +414,11 @@
 
 <section>
   <h2><span class="step">4</span> Put it on your iPhone (no Mac needed)</h2>
-  <ol>
+  <button class="primary" id="wizardBtn" style="width:100%;font-size:16px;padding:14px">🪄 Set up my iPhone — step by step</button>
+  <p class="hint" style="margin-top:8px">💡 Make this designer feel like an app: in Safari tap <b>Share → Add to Home Screen</b> — you'll get a WidgetKing 👑 icon that opens full-screen.</p>
+  <details>
+  <summary>The full instructions, if you prefer reading</summary>
+  <ol style="margin-top:8px">
     <li>Install the free <b>Scriptable</b> app from the App Store.</li>
     <li>Design widgets above, then tap <b>Copy Scriptable Script</b>.</li>
     <li>In Scriptable, tap <b>+</b>, paste, and name it <b>WidgetKing</b>.</li>
@@ -393,8 +427,64 @@
     <li><b>Glass / Clear backgrounds (one-time):</b> long-press your Home Screen, swipe to the last empty page, take a screenshot. Then open the WidgetKing script <i>inside</i> Scriptable, run it (▶), choose <b>Set wallpaper photo…</b> and pick that screenshot. For pixel-perfect <b>Clear</b> widgets, set the widget Parameter to <b>Name | position</b> — e.g. <b>My Clock | top-left</b> (small: top/middle/bottom-left/right; medium &amp; large: top, middle, bottom). Glass looks great without a position.</li>
     <li>Changed your designs? Copy the script again and paste over the old one.</li>
   </ol>
+  </details>
   <p class="hint">iOS refreshes Scriptable widgets on its own schedule (every few minutes), so clock and battery values are close but not live to-the-second. Everything runs on your devices — nothing is uploaded anywhere.</p>
 </section>
+
+<div id="setupWizard">
+  <div id="wizardHead">
+    <span class="title">🪄 Set up your iPhone</span>
+    <button id="wizardCloseBtn">✕ Done</button>
+  </div>
+  <div id="wizardBody">
+    <div class="wiz-card">
+      <div class="wiz-num">1</div>
+      <div class="wiz-text">
+        <b>Get the free Scriptable app</b>
+        <p>It's the little engine that draws your widgets. Free, no account, one download.</p>
+        <a class="wiz-action" href="https://apps.apple.com/app/scriptable/id1405459188" target="_blank" rel="noopener">⬇️ Open the App Store</a>
+      </div>
+    </div>
+    <div class="wiz-card">
+      <div class="wiz-num">2</div>
+      <div class="wiz-text">
+        <b>Copy your widgets</b>
+        <p>This copies every design you've saved, ready to paste.</p>
+        <button class="wiz-action" id="wizardCopyBtn">📋 Copy my widgets</button>
+      </div>
+    </div>
+    <div class="wiz-card">
+      <div class="wiz-num">3</div>
+      <div class="wiz-text">
+        <b>Paste into Scriptable</b>
+        <p>In Scriptable: tap <b>+</b> (top right) → tap in the empty page and <b>Paste</b> → tap the name at the top and call it <b>WidgetKing</b> → Done.</p>
+        <a class="wiz-action" href="scriptable:///">🚀 Open Scriptable</a>
+      </div>
+    </div>
+    <div class="wiz-card">
+      <div class="wiz-num">4</div>
+      <div class="wiz-text">
+        <b>Add the widget to your Home Screen</b>
+        <p>Press and hold your Home Screen → <b>Edit</b> → <b>Add Widget</b> → search <b>Scriptable</b> → pick a size (Medium or Large for launchers) → <b>Add Widget</b>.</p>
+      </div>
+    </div>
+    <div class="wiz-card">
+      <div class="wiz-num">5</div>
+      <div class="wiz-text">
+        <b>Point it at your design</b>
+        <p>Press and hold the new widget → <b>Edit Widget</b> → Script: <b>WidgetKing</b> → Parameter: type your design's name (e.g. <b>Social Launcher</b>). Add more widgets with different names — mix and match!</p>
+      </div>
+    </div>
+    <div class="wiz-card">
+      <div class="wiz-num">✨</div>
+      <div class="wiz-text">
+        <b>Optional: Glass &amp; Clear backgrounds</b>
+        <p>Swipe to an empty Home Screen page and take a screenshot. Open the WidgetKing script <i>inside</i> Scriptable → <b>Set wallpaper photo…</b> → pick that screenshot. For Clear widgets, set the Parameter to <b>Name | position</b> (like <b>My Clock | top-left</b>).</p>
+      </div>
+    </div>
+    <p class="hint" style="text-align:center;padding:0 0 20px">Changed a design later? Just do steps 2–3 again (paste over the old script). Everything else stays put. 👑</p>
+  </div>
+</div>
 
 <div id="toast"></div>
 
@@ -410,7 +500,11 @@ const THEMES = {
   forest: ["#134E5E", "#71B280"], candy: ["#FC5C7D", "#6A82FB"],
   lava: ["#870000", "#190A05"], gold: ["#B8860B", "#FFD700"],
   berry: ["#8E2DE2", "#4A00E0"], mist: ["#606C88", "#3F4C6B"],
-  mint: ["#02AABD", "#00CDAC"], paper: ["#F5F5F0", "#E4E0D8"]
+  mint: ["#02AABD", "#00CDAC"], paper: ["#F5F5F0", "#E4E0D8"],
+  rosegold: ["#9F5F6F", "#E8B4B8"], lavender: ["#6D5BBA", "#B49FDC"],
+  sage: ["#3E5C4A", "#A3C9A8"], blush: ["#B24592", "#F15F79"],
+  mocha: ["#3E2723", "#8D6E63"], navy: ["#0F2027", "#2C5364"],
+  aurora: ["#1D976C", "#59C9A5"], cosmos: ["#0F0C29", "#764BA2"]
 };
 const SYMBOL_EMOJI = {
   "star.fill": "⭐", "heart.fill": "❤️", "bolt.fill": "⚡",
@@ -1262,7 +1356,11 @@ const THEMES = {
   forest: ["#134E5E", "#71B280"], candy: ["#FC5C7D", "#6A82FB"],
   lava: ["#870000", "#190A05"], gold: ["#B8860B", "#FFD700"],
   berry: ["#8E2DE2", "#4A00E0"], mist: ["#606C88", "#3F4C6B"],
-  mint: ["#02AABD", "#00CDAC"], paper: ["#F5F5F0", "#E4E0D8"]
+  mint: ["#02AABD", "#00CDAC"], paper: ["#F5F5F0", "#E4E0D8"],
+  rosegold: ["#9F5F6F", "#E8B4B8"], lavender: ["#6D5BBA", "#B49FDC"],
+  sage: ["#3E5C4A", "#A3C9A8"], blush: ["#B24592", "#F15F79"],
+  mocha: ["#3E2723", "#8D6E63"], navy: ["#0F2027", "#2C5364"],
+  aurora: ["#1D976C", "#59C9A5"], cosmos: ["#0F0C29", "#764BA2"]
 };
 const KINDS = [
   ["clock", "🕐 Clock"], ["date", "📅 Date"], ["countdown", "⏳ Countdown"],
@@ -3283,6 +3381,30 @@ function setupLauncherControls() {
 // ==================== Templates ====================
 function buildTemplates() {
   return [
+    { category: "Live", design: { name: "Weather Glass", kind: "freestyle", background: "glass", glassTint: "dark", themeID: "navy", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "weather", x: 0.5, y: 0.4, size: 30, colorHex: "#FFFFFF", opacity: 1, unit: "f" },
+      { kind: "date", x: 0.5, y: 0.63, size: 12, colorHex: "#FFFFFF", opacity: 0.85 }
+    ] } },
+    { category: "Live", design: { name: "Morning Brief", kind: "freestyle", themeID: "navy", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "weather", x: 0.5, y: 0.22, size: 24, colorHex: "#FFFFFF", opacity: 1, unit: "f" },
+      { kind: "calendar", x: 0.5, y: 0.5, size: 11, colorHex: "#D7E3F4", opacity: 0.95 },
+      { kind: "progress", source: "day", x: 0.5, y: 0.74, size: 7, w: 0.66, colorHex: "#8FD3FE", opacity: 1 },
+      { kind: "text", text: "today", x: 0.5, y: 0.87, size: 9, colorHex: "#FFFFFF", opacity: 0.6, w: 0, align: "center", bold: false }
+    ] } },
+    { category: "Live", design: { name: "Year Progress", kind: "freestyle", themeID: "cosmos", fontStyle: "mono", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "text", text: "2026", x: 0.5, y: 0.32, size: 30, colorHex: "#FFFFFF", opacity: 1, w: 0, align: "center", bold: true },
+      { kind: "progress", source: "year", x: 0.5, y: 0.58, size: 9, w: 0.72, colorHex: "#C7A6FF", opacity: 1 },
+      { kind: "text", text: "loading…", x: 0.5, y: 0.75, size: 10, colorHex: "#B9A8D8", opacity: 0.85, w: 0, align: "center", bold: false }
+    ] } },
+    { category: "Photos", design: { name: "Polaroid", kind: "freestyle", themeID: "paper", fontStyle: "noteworthy", textColorHex: "#333333", canvasElements: [
+      { kind: "shape", shape: "rect", w: 0.74, h: 0.8, x: 0.5, y: 0.5, size: 0, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "photo", x: 0.5, y: 0.43, w: 0.62, shape: "rect", size: 18, opacity: 1, aspect: 1 },
+      { kind: "text", text: "our story 🤍", x: 0.5, y: 0.78, size: 12, colorHex: "#4A4A4A", opacity: 1, w: 0, align: "center", bold: true }
+    ] } },
+    { category: "Quotes", design: { name: "Daily Quote", kind: "quote", themeID: "lavender", fontStyle: "script", textColorHex: "#FFFFFF", primaryText: "Dream big\nOne day at a time\nChoose joy\nMake it count" } },
+    { category: "Clocks", design: { name: "Rose Clock", kind: "clock", themeID: "rosegold", fontStyle: "didot", textColorHex: "#FFF6F2" } },
+    { category: "Dates", design: { name: "Sage Days", kind: "date", themeID: "sage", fontStyle: "serif", textColorHex: "#F3F8F2" } },
+    { category: "Live", design: { name: "Cozy Battery", kind: "battery", themeID: "mocha", fontStyle: "rounded", textColorHex: "#F5EBE0" } },
     { category: "Clocks", design: { name: "Midnight Moon", kind: "freestyle", themeID: "midnight", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
       { kind: "shape", shape: "pill", w: 0.84, h: 0.44, x: 0.5, y: 0.5, size: 0, colorHex: "#FFFFFF", opacity: 0.15 },
       { kind: "clock", x: 0.5, y: 0.45, size: 32, colorHex: "#FFFFFF", opacity: 1 },
@@ -3652,6 +3774,22 @@ tapPreset.onchange = function () {
 document.getElementById("glassTint").onchange = function (e) {
   current.glassTint = e.target.value;
   renderPreview();
+};
+document.getElementById("surpriseBtn").onclick = function () {
+  const pick = function (arr) { return arr[Math.floor(Math.random() * arr.length)]; };
+  const themeKeys = Object.keys(THEMES);
+  let theme = pick(themeKeys);
+  while (theme === current.themeID && themeKeys.length > 1) theme = pick(themeKeys);
+  current.themeID = theme;
+  current.customColors = null;
+  current.fontStyle = pick(Object.keys(FONT_CSS));
+  current.gradientDir = pick(["diagonal", "vertical", "horizontal"]);
+  current.textColorHex = theme === "paper" ? "#333333"
+    : (current.textColorHex === "#333333" || !current.textColorHex) ? "#FFFFFF" : current.textColorHex;
+  syncControls();
+  renderAll();
+  popCanvas();
+  toast("🎲 " + theme + " + " + (FONT_LABELS[current.fontStyle] || current.fontStyle) + " — roll again?");
 };
 document.getElementById("bgOpacity").oninput = function (e) {
   current.bgOpacity = Number(e.target.value) / 100;
@@ -4072,6 +4210,17 @@ setInterval(function () {
     select.appendChild(option);
   }
 })();
+document.getElementById("wizardBtn").onclick = function () {
+  document.getElementById("setupWizard").classList.add("open");
+  document.body.style.overflow = "hidden";
+};
+document.getElementById("wizardCloseBtn").onclick = function () {
+  document.getElementById("setupWizard").classList.remove("open");
+  document.body.style.overflow = "";
+};
+document.getElementById("wizardCopyBtn").onclick = function () {
+  document.getElementById("copyScriptBtn").onclick();
+};
 setupLauncherControls();
 renderTemplates();
 renderLibrary();
