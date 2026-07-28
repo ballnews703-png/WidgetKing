@@ -839,6 +839,14 @@ async function fetchSleeper(el) {
     const rosters = await new Request(base + "/league/" + el.leagueID + "/rosters").loadJSON();
     const mine = rosters.find(function (r) { return r.owner_id === el.userID; });
     if (!mine) return null;
+    const users = await new Request(base + "/league/" + el.leagueID + "/users").loadJSON();
+    function teamOf(ownerID) {
+      const u = (users || []).find(function (x) { return x.user_id === ownerID; }) || {};
+      const meta = u.metadata || {};
+      let avatar = meta.avatar || "";
+      if (!avatar && u.avatar) avatar = "https://sleepercdn.com/avatars/thumbs/" + u.avatar;
+      return { name: String(meta.team_name || u.display_name || "Team").slice(0, 18), avatar: avatar };
+    }
     const sorted = rosters.slice().sort(function (a, b) {
       const aw = (a.settings || {}).wins || 0, bw = (b.settings || {}).wins || 0;
       if (bw !== aw) return bw - aw;
@@ -850,7 +858,9 @@ async function fetchSleeper(el) {
       wins: (mine.settings || {}).wins || 0,
       losses: (mine.settings || {}).losses || 0,
       rank: rank,
-      me: 0, opp: 0
+      me: 0, opp: 0,
+      myTeam: teamOf(el.userID),
+      oppTeam: { name: "Opponent", avatar: "" }
     };
     const matchups = await new Request(base + "/league/" + el.leagueID + "/matchups/" + week).loadJSON();
     const my = (matchups || []).find(function (m) { return m.roster_id === mine.roster_id; });
@@ -859,7 +869,11 @@ async function fetchSleeper(el) {
       const opp = (matchups || []).find(function (m) {
         return m.matchup_id === my.matchup_id && m.roster_id !== my.roster_id;
       });
-      if (opp) out.opp = Math.round((opp.points || 0) * 10) / 10;
+      if (opp) {
+        out.opp = Math.round((opp.points || 0) * 10) / 10;
+        const oppRoster = rosters.find(function (r) { return r.roster_id === opp.roster_id; });
+        if (oppRoster) out.oppTeam = teamOf(oppRoster.owner_id);
+      }
     }
     fm.writeString(cachePath, JSON.stringify(out));
     return out;
@@ -869,8 +883,15 @@ async function fetchSleeper(el) {
   }
 }
 function sleeperText(el, s) {
-  if (!s) return el.mode === "record" ? "– · –" : "Connect Sleeper";
+  if (!s) {
+    if (el.mode === "record") return "– · –";
+    if (el.mode === "myteam") return "My Team";
+    if (el.mode === "opponent") return "Opponent";
+    return "Connect Sleeper";
+  }
   if (el.mode === "record") return s.wins + "-" + s.losses + (s.rank ? " · #" + s.rank : "");
+  if (el.mode === "myteam") return (s.myTeam || {}).name || "My Team";
+  if (el.mode === "opponent") return (s.oppTeam || {}).name || "Opponent";
   return s.me.toFixed(1) + " – " + s.opp.toFixed(1);
 }
 // Fetch only the live data this design actually uses.
@@ -879,7 +900,7 @@ async function liveDataFor(design) {
   const live = {};
   if (els.some(function (e) { return e.kind === "weather"; })) live.weather = await fetchWeather();
   if (els.some(function (e) { return e.kind === "calendar"; })) live.event = await fetchNextEvent();
-  const sleeperEls = els.filter(function (e) { return e.kind === "sleeper" && e.leagueID; });
+  const sleeperEls = els.filter(function (e) { return (e.kind === "sleeper" || e.kind === "sleeperlogo") && e.leagueID; });
   if (sleeperEls.length) {
     live.sleeper = {};
     for (const el of sleeperEls) {
@@ -1256,7 +1277,7 @@ function drawFreestyle(design, family, bgImg, live) {
       }
       continue;
     }
-    if (el.kind === "app") continue; // apps render as tappable overlay stacks
+    if (el.kind === "app" || el.kind === "sleeperlogo") continue; // rendered as overlay stacks
     let text;
     if (el.kind === "clock") { const df = new DateFormatter(); df.useShortTimeStyle(); text = df.string(new Date()); }
     else if (el.kind === "date") { const df = new DateFormatter(); df.dateFormat = "EEE MMM d"; text = df.string(new Date()); }
@@ -1288,8 +1309,8 @@ function drawFreestyle(design, family, bgImg, live) {
 // App elements in freestyle designs are laid over the drawn background as
 // real stacks, so they get crisp rounded icons AND per-icon tap targets
 // (iOS allows multiple tap targets on medium/large widgets only).
-async function addFreestyleApps(w, design, family) {
-  const apps = (design.canvasElements || []).filter(function (el) { return el.kind === "app"; });
+async function addFreestyleApps(w, design, family, live) {
+  const apps = (design.canvasElements || []).filter(function (el) { return el.kind === "app" || el.kind === "sleeperlogo"; });
   if (apps.length === 0) return;
   const dims = widgetPointSizes(family);
   const W = dims[0], H = dims[1];
@@ -1327,6 +1348,24 @@ async function addFreestyleApps(w, design, family) {
       cell.layoutVertically();
       if (el.url) cell.url = el.url;
       const iconStack = cell.addStack();
+      if (el.kind === "sleeperlogo") {
+        // Live Sleeper team avatar as a circular badge; taps open Sleeper.
+        const s = live && live.sleeper ? live.sleeper[el.leagueID] : null;
+        const team = s ? (el.side === "opp" ? s.oppTeam : s.myTeam) : null;
+        let avatar = null;
+        if (team && team.avatar) avatar = await loadIcon(team.avatar);
+        if (avatar) {
+          const img = iconStack.addImage(avatar);
+          img.imageSize = new Size(pt, pt);
+          img.cornerRadius = pt / 2;
+        } else {
+          const t = iconStack.addText(el.side === "opp" ? "🛡" : "🏈");
+          t.font = Font.systemFont(Math.round(pt * 0.85));
+        }
+        if (!cell.url) cell.url = "sleeper://";
+        cursorX = left + pt;
+        continue;
+      }
       const elTheme = el.iconTheme && ICON_THEMES[el.iconTheme] ? el.iconTheme : "real";
       let realIcon = null;
       if (elTheme !== "real") {
@@ -1528,7 +1567,7 @@ async function buildWidget(design, position) {
     w.setPadding(0, 0, 0, 0);
     const live = await liveDataFor(design);
     w.backgroundImage = drawFreestyle(design, family, bgImg, live);
-    await addFreestyleApps(w, design, family);
+    await addFreestyleApps(w, design, family, live);
     w.refreshAfterDate = new Date(Date.now() + 5 * 60 * 1000);
     return w;
   }
@@ -1988,12 +2027,16 @@ function normalizeDesign(design) {
       if (!["day", "refresh"].includes(el.rotate)) el.rotate = "day";
     }
     if (el.kind === "weather" && el.unit !== "c") el.unit = "f";
-    if (el.kind === "sleeper") {
+    if (el.kind === "sleeper" || el.kind === "sleeperlogo") {
       if (typeof el.username !== "string") el.username = "";
       if (typeof el.userID !== "string") el.userID = "";
       if (typeof el.leagueID !== "string") el.leagueID = "";
       if (typeof el.leagueName !== "string") el.leagueName = "";
-      if (el.mode !== "record") el.mode = "score";
+      if (el.kind === "sleeper" && !["score", "record", "myteam", "opponent"].includes(el.mode)) el.mode = "score";
+      if (el.kind === "sleeperlogo") {
+        if (el.side !== "opp") el.side = "me";
+        if (typeof el.size !== "number" || el.size < 16) el.size = 34;
+      }
     }
     if (el.kind === "progress" || el.kind === "ring") {
       if (!["battery", "day", "year", "countdown"].includes(el.source)) el.source = el.kind === "ring" ? "battery" : "day";
@@ -2339,7 +2382,7 @@ const AI_SCHEMA = {
       items: {
         type: "object",
         properties: {
-          kind: { type: "string", "enum": ["text", "clock", "date", "emoji", "icon", "shape", "battery", "countdown", "app", "weather", "calendar", "progress", "ring", "sleeper"] },
+          kind: { type: "string", "enum": ["text", "clock", "date", "emoji", "icon", "shape", "battery", "countdown", "app", "weather", "calendar", "progress", "ring", "sleeper", "sleeperlogo"] },
           text: { type: "string", description: "Text or emoji content; for kind=icon a single glyph like ★ ♥ ● ▲ ☾ ⚡ ✈ ⚙ →; empty for other kinds" },
           label: { type: "string", description: "App name for kind=app; empty otherwise" },
           url: { type: "string", description: "URL scheme to open for kind=app (e.g. spotify://); empty otherwise" },
@@ -2353,11 +2396,12 @@ const AI_SCHEMA = {
           w: { type: "number", description: "Shape width 0-1 of canvas (0 when unused). For kind=text: 0 = auto single line, >0 = wrapping text box of that width — use ~0.8 for quotes/long text" },
           h: { type: "number", description: "Shape height 0-1 of canvas; 0 when unused (ignored for circles)" },
           align: { type: "string", "enum": ["", "left", "center", "right"], description: "Text-box alignment when kind=text and w>0; empty otherwise" },
+          mode: { type: "string", "enum": ["", "score", "record", "myteam", "opponent"], description: "For kind=sleeper: what to show (score/record/myteam name/opponent name). For kind=sleeperlogo: myteam or opponent picks whose circular team logo. Empty otherwise" },
           source: { type: "string", "enum": ["", "day", "year", "battery", "countdown"], description: "For kind=progress (bar) and kind=ring (circular gauge): what it measures; empty otherwise. Rings: w = diameter 0-1 of the short side, size = stroke thickness pt (5-10)" },
           bold: { type: "boolean", description: "For kind=text: false for lighter body text; true otherwise" },
           dateISO: { type: "string", description: "yyyy-MM-dd for countdown elements; empty otherwise" }
         },
-        required: ["kind", "text", "label", "url", "font", "x", "y", "size", "colorHex", "opacity", "shape", "w", "h", "align", "bold", "source", "dateISO"],
+        required: ["kind", "text", "label", "url", "font", "x", "y", "size", "colorHex", "opacity", "shape", "w", "h", "align", "bold", "mode", "source", "dateISO"],
         additionalProperties: false
       }
     }
@@ -2373,10 +2417,10 @@ const AI_EX_RING = {
   backgroundColors: [], tapUrl: "", apps: [],
   canvasElements: [
     { kind: "ring", text: "", label: "", url: "", font: "", x: 0.3, y: 0.5, size: 7, colorHex: "#8FD3FE", opacity: 1, shape: "", w: 0.52, h: 0, align: "", bold: true, source: "battery", dateISO: "" },
-    { kind: "battery", text: "", label: "", url: "", font: "", x: 0.3, y: 0.5, size: 21, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, source: "", dateISO: "" },
-    { kind: "text", text: "POWER", label: "", url: "", font: "", x: 0.72, y: 0.3, size: 10, colorHex: "#8FD3FE", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, source: "", dateISO: "" },
+    { kind: "battery", text: "", label: "", url: "", font: "", x: 0.3, y: 0.5, size: 21, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, mode: "", source: "", dateISO: "" },
+    { kind: "text", text: "POWER", label: "", url: "", font: "", x: 0.72, y: 0.3, size: 10, colorHex: "#8FD3FE", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, mode: "", source: "", dateISO: "" },
     { kind: "date", text: "", label: "", url: "", font: "", x: 0.72, y: 0.46, size: 11, colorHex: "#FFFFFF", opacity: 0.85, shape: "", w: 0, h: 0, align: "", bold: false, source: "", dateISO: "" },
-    { kind: "shape", text: "", label: "", url: "", font: "", x: 0.72, y: 0.58, size: 0, colorHex: "#FFFFFF", opacity: 0.25, shape: "rect", w: 0.3, h: 0.006, align: "", bold: true, source: "", dateISO: "" },
+    { kind: "shape", text: "", label: "", url: "", font: "", x: 0.72, y: 0.58, size: 0, colorHex: "#FFFFFF", opacity: 0.25, shape: "rect", w: 0.3, h: 0.006, align: "", bold: true, mode: "", source: "", dateISO: "" },
     { kind: "progress", text: "", label: "", url: "", font: "", x: 0.72, y: 0.7, size: 5, colorHex: "#8FD3FE", opacity: 1, shape: "", w: 0.3, h: 0, align: "", bold: true, source: "day", dateISO: "" }
   ]
 };
@@ -2386,10 +2430,10 @@ const AI_EX_HERO = {
   background: "gradient", glassTint: "dark", bgOpacity: 1,
   backgroundColors: ["#2A1A34", "#B0626A"], tapUrl: "", apps: [],
   canvasElements: [
-    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.51, y: 0.462, size: 46, colorHex: "#141018", opacity: 0.45, shape: "", w: 0, h: 0, align: "", bold: true, source: "", dateISO: "" },
-    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.5, y: 0.45, size: 46, colorHex: "#FFF6EC", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, source: "", dateISO: "" },
-    { kind: "text", text: "golden hour", label: "", url: "", font: "script", x: 0.5, y: 0.66, size: 13, colorHex: "#F2B694", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, source: "", dateISO: "" },
-    { kind: "icon", text: "\u2600", label: "", url: "", font: "", x: 0.86, y: 0.16, size: 14, colorHex: "#F2B694", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, source: "", dateISO: "" }
+    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.51, y: 0.462, size: 46, colorHex: "#141018", opacity: 0.45, shape: "", w: 0, h: 0, align: "", bold: true, mode: "", source: "", dateISO: "" },
+    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.5, y: 0.45, size: 46, colorHex: "#FFF6EC", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, mode: "", source: "", dateISO: "" },
+    { kind: "text", text: "golden hour", label: "", url: "", font: "script", x: 0.5, y: 0.66, size: 13, colorHex: "#F2B694", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, mode: "", source: "", dateISO: "" },
+    { kind: "icon", text: "\u2600", label: "", url: "", font: "", x: 0.86, y: 0.16, size: 14, colorHex: "#F2B694", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, mode: "", source: "", dateISO: "" }
   ]
 };
 
@@ -2406,7 +2450,7 @@ function aiSystemPrompt() {
     "5 Corner Anchor (asymmetric): main element at x .34 y .42; small satellites (icon 12-16pt) near corners x/y .12 and .88.\n" +
     "6 Monogram: one letter or glyph size 50-60 centered with a ring w .72 around it.\n" +
     "7 Photo Feature: photo placeholder + translucent caption card (pill opacity .25) overlapping its lower edge.\n" +
-    "8 Matchup Card (fantasy sports): sleeper score element as hero (size 22-28, shadow duplicate behind) at y .42, microlabel 'YOU  ·  OPP' 8-9pt above it, a second sleeper element mode omitted (defaults to score) — use ONE score + one record line 9-10pt, divider, plus a day ring or countdown in a side column. kind=sleeper shows the user's LIVE fantasy matchup (they link their league afterward — leave its config fields empty). Use it whenever fantasy football/Sleeper is mentioned.\n" +
+    "8 Matchup Card (fantasy sports): sleeper score element as hero (size 22-28, shadow duplicate behind) at y .42, microlabel 'YOU  ·  OPP' 8-9pt above it, a second sleeper element mode omitted (defaults to score) — use ONE score + one record line 9-10pt, divider, plus a day ring or countdown in a side column. kind=sleeper shows the user's LIVE fantasy matchup (they link their league afterward — leave its config fields empty). Also available: mode myteam/opponent on sleeper = the TEAM NAMES, and kind=sleeperlogo (mode myteam/opponent) = circular team LOGOS 30-38pt — flank the score with both logos and put the names 8-9pt beneath them for a broadcast-style matchup card. Use these whenever fantasy football/Sleeper is mentioned.\n" +
     "CRAFT TRICKS the renderer supports:\n" +
     "- Shadow: duplicate the SAME element first in near-black (#141018, opacity .4-.5) offset +.01 x, +.012 y, then the real one on top. Use on hero type.\n" +
     "- Glow: duplicate first in the accent color, opacity .2-.3, size +6, then the real element. Neon moods.\n" +
@@ -2495,7 +2539,7 @@ function specToDesign(spec) {
     return { emoji: app.emoji || "🌐", label: (app.label || "App").slice(0, 12), url: app.url || "" };
   });
   design.canvasElements = (spec.canvasElements || []).slice(0, 16).map(function (el) {
-    const kind = ["text","clock","date","emoji","icon","shape","battery","countdown","app","weather","calendar","progress","ring","sleeper"].includes(el.kind) ? el.kind : "text";
+    const kind = ["text","clock","date","emoji","icon","shape","battery","countdown","app","weather","calendar","progress","ring","sleeper","sleeperlogo"].includes(el.kind) ? el.kind : "text";
     const rawW = Number(el.w) || 0;
     const out = {
       id: uid(),
@@ -2529,7 +2573,11 @@ function specToDesign(spec) {
     }
     if (kind === "icon" && !out.text) out.text = "★";
     if (kind === "weather") out.unit = "f";
-    if (kind === "sleeper") { out.mode = "score"; out.username = ""; out.userID = ""; out.leagueID = ""; out.leagueName = ""; }
+    if (kind === "sleeper" || kind === "sleeperlogo") {
+      out.username = ""; out.userID = ""; out.leagueID = ""; out.leagueName = "";
+      if (kind === "sleeper") out.mode = ["score","record","myteam","opponent"].includes(el.mode) ? el.mode : "score";
+      if (kind === "sleeperlogo") { out.side = el.mode === "opponent" ? "opp" : "me"; out.size = Math.min(Math.max(Number(el.size) || 34, 16), 96); }
+    }
     if (kind === "progress" || kind === "ring") {
       out.source = ["day","year","battery","countdown"].includes(el.source) ? el.source : (kind === "ring" ? "battery" : "day");
       out.w = Math.min(Math.max(rawW || (kind === "ring" ? 0.55 : 0.7), 0.1), 1);
@@ -2751,6 +2799,13 @@ function renderFreestyleInto(node, design, w, h, interactive) {
         ";pointer-events:none";
       div.appendChild(fill);
       div.classList.add("cel-shape");
+    } else if (el.kind === "sleeperlogo") {
+      const pt = (el.size || 34) * scale;
+      div.style.cssText += "width:" + pt + "px;height:" + pt + "px;border-radius:50%;" +
+        "background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;" +
+        "font-size:" + Math.round(pt * 0.55) + "px;overflow:hidden";
+      div.textContent = el.side === "opp" ? "🛡" : "🏈";
+      div.style.opacity = el.opacity;
     } else if (el.kind === "app") {
       const pt = (el.size || 40) * scale;
       const iconBox = document.createElement("div");
@@ -2803,7 +2858,8 @@ function renderFreestyleInto(node, design, w, h, interactive) {
       else if (el.kind === "icon") div.textContent = el.text || "★";
       else if (el.kind === "weather") div.textContent = "☀️ " + (el.unit === "c" ? "22°" : "72°");
       else if (el.kind === "calendar") div.textContent = "Team call · 2:30 PM";
-      else if (el.kind === "sleeper") div.textContent = el.mode === "record" ? "7-2 · #3" : "112.4 – 98.7";
+      else if (el.kind === "sleeper") div.textContent = el.mode === "record" ? "7-2 · #3"
+        : el.mode === "myteam" ? "Birds of Prey" : el.mode === "opponent" ? "Waiver Wire FC" : "112.4 – 98.7";
       else div.textContent = el.text || "Text";
     }
     if (interactive) attachDrag(div, el);
@@ -2964,7 +3020,7 @@ function attachDrag(div, el) {
 // ==================== Freestyle palette & inspector ====================
 const ELEMENT_PALETTE = [["text", "Text"], ["photo", "🖼 Photo"], ["app", "📲 App icon"],
   ["clock", "🕐 Clock"], ["date", "📅 Date"], ["weather", "☀️ Weather"], ["calendar", "📆 Calendar"],
-  ["progress", "▬ Progress"], ["ring", "◯ Ring"], ["sleeper", "🏈 Fantasy"], ["icon", "◆ Icon"], ["emoji", "✨ Emoji"],
+  ["progress", "▬ Progress"], ["ring", "◯ Ring"], ["sleeper", "🏈 Fantasy"], ["sleeperlogo", "🛡 Team logo"], ["icon", "◆ Icon"], ["emoji", "✨ Emoji"],
   ["shape", "▢ Shape"], ["battery", "🔋 Battery"], ["countdown", "⏳ Countdown"]];
 
 function dayOfYear(d) {
@@ -3019,7 +3075,18 @@ function addElement(kind) {
   if (kind === "weather") { el.unit = "f"; }
   if (kind === "progress") { el.source = "day"; el.w = 0.7; }
   if (kind === "ring") { el.source = "battery"; el.w = 0.55; }
-  if (kind === "sleeper") { el.mode = "score"; el.username = ""; el.userID = ""; el.leagueID = ""; el.leagueName = ""; }
+  if (kind === "sleeper" || kind === "sleeperlogo") {
+    el.mode = "score"; el.side = "me";
+    el.username = ""; el.userID = ""; el.leagueID = ""; el.leagueName = "";
+    const linked = current.canvasElements.find(function (e) {
+      return (e.kind === "sleeper" || e.kind === "sleeperlogo") && e.leagueID;
+    });
+    if (linked) {
+      el.username = linked.username; el.userID = linked.userID;
+      el.leagueID = linked.leagueID; el.leagueName = linked.leagueName;
+    }
+    if (kind === "sleeperlogo") el.size = 34;
+  }
   if (kind === "app") {
     el.label = "App"; el.url = ""; el.iconUrl = ""; el.emoji = "📲";
     el.shape = "rounded"; el.showLabel = false;
@@ -3086,6 +3153,7 @@ function labelForElement(el) {
   if (el.kind === "progress") return "▬ " + (el.source || "day");
   if (el.kind === "ring") return "◯ " + (el.source || "battery");
   if (el.kind === "sleeper") return "🏈 " + (el.leagueName || "Fantasy");
+  if (el.kind === "sleeperlogo") return (el.side === "opp" ? "🛡 Opp logo" : "🏈 My logo");
   if (el.kind === "clock") return "🕐 Clock";
   if (el.kind === "date") return "📅 Date";
   if (el.kind === "emoji") return el.text || "✨";
@@ -3318,17 +3386,25 @@ function buildInspectorContent(inspector) {
     inspector.appendChild(calHint);
   }
 
-  if (el.kind === "sleeper") {
+  if (el.kind === "sleeper" || el.kind === "sleeperlogo") {
     const modeRow = document.createElement("div");
     modeRow.className = "row";
     const modeSel = document.createElement("select");
-    for (const [value, label] of [["score", "🏈 Live matchup score"], ["record", "🏆 Record & rank"]]) {
+    const modeOptions = el.kind === "sleeperlogo"
+      ? [["me", "🏈 My team logo"], ["opp", "🛡 Opponent logo"]]
+      : [["score", "🏈 Live matchup score"], ["record", "🏆 Record & rank"],
+         ["myteam", "🏷 My team name"], ["opponent", "🏷 Opponent name"]];
+    for (const [value, label] of modeOptions) {
       const option = document.createElement("option");
       option.value = value; option.textContent = label;
       modeSel.appendChild(option);
     }
-    modeSel.value = el.mode === "record" ? "record" : "score";
-    modeSel.onchange = function () { el.mode = modeSel.value; refreshCanvases(); };
+    modeSel.value = el.kind === "sleeperlogo" ? (el.side === "opp" ? "opp" : "me")
+      : (["record", "myteam", "opponent"].includes(el.mode) ? el.mode : "score");
+    modeSel.onchange = function () {
+      if (el.kind === "sleeperlogo") { el.side = modeSel.value; } else { el.mode = modeSel.value; }
+      refreshCanvases();
+    };
     modeRow.appendChild(modeSel);
     inspector.appendChild(modeRow);
     const userRow = document.createElement("div");
@@ -4042,15 +4118,17 @@ function buildTemplates() {
       { kind: "icon", text: "⚡", x: 0.14, y: 0.16, size: 14, colorHex: "#FF2079", opacity: 1 }
     ] } },
     { category: "Sports", pack: "Sports", design: { name: "Fantasy Command", kind: "freestyle", themeID: "custom", customColors: ["#0C1712", "#14402A"], fontStyle: "futura", textColorHex: "#FFFFFF", canvasElements: [
-      { kind: "text", text: "YOU  ·  OPP", x: 0.34, y: 0.2, size: 9, colorHex: "#7FE08F", opacity: 0.9, w: 0, align: "center", bold: true },
-      { kind: "sleeper", mode: "score", x: 0.348, y: 0.432, size: 24, colorHex: "#08130C", opacity: 0.5 },
-      { kind: "sleeper", mode: "score", x: 0.34, y: 0.42, size: 24, colorHex: "#FFFFFF", opacity: 1 },
-      { kind: "sleeper", mode: "record", x: 0.34, y: 0.6, size: 10, colorHex: "#7FE08F", opacity: 0.95 },
-      { kind: "shape", shape: "rect", x: 0.34, y: 0.73, w: 0.42, h: 0.006, size: 0, colorHex: "#FFFFFF", opacity: 0.25 },
-      { kind: "text", text: "MY LEAGUE", x: 0.34, y: 0.84, size: 8, colorHex: "#FFFFFF", opacity: 0.6, w: 0, align: "center", bold: true },
-      { kind: "ring", source: "day", x: 0.79, y: 0.42, w: 0.34, size: 5, colorHex: "#7FE08F", opacity: 1 },
-      { kind: "text", text: "game day", x: 0.79, y: 0.68, size: 8, colorHex: "#FFFFFF", opacity: 0.7, w: 0, align: "center", bold: false },
-      { kind: "icon", text: "★", x: 0.79, y: 0.42, size: 13, colorHex: "#FFD75E", opacity: 1 }
+      { kind: "sleeperlogo", side: "me", x: 0.14, y: 0.34, size: 32, opacity: 1 },
+      { kind: "sleeperlogo", side: "opp", x: 0.54, y: 0.34, size: 32, opacity: 1 },
+      { kind: "sleeper", mode: "score", x: 0.348, y: 0.352, size: 20, colorHex: "#08130C", opacity: 0.5 },
+      { kind: "sleeper", mode: "score", x: 0.34, y: 0.34, size: 20, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "sleeper", mode: "myteam", x: 0.14, y: 0.58, size: 8, colorHex: "#7FE08F", opacity: 0.95 },
+      { kind: "sleeper", mode: "opponent", x: 0.54, y: 0.58, size: 8, colorHex: "#FFFFFF", opacity: 0.7 },
+      { kind: "sleeper", mode: "record", x: 0.34, y: 0.72, size: 10, colorHex: "#7FE08F", opacity: 0.95 },
+      { kind: "shape", shape: "rect", x: 0.34, y: 0.83, w: 0.42, h: 0.006, size: 0, colorHex: "#FFFFFF", opacity: 0.25 },
+      { kind: "ring", source: "day", x: 0.85, y: 0.4, w: 0.26, size: 4, colorHex: "#7FE08F", opacity: 1 },
+      { kind: "icon", text: "★", x: 0.85, y: 0.4, size: 11, colorHex: "#FFD75E", opacity: 1 },
+      { kind: "text", text: "game day", x: 0.85, y: 0.62, size: 7, colorHex: "#FFFFFF", opacity: 0.7, w: 0, align: "center", bold: false }
     ] } },
     { category: "Sports", pack: "Sports", design: { name: "Game Slate", kind: "launcher", themeID: "custom", customColors: ["#0C1712", "#1C1C24"], fontStyle: "futura", textColorHex: "#FFFFFF", launcherStyle: { iconSize: 40, shape: "rounded", labels: true, columns: 3 }, apps: [
       { emoji: "🏈", label: "ESPN Fantasy", url: "fantasyapp://" },
