@@ -262,26 +262,27 @@
   <textarea id="magicInput" placeholder="A launcher with Spotify, Instagram and YouTube"></textarea>
   <div class="chips" id="magicChips"></div>
   <button class="primary" id="magicBtn">Build it ✨</button>
+  <button id="cloneBtn" style="display:none;width:100%;margin-top:8px">📷 Clone a widget from a photo</button>
+  <input type="file" id="cloneInput" accept="image/*" style="display:none">
+  <div id="magicFallback" style="display:none;margin-top:10px">
+    <p class="hint">🤔 That idea is too detailed for the free built-in parser — it would just become a text note. Better options:</p>
+    <div class="row">
+      <button id="mfBuilder">🪄 Answer 3 quick questions</button>
+      <button id="mfAI">✨ Set up Claude AI</button>
+      <button id="mfNote">📝 Keep it as a note</button>
+    </div>
+  </div>
   <details>
     <summary>🤖 Optional: use Claude AI for smarter results</summary>
     <p class="hint" style="margin-top:8px">
-      Paste an Anthropic API key and the Magic box sends your idea straight from
-      this browser to Claude, which designs the whole widget — layout, colors,
-      apps, dates, everything. <b>This is the only paid thing in WidgetKing</b>:
-      API keys are pay-per-use (roughly a few cents per widget). Leave it empty
-      and the free built-in parser is used. The key is stored only in this
-      browser.
+      Paste an Anthropic API key and Claude designs whole widgets from your
+      words (and clones them from photos). <b>The only paid thing in
+      WidgetKing</b> — a few cents per widget, key stored only in this browser.
+      Sharing with family: use <b>📲 Send all to my other device</b> and include
+      the key — their device gets designs + AI with zero setup, and your prepaid
+      balance ($5, auto-reload off) stays a hard cap for everyone combined.
     </p>
     <input type="password" id="apiKeyInput" placeholder="sk-ant-…" autocomplete="off">
-    <p class="hint" style="margin-top:6px">
-      👨‍👩‍👧 <b>Sharing with family:</b> easiest way — tap
-      <b>📲 Send all to my other device</b> below and choose to include your AI
-      key: their device gets your designs <i>and</i> AI, zero setup. The key
-      stays out of the public site (it only rides inside that private link) and
-      lives in their browser only. All devices draw from the same prepaid
-      credits, so a small balance ($5, auto-reload off) stays a hard cap for
-      everyone combined.
-    </p>
     <div class="row" style="margin-top:8px">
       <span style="font-size:12px;color:var(--muted)">Model</span>
       <select id="aiModel" style="flex:1">
@@ -289,6 +290,9 @@
         <option value="claude-haiku-4-5">Fast &amp; cheap — Claude Haiku (a fraction of a cent)</option>
       </select>
     </div>
+    <label style="font-size:13px;display:flex;align-items:center;gap:6px;margin-top:8px">
+      <input type="checkbox" id="aiPolish"> ✨ Design-director pass — a second AI review for extra polish (doubles the per-widget cost)
+    </label>
     <div class="row" style="margin-top:8px">
       <span style="font-size:12px;color:var(--muted)">Budget $</span>
       <input type="text" id="budgetInput" inputmode="decimal" style="width:64px">
@@ -483,7 +487,6 @@
     <button id="backupBtn">💾 Back up all designs</button>
     <button id="importJsonBtn">📂 Restore / Import</button>
     <button id="syncAllBtn">📲 Send all to my other device</button>
-    <button id="exportJsonBtn" style="display:none">Export JSON</button>
     <input type="file" id="importFile" accept=".json,application/json" style="display:none">
   </div>
 </section>
@@ -500,7 +503,7 @@
     <li>In Scriptable, tap <b>+</b>, paste, and name it <b>WidgetKing</b>.</li>
     <li>Long-press your Home Screen → <b>Edit → Add Widget</b> → search <b>Scriptable</b> → add a widget (use <b>Medium/Large</b> for launchers so every icon is tappable).</li>
     <li>Long-press the widget → <b>Edit Widget</b> → Script: <b>WidgetKing</b>, and set <b>Parameter</b> to a design's name. Different widgets can show different designs.</li>
-    <li><b>Glass / Clear backgrounds (one-time):</b> long-press your Home Screen, swipe to the last empty page, take a screenshot. Then open the WidgetKing script <i>inside</i> Scriptable, run it (▶), choose <b>Set wallpaper photo…</b> and pick that screenshot. For pixel-perfect <b>Clear</b> widgets, set the widget Parameter to <b>Name | position</b> — e.g. <b>My Clock | top-left</b> (small: top/middle/bottom-left/right; medium &amp; large: top, middle, bottom). Glass looks great without a position.</li>
+    <li><b>Glass / Clear backgrounds:</b> follow the ✨ step in the wizard above (one-time wallpaper photo; Clear also wants Parameter <b>Name | position</b>).</li>
     <li>Changed your designs? Copy the script again and paste over the old one.</li>
   </ol>
   </details>
@@ -828,7 +831,7 @@ function rgbToHex(rgb) {
   }).join("");
 }
 
-// ---- Transparent / glass backgrounds (wallpaper slice, Koco-style) ----
+// ---- Transparent / glass backgrounds (wallpaper slice technique) ----
 function wallpaperPath() {
   const fm = FileManager.local();
   return fm.joinPath(fm.documentsDirectory(), "widgetking-wallpaper.jpg");
@@ -1123,6 +1126,36 @@ function drawFreestyle(design, family, bgImg, live) {
         fill.addRoundedRect(new Rect(x0, y0, Math.max(hPx, wPx * pct), hPx), r, r);
         ctx.addPath(fill);
         ctx.fillPath();
+      }
+      continue;
+    }
+    if (el.kind === "ring") {
+      // Progress ring: polyline arc (DrawContext has no arc API). Track
+      // circle at low alpha, then the progress sweep from 12 o'clock.
+      const pct = Math.min(Math.max(progressPct(el), 0), 1);
+      const dia = (el.w || 0.55) * Math.min(W, H);
+      const radius2 = dia / 2;
+      const stroke = Math.max(2 * scale, (el.size || 7) * scale);
+      const rr = radius2 - stroke / 2;
+      ctx.setLineWidth(stroke);
+      function ringPath(fromT, toT) {
+        const path = new Path();
+        const steps = Math.max(8, Math.round(72 * (toT - fromT)));
+        for (let s2 = 0; s2 <= steps; s2++) {
+          const a = -Math.PI / 2 + 2 * Math.PI * (fromT + (toT - fromT) * (s2 / steps));
+          const ptx = px + rr * Math.cos(a);
+          const pty = py + rr * Math.sin(a);
+          if (s2 === 0) path.move(new Point(ptx, pty)); else path.addLine(new Point(ptx, pty));
+        }
+        return path;
+      }
+      ctx.setStrokeColor(new Color(el.colorHex || "#FFFFFF", op * 0.25));
+      ctx.addPath(ringPath(0, 1));
+      ctx.strokePath();
+      if (pct > 0.01) {
+        ctx.setStrokeColor(new Color(el.colorHex || "#FFFFFF", op));
+        ctx.addPath(ringPath(0, pct));
+        ctx.strokePath();
       }
       continue;
     }
@@ -1854,9 +1887,9 @@ function normalizeDesign(design) {
       if (!["day", "refresh"].includes(el.rotate)) el.rotate = "day";
     }
     if (el.kind === "weather" && el.unit !== "c") el.unit = "f";
-    if (el.kind === "progress") {
-      if (!["battery", "day", "year", "countdown"].includes(el.source)) el.source = "day";
-      if (typeof el.w !== "number" || el.w <= 0 || el.w > 1) el.w = 0.7;
+    if (el.kind === "progress" || el.kind === "ring") {
+      if (!["battery", "day", "year", "countdown"].includes(el.source)) el.source = el.kind === "ring" ? "battery" : "day";
+      if (typeof el.w !== "number" || el.w <= 0 || el.w > 1) el.w = el.kind === "ring" ? 0.55 : 0.7;
       if (el.source === "countdown") {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(el.dateISO || "")) el.dateISO = isoInDays(30);
         if (!/^\d{4}-\d{2}-\d{2}$/.test(el.startISO || "")) el.startISO = isoInDays(0);
@@ -2194,11 +2227,11 @@ const AI_SCHEMA = {
     },
     canvasElements: {
       type: "array",
-      description: "For freestyle widgets only, max 12; empty otherwise. Position is normalized 0-1 from top-left; size is point size on a 158pt canvas. Array order is z-order: put shape cards BEFORE the text that sits on them.",
+      description: "For freestyle widgets only, max 16; empty otherwise. Position is normalized 0-1 from top-left; size is point size on a 158pt canvas. Array order is z-order: put shapes/shadows BEFORE the elements that sit on them.",
       items: {
         type: "object",
         properties: {
-          kind: { type: "string", "enum": ["text", "clock", "date", "emoji", "icon", "shape", "battery", "countdown", "app", "weather", "calendar", "progress"] },
+          kind: { type: "string", "enum": ["text", "clock", "date", "emoji", "icon", "shape", "battery", "countdown", "app", "weather", "calendar", "progress", "ring"] },
           text: { type: "string", description: "Text or emoji content; for kind=icon a single glyph like ★ ♥ ● ▲ ☾ ⚡ ✈ ⚙ →; empty for other kinds" },
           label: { type: "string", description: "App name for kind=app; empty otherwise" },
           url: { type: "string", description: "URL scheme to open for kind=app (e.g. spotify://); empty otherwise" },
@@ -2212,7 +2245,7 @@ const AI_SCHEMA = {
           w: { type: "number", description: "Shape width 0-1 of canvas (0 when unused). For kind=text: 0 = auto single line, >0 = wrapping text box of that width — use ~0.8 for quotes/long text" },
           h: { type: "number", description: "Shape height 0-1 of canvas; 0 when unused (ignored for circles)" },
           align: { type: "string", "enum": ["", "left", "center", "right"], description: "Text-box alignment when kind=text and w>0; empty otherwise" },
-          source: { type: "string", "enum": ["", "day", "year", "battery", "countdown"], description: "For kind=progress only: what the bar measures; empty otherwise" },
+          source: { type: "string", "enum": ["", "day", "year", "battery", "countdown"], description: "For kind=progress (bar) and kind=ring (circular gauge): what it measures; empty otherwise. Rings: w = diameter 0-1 of the short side, size = stroke thickness pt (5-10)" },
           bold: { type: "boolean", description: "For kind=text: false for lighter body text; true otherwise" },
           dateISO: { type: "string", description: "yyyy-MM-dd for countdown elements; empty otherwise" }
         },
@@ -2225,47 +2258,64 @@ const AI_SCHEMA = {
   additionalProperties: false
 };
 
-const AI_EXAMPLE = {
-  name: "Cozy Night", kind: "freestyle", themeID: "midnight", fontStyle: "rounded",
+const AI_EX_RING = {
+  name: "Power Hub", kind: "freestyle", themeID: "navy", fontStyle: "avenir",
   textColorHex: "#FFFFFF", primaryText: "", secondaryText: "", targetDate: "",
   background: "gradient", glassTint: "dark", bgOpacity: 1,
   backgroundColors: [], tapUrl: "", apps: [],
   canvasElements: [
-    { kind: "shape", text: "", label: "", url: "", font: "", x: 0.5, y: 0.5, size: 0, colorHex: "#FFFFFF", opacity: 0.16, shape: "pill", w: 0.84, h: 0.46, align: "", bold: true, source: "", dateISO: "" },
-    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.5, y: 0.44, size: 34, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, source: "", dateISO: "" },
-    { kind: "text", text: "sweet dreams", label: "", url: "", font: "script", x: 0.5, y: 0.62, size: 11, colorHex: "#D8CFFF", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, source: "", dateISO: "" },
-    { kind: "icon", text: "☾", label: "", url: "", font: "", x: 0.83, y: 0.15, size: 20, colorHex: "#F5E9C9", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, source: "", dateISO: "" },
-    { kind: "emoji", text: "✨", label: "", url: "", font: "", x: 0.15, y: 0.2, size: 13, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, source: "", dateISO: "" }
+    { kind: "ring", text: "", label: "", url: "", font: "", x: 0.3, y: 0.5, size: 7, colorHex: "#8FD3FE", opacity: 1, shape: "", w: 0.52, h: 0, align: "", bold: true, source: "battery", dateISO: "" },
+    { kind: "battery", text: "", label: "", url: "", font: "", x: 0.3, y: 0.5, size: 21, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, source: "", dateISO: "" },
+    { kind: "text", text: "POWER", label: "", url: "", font: "", x: 0.72, y: 0.3, size: 10, colorHex: "#8FD3FE", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, source: "", dateISO: "" },
+    { kind: "date", text: "", label: "", url: "", font: "", x: 0.72, y: 0.46, size: 11, colorHex: "#FFFFFF", opacity: 0.85, shape: "", w: 0, h: 0, align: "", bold: false, source: "", dateISO: "" },
+    { kind: "shape", text: "", label: "", url: "", font: "", x: 0.72, y: 0.58, size: 0, colorHex: "#FFFFFF", opacity: 0.25, shape: "rect", w: 0.3, h: 0.006, align: "", bold: true, source: "", dateISO: "" },
+    { kind: "progress", text: "", label: "", url: "", font: "", x: 0.72, y: 0.7, size: 5, colorHex: "#8FD3FE", opacity: 1, shape: "", w: 0.3, h: 0, align: "", bold: true, source: "day", dateISO: "" }
+  ]
+};
+const AI_EX_HERO = {
+  name: "Golden Hour", kind: "freestyle", themeID: "custom", fontStyle: "didot",
+  textColorHex: "#FFF6EC", primaryText: "", secondaryText: "", targetDate: "",
+  background: "gradient", glassTint: "dark", bgOpacity: 1,
+  backgroundColors: ["#2A1A34", "#B0626A"], tapUrl: "", apps: [],
+  canvasElements: [
+    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.51, y: 0.462, size: 46, colorHex: "#141018", opacity: 0.45, shape: "", w: 0, h: 0, align: "", bold: true, source: "", dateISO: "" },
+    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.5, y: 0.45, size: 46, colorHex: "#FFF6EC", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, source: "", dateISO: "" },
+    { kind: "text", text: "golden hour", label: "", url: "", font: "script", x: 0.5, y: 0.66, size: 13, colorHex: "#F2B694", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, source: "", dateISO: "" },
+    { kind: "icon", text: "\u2600", label: "", url: "", font: "", x: 0.86, y: 0.16, size: 14, colorHex: "#F2B694", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, source: "", dateISO: "" }
   ]
 };
 
 function aiSystemPrompt() {
   const today = new Date().toISOString().slice(0, 10);
-  return "You design iPhone Home Screen widgets for WidgetKing. The user describes a widget; return a spec.\n" +
-    "Kinds: clock (time+date), date (big day), countdown (days until an event), quote, note (short text), " +
-    "launcher (grid of tappable app icons with iOS URL schemes), battery (device battery level), " +
-    "freestyle (compose elements on a canvas — prefer it for creative or decorated requests).\n" +
-    "Fonts (fontStyle, or per-element font override): " + Object.keys(FONT_CSS).join(", ") +
-    " — didot/baskerville for elegance, script/noteworthy for handwritten, marker/chalkboard for playful, futura/avenir for modern, typewriter for retro.\n" +
-    "Freestyle elements: kind=icon is a clean monochrome glyph (set text to one glyph: ★ ☆ ♥ ♡ ● ◆ ▲ ✦ ❀ ☀ ☾ ☁ ⚡ ♪ ☕ ✈ ⌂ ✉ ⚙ ✓ → ∞) tinted via colorHex — prefer it over emoji for minimal/elegant looks. " +
-    "kind=app is a tappable app icon: set label and url (the real icon is fetched automatically); space them like a launcher grid. " +
-    "kind=weather shows live temperature with a condition emoji (size ~26). kind=calendar shows the user's next calendar event (size ~12). " +
-    "kind=progress is a rounded progress bar: set source (day/year/battery/countdown), w = bar width 0-1, size = bar thickness in points (6-12 typical) — great minimal look.\n" +
-    "Themes: " + Object.keys(THEMES).join(", ") + ". 'paper' is light (use dark text like #333333); the rest are dark (use light text). " +
-    "If the requested colors don't match a preset, set backgroundColors to two #RRGGBB colors for a custom gradient. " +
-    "Backgrounds: background=glass gives a frosted blurred wallpaper look (choose glassTint dark or light); background=clear makes the widget fully transparent against the wallpaper — use these when the user says transparent, see-through, frosted, glass, or wants it to blend with their wallpaper; otherwise background=gradient. bgOpacity below 1 (e.g. 0.5) makes a gradient blend see-through over the wallpaper like tinted glass. " +
-    "Set tapUrl when the user wants the widget to open an app on tap.\n" +
-    "Design principles for freestyle: one focal element (size 30-44); secondary text 11-16; decorations 13-24; " +
-    "keep every element inside x/y 0.08-0.92; use a translucent shape (white or black, opacity 0.15-0.35, pill or rect) " +
-    "as a card behind the main content; shapes come EARLIER in the array so they render underneath; " +
-    "center compositions on x=0.5; ensure text contrasts with the background. " +
-    "For long text (quotes, sentences) set w to ~0.8 on the text element so it wraps as a box (w=0 = auto single line), with align and bold as fits.\n" +
-    "Example — idea: 'cozy night clock with a moon' -> " + JSON.stringify(AI_EXAMPLE) + "\n" +
-    "Common app URL schemes: instagram://, spotify://, youtube://, tiktok://, twitter://, snapchat://, whatsapp://, fb://, reddit://, googlegmail://, googlechrome://, nflx://, music://, maps://, calshow://, mobilenotes://, shortcuts://, tel://, sms://, mailto:, photos-redirect://, camera://.\n" +
-    "Today is " + today + ". Resolve relative dates to yyyy-MM-dd. Keep names under 24 chars. Fill unused fields with empty strings, 0, or empty arrays.";
+  return "You are WidgetKing's expert widget designer. Design at the level of the most beautiful Home Screen setups people share online: intentional composition, real hierarchy, restraint. The user describes a widget; return a spec.\n" +
+    "Kinds: clock (time+date), date (big day), countdown, quote, note, launcher (tappable app grid), battery, freestyle (a canvas of elements — PREFER freestyle for anything creative; simple kinds are only for plain requests).\n" +
+    "FREESTYLE ELEMENTS (max 16; array order is z-order, bottom first): text, clock, date, emoji, icon (monochrome glyph ★ ☆ ♥ ● ◆ ▲ ✦ ❀ ☀ ☾ ☁ ⚡ ♪ ☕ ✈ ⌂ ✉ ⚙ ✓ → ∞, tinted via colorHex — prefer over emoji for elegance), shape (rect/pill/circle), battery, countdown, app (tappable icon: set label+url), weather (live temp), calendar (next event), progress (bar), ring (circular gauge; w=diameter 0-1 of short side, size=stroke pt 5-10; source day/year/battery/countdown).\n" +
+    "ARCHETYPES — proven layouts; pick one and adapt, or blend two:\n" +
+    "1 Ring Dashboard: ring at x .3 y .5 w .5 + its stat text centered on it (battery/countdown, size 18-22) + right column at x .72: label 10pt, date/calendar 11pt, thin divider, small progress bar.\n" +
+    "2 Hero Type: one oversized clock/countdown/date size 44-58 at y .42-.48, tiny styled caption .16 below, one accent glyph in a corner.\n" +
+    "3 Split Card: tall rect shape x .27 y .5 w .44 h .92 opacity .16 as a side panel holding the hero; secondary info column at x .74.\n" +
+    "4 Info Stack: three rows at y .2 / .5 / .8 (e.g. weather, calendar, progress), separated by divider shapes (rect w .68 h .006 opacity .3).\n" +
+    "5 Corner Anchor (asymmetric): main element at x .34 y .42; small satellites (icon 12-16pt) near corners x/y .12 and .88.\n" +
+    "6 Monogram: one letter or glyph size 50-60 centered with a ring w .72 around it.\n" +
+    "7 Photo Feature: photo placeholder + translucent caption card (pill opacity .25) overlapping its lower edge.\n" +
+    "CRAFT TRICKS the renderer supports:\n" +
+    "- Shadow: duplicate the SAME element first in near-black (#141018, opacity .4-.5) offset +.01 x, +.012 y, then the real one on top. Use on hero type.\n" +
+    "- Glow: duplicate first in the accent color, opacity .2-.3, size +6, then the real element. Neon moods.\n" +
+    "- Dividers: skinny rect shapes (h .005-.008) at opacity .25-.35 to separate rows.\n" +
+    "- Layered cards: two shapes slightly offset with opacities .12 and .22 for depth.\n" +
+    "- Font pairing: ONE display font (didot, script, futura, marker, copperplate) for the hero element only via its font field; classic/avenir/optima for data and captions. Never three fonts.\n" +
+    "- Color discipline: ONE accent color used 2-3 times (ring, caption, glyph); everything else white/near-black at varied opacities. Text must contrast the background.\n" +
+    "SPACING: keep everything inside x/y .08-.92; give the hero room; captions sit .12-.16 below their hero; fewer, larger elements beat many small ones.\n" +
+    "Fonts (fontStyle or per-element font): " + Object.keys(FONT_CSS).join(", ") + ".\n" +
+    "Themes: " + Object.keys(THEMES).join(", ") + ". 'paper' is light (use dark text #333333); others are dark (use light text). For specific moods prefer TWO custom backgroundColors (e.g. dusk plum #2A1A34 to terracotta #B0626A) over presets.\n" +
+    "Backgrounds: glass = frosted wallpaper (glassTint dark/light); clear = fully transparent on the wallpaper — use when the user says transparent/frosted/blend; bgOpacity below 1 makes a gradient see-through like tinted glass. Otherwise gradient.\n" +
+    "Launchers: set tapUrl when the whole widget should open one app. Common schemes: instagram://, spotify://, youtube://, tiktok://, twitter://, snapchat://, whatsapp://, fb://, fb-messenger://, discord://, reddit://, googlegmail://, slack://, zoomus://, nflx://, music://, maps://, calshow://, tel://, sms://, mailto:.\n" +
+    "For long text set w ~0.8 on the text element so it wraps (w=0 = single line).\n" +
+    "Example — 'battery dashboard, cool blue' -> " + JSON.stringify(AI_EX_RING) + "\n" +
+    "Example — 'a dreamy sunset clock' -> " + JSON.stringify(AI_EX_HERO) + "\n" +
+    "Today is " + today + ". Resolve relative dates to yyyy-MM-dd. Names under 24 chars. Fill unused fields with empty strings, 0, or empty arrays. Compose like a designer, not a form-filler: every element should earn its place.";
 }
-
-async function callClaude(messages, key) {
+async function callClaudeOnce(messages, key) {
   if (getSpend() >= getBudget()) {
     throw new Error("AI budget reached ($" + getBudget().toFixed(2) + ") — raise the budget in the AI section to keep using Claude");
   }
@@ -2296,7 +2346,20 @@ async function callClaude(messages, key) {
   if (data.stop_reason === "refusal") throw new Error("Claude declined this request");
   const block = (data.content || []).find(function (b) { return b.type === "text"; });
   if (!block) throw new Error("Empty response from Claude");
-  return specToDesign(JSON.parse(block.text));
+  return JSON.parse(block.text);
+}
+async function callClaude(messages, key) {
+  let spec = await callClaudeOnce(messages, key);
+  // Optional second pass: a design-director review of the first spec.
+  if (localStorage.getItem("widgetking.aipolish") === "1") {
+    try {
+      spec = await callClaudeOnce(messages.concat([
+        { role: "assistant", content: JSON.stringify(spec) },
+        { role: "user", content: "Review that spec as a demanding design director: strengthen hierarchy and spacing, enforce one accent color, pick a better archetype if it's generic, and add the craft touches it deserves (shadow or glow duplicate, dividers, ring pairing, font pairing). Return the improved spec." }
+      ]), key);
+    } catch (e) { /* keep the first pass */ }
+  }
+  return specToDesign(spec);
 }
 
 function specToDesign(spec) {
@@ -2322,8 +2385,8 @@ function specToDesign(spec) {
   design.apps = (spec.apps || []).slice(0, 8).map(function (app) {
     return { emoji: app.emoji || "🌐", label: (app.label || "App").slice(0, 12), url: app.url || "" };
   });
-  design.canvasElements = (spec.canvasElements || []).slice(0, 12).map(function (el) {
-    const kind = ["text","clock","date","emoji","icon","shape","battery","countdown","app","weather","calendar","progress"].includes(el.kind) ? el.kind : "text";
+  design.canvasElements = (spec.canvasElements || []).slice(0, 16).map(function (el) {
+    const kind = ["text","clock","date","emoji","icon","shape","battery","countdown","app","weather","calendar","progress","ring"].includes(el.kind) ? el.kind : "text";
     const rawW = Number(el.w) || 0;
     const out = {
       id: uid(),
@@ -2357,10 +2420,10 @@ function specToDesign(spec) {
     }
     if (kind === "icon" && !out.text) out.text = "★";
     if (kind === "weather") out.unit = "f";
-    if (kind === "progress") {
-      out.source = ["day","year","battery","countdown"].includes(el.source) ? el.source : "day";
-      out.w = Math.min(Math.max(rawW || 0.7, 0.1), 1);
-      out.size = Math.min(Math.max(Number(el.size) || 8, 3), 30);
+    if (kind === "progress" || kind === "ring") {
+      out.source = ["day","year","battery","countdown"].includes(el.source) ? el.source : (kind === "ring" ? "battery" : "day");
+      out.w = Math.min(Math.max(rawW || (kind === "ring" ? 0.55 : 0.7), 0.1), 1);
+      out.size = Math.min(Math.max(Number(el.size) || (kind === "ring" ? 7 : 8), 2), 30);
       if (out.source === "countdown") { out.startISO = isoInDays(0); if (!out.dateISO) out.dateISO = isoInDays(30); }
     }
     if (el.font && FONT_CSS[el.font]) out.font = el.font;
@@ -2548,6 +2611,21 @@ function renderFreestyleInto(node, design, w, h, interactive) {
         div.style.background = "rgba(255,255,255,.15)";
         div.textContent = "🖼";
       }
+    } else if (el.kind === "ring") {
+      const pct = Math.min(Math.max(progressPctPreview(el), 0), 1);
+      const dia = (el.w || 0.55) * Math.min(w, h);
+      const stroke = Math.max(2, (el.size || 7) * scale);
+      const color = /^#[0-9a-fA-F]{6}$/.test(el.colorHex || "") ? el.colorHex : "#FFFFFF";
+      div.style.width = dia + "px";
+      div.style.height = dia + "px";
+      div.style.borderRadius = "50%";
+      div.style.background = "conic-gradient(" + hexToRgba(color, el.opacity || 1) + " " + (pct * 360) + "deg, " +
+        hexToRgba(color, 0.25 * (el.opacity || 1)) + " 0)";
+      const holePct = Math.max(0, (dia / 2 - stroke) / (dia / 2)) * 100;
+      const mask = "radial-gradient(closest-side, transparent " + holePct + "%, #000 " + (holePct + 0.5) + "%)";
+      div.style.webkitMask = mask;
+      div.style.mask = mask;
+      div.classList.add("cel-shape");
     } else if (el.kind === "progress") {
       const pct = Math.min(Math.max(progressPctPreview(el), 0), 1);
       const wPx = (el.w || 0.7) * w;
@@ -2775,7 +2853,7 @@ function attachDrag(div, el) {
 // ==================== Freestyle palette & inspector ====================
 const ELEMENT_PALETTE = [["text", "Text"], ["photo", "🖼 Photo"], ["app", "📲 App icon"],
   ["clock", "🕐 Clock"], ["date", "📅 Date"], ["weather", "☀️ Weather"], ["calendar", "📆 Calendar"],
-  ["progress", "▬ Progress"], ["icon", "◆ Icon"], ["emoji", "✨ Emoji"],
+  ["progress", "▬ Progress"], ["ring", "◯ Ring"], ["icon", "◆ Icon"], ["emoji", "✨ Emoji"],
   ["shape", "▢ Shape"], ["battery", "🔋 Battery"], ["countdown", "⏳ Countdown"]];
 
 function dayOfYear(d) {
@@ -2820,7 +2898,7 @@ function addElement(kind) {
     size: kind === "clock" ? 34 : kind === "emoji" ? 30 : kind === "date" ? 14
       : kind === "battery" ? 30 : kind === "countdown" ? 34 : kind === "shape" ? 0
       : kind === "icon" ? 26 : kind === "app" ? 40 : kind === "weather" ? 26
-      : kind === "calendar" ? 12 : kind === "progress" ? 8 : 18,
+      : kind === "calendar" ? 12 : kind === "progress" ? 8 : kind === "ring" ? 7 : 18,
     colorHex: "#FFFFFF", opacity: kind === "shape" ? 0.25 : 1
   };
   if (kind === "shape") { el.shape = "rect"; el.w = 0.5; el.h = 0.25; }
@@ -2828,6 +2906,7 @@ function addElement(kind) {
   if (kind === "countdown") { el.dateISO = isoInDays(30); }
   if (kind === "weather") { el.unit = "f"; }
   if (kind === "progress") { el.source = "day"; el.w = 0.7; }
+  if (kind === "ring") { el.source = "battery"; el.w = 0.55; }
   if (kind === "app") {
     el.label = "App"; el.url = ""; el.iconUrl = ""; el.emoji = "📲";
     el.shape = "rounded"; el.showLabel = false;
@@ -2892,6 +2971,7 @@ function labelForElement(el) {
   if (el.kind === "weather") return "☀️ Weather";
   if (el.kind === "calendar") return "📆 Calendar";
   if (el.kind === "progress") return "▬ " + (el.source || "day");
+  if (el.kind === "ring") return "◯ " + (el.source || "battery");
   if (el.kind === "clock") return "🕐 Clock";
   if (el.kind === "date") return "📅 Date";
   if (el.kind === "emoji") return el.text || "✨";
@@ -3083,7 +3163,7 @@ function buildInspectorContent(inspector) {
     inspector.appendChild(optRow);
     const tapHint = document.createElement("p");
     tapHint.className = "hint";
-    tapHint.innerHTML = "Tappable on <b>Medium/Large</b> widgets; a Small widget opens its first app. Widget taps flash through Scriptable for a moment (an Apple rule for every widget app) — for instant opening, use the <b>App Icon Maker</b> in the Install tab. shortcuts:// links need the one-time Shortcut setup (see the Launcher section).";
+    tapHint.innerHTML = "Tappable on <b>Medium/Large</b> widgets (Small opens its first app). Tap details live in the <b>Shortcut Guide</b> on the Install tab.";
     inspector.appendChild(tapHint);
   }
 
@@ -3124,7 +3204,7 @@ function buildInspectorContent(inspector) {
     inspector.appendChild(calHint);
   }
 
-  if (el.kind === "progress") {
+  if (el.kind === "progress" || el.kind === "ring") {
     const srcRow = document.createElement("div");
     srcRow.className = "row";
     const srcSel = document.createElement("select");
@@ -3266,6 +3346,9 @@ function buildInspectorContent(inspector) {
   } else if (el.kind === "progress") {
     sliderRow("Width", 10, 100, Math.round((el.w || 0.7) * 100), function (v) { el.w = v / 100; });
     sliderRow("Thick", 3, 30, el.size || 8, function (v) { el.size = v; });
+  } else if (el.kind === "ring") {
+    sliderRow("Size", 15, 100, Math.round((el.w || 0.55) * 100), function (v) { el.w = v / 100; });
+    sliderRow("Thick", 2, 24, el.size || 7, function (v) { el.size = v; });
   } else {
     sliderRow("Size", 8, 80, el.size, function (v) { el.size = v; });
   }
@@ -3571,9 +3654,7 @@ function renderLauncherUI() {
       } catch (e) { return "Open " + app.label; }
     });
     hint.style.display = "block";
-    hint.innerHTML = "⚡ <b>One-time Shortcut setup</b> (makes these buttons work for any app, Koco-style): " +
-      "open the <b>Shortcuts</b> app on your iPhone and create one shortcut per app — name it exactly as shown, " +
-      "with a single <b>“Open App”</b> action pointed at that app: <b>" + names.map(esc).join("</b>, <b>") + "</b>.";
+    hint.innerHTML = "⚡ " + names.length + " app" + (names.length === 1 ? "" : "s") + " here need a one-time Shortcut — the <b>Shortcut Guide</b> on the Install tab lists them with a Set up button each.";
   } else {
     hint.style.display = "none";
   }
@@ -3732,6 +3813,46 @@ function buildTemplates() {
     { category: "Clocks", pack: "Cute", design: { name: "Rose Clock", kind: "clock", themeID: "rosegold", fontStyle: "didot", textColorHex: "#FFF6F2" } },
     { category: "Dates", pack: "Zen", design: { name: "Sage Days", kind: "date", themeID: "sage", fontStyle: "serif", textColorHex: "#F3F8F2" } },
     { category: "Live", pack: "Live", design: { name: "Cozy Battery", kind: "battery", themeID: "mocha", fontStyle: "rounded", textColorHex: "#F5EBE0" } },
+    { category: "Pro", pack: "Pro", design: { name: "Power Hub", kind: "freestyle", themeID: "navy", fontStyle: "avenir", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "ring", source: "battery", x: 0.3, y: 0.5, w: 0.52, size: 7, colorHex: "#8FD3FE", opacity: 1 },
+      { kind: "battery", x: 0.3, y: 0.5, size: 21, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "text", text: "POWER", x: 0.72, y: 0.3, size: 10, colorHex: "#8FD3FE", opacity: 0.9, w: 0, align: "center", bold: true },
+      { kind: "date", x: 0.72, y: 0.46, size: 11, colorHex: "#FFFFFF", opacity: 0.85 },
+      { kind: "shape", shape: "rect", x: 0.72, y: 0.58, w: 0.3, h: 0.006, size: 0, colorHex: "#FFFFFF", opacity: 0.25 },
+      { kind: "progress", source: "day", x: 0.72, y: 0.7, w: 0.3, size: 5, colorHex: "#8FD3FE", opacity: 1 }
+    ] } },
+    { category: "Pro", pack: "Pro", design: { name: "Golden Hour", kind: "freestyle", themeID: "custom", customColors: ["#2A1A34", "#B0626A"], fontStyle: "didot", textColorHex: "#FFF6EC", canvasElements: [
+      { kind: "clock", x: 0.51, y: 0.462, size: 46, colorHex: "#141018", opacity: 0.45 },
+      { kind: "clock", x: 0.5, y: 0.45, size: 46, colorHex: "#FFF6EC", opacity: 1 },
+      { kind: "text", text: "golden hour", font: "script", x: 0.5, y: 0.66, size: 13, colorHex: "#F2B694", opacity: 1, w: 0, align: "center", bold: true },
+      { kind: "icon", text: "☀", x: 0.86, y: 0.16, size: 14, colorHex: "#F2B694", opacity: 0.9 }
+    ] } },
+    { category: "Pro", pack: "Pro", design: { name: "Split Card", kind: "freestyle", themeID: "cosmos", fontStyle: "futura", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "shape", shape: "rect", x: 0.27, y: 0.5, w: 0.44, h: 0.92, size: 0, colorHex: "#FFFFFF", opacity: 0.14 },
+      { kind: "clock", x: 0.27, y: 0.42, size: 26, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "date", x: 0.27, y: 0.58, size: 10, colorHex: "#C7A6FF", opacity: 0.95 },
+      { kind: "weather", x: 0.74, y: 0.3, size: 17, colorHex: "#FFFFFF", opacity: 1, unit: "f" },
+      { kind: "shape", shape: "rect", x: 0.74, y: 0.47, w: 0.32, h: 0.006, size: 0, colorHex: "#FFFFFF", opacity: 0.3 },
+      { kind: "calendar", x: 0.74, y: 0.62, size: 10, colorHex: "#FFFFFF", opacity: 0.9 }
+    ] } },
+    { category: "Pro", pack: "Pro", design: { name: "Day Stack", kind: "freestyle", themeID: "mist", fontStyle: "optima", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "weather", x: 0.5, y: 0.18, size: 22, colorHex: "#FFFFFF", opacity: 1, unit: "f" },
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.35, w: 0.68, h: 0.006, size: 0, colorHex: "#FFFFFF", opacity: 0.3 },
+      { kind: "calendar", x: 0.5, y: 0.5, size: 12, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.65, w: 0.68, h: 0.006, size: 0, colorHex: "#FFFFFF", opacity: 0.3 },
+      { kind: "progress", source: "day", x: 0.5, y: 0.8, w: 0.68, size: 6, colorHex: "#BFD9EA", opacity: 1 }
+    ] } },
+    { category: "Pro", pack: "Pro", design: { name: "Monogram", kind: "freestyle", themeID: "midnight", fontStyle: "copperplate", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "ring", source: "year", x: 0.5, y: 0.48, w: 0.72, size: 4, colorHex: "#FFD75E", opacity: 0.9 },
+      { kind: "text", text: "A", x: 0.5, y: 0.48, size: 52, colorHex: "#FFFFFF", opacity: 1, w: 0, align: "center", bold: true },
+      { kind: "text", text: "est. 2026", x: 0.5, y: 0.85, size: 9, colorHex: "#FFD75E", opacity: 0.85, w: 0, align: "center", bold: false }
+    ] } },
+    { category: "Pro", pack: "Pro", design: { name: "Neon Glow", kind: "freestyle", themeID: "custom", customColors: ["#0B0018", "#2B0A4E"], fontStyle: "mono", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "clock", x: 0.5, y: 0.46, size: 40, colorHex: "#FF2079", opacity: 0.3 },
+      { kind: "clock", x: 0.5, y: 0.45, size: 34, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "text", text: "S T A Y  E L E C T R I C", x: 0.5, y: 0.68, size: 9, colorHex: "#00F0FF", opacity: 1, w: 0, align: "center", bold: true },
+      { kind: "icon", text: "⚡", x: 0.14, y: 0.16, size: 14, colorHex: "#FF2079", opacity: 1 }
+    ] } },
     { category: "Sports", pack: "Sports", design: { name: "Game Day", kind: "freestyle", themeID: "lava", fontStyle: "futura", textColorHex: "#FFFFFF", canvasElements: [
       { kind: "text", text: "GAME DAY", x: 0.5, y: 0.22, size: 15, colorHex: "#FFD75E", opacity: 1, w: 0, align: "center", bold: true },
       { kind: "countdown", x: 0.5, y: 0.5, size: 42, colorHex: "#FFFFFF", opacity: 1, dateISO: "" },
@@ -3834,7 +3955,7 @@ function buildTemplates() {
 let activePack = "all";
 const PACK_CHIPS = [["all", "✨ All"], ["Cute", "🌸 Cute"], ["Minimal", "▫️ Minimal"],
   ["Zen", "🍃 Zen"], ["Sports", "🏈 Sports"], ["Work", "💼 Work"],
-  ["Neon", "⚡ Neon"], ["Live", "🌤 Live"]];
+  ["Neon", "⚡ Neon"], ["Live", "🌤 Live"], ["Pro", "💎 Pro"]];
 function renderTemplates() {
   const chipRow = document.getElementById("packChips");
   chipRow.innerHTML = "";
@@ -3947,10 +4068,10 @@ function renderControls() {
     bgHint.innerHTML = "🎨 With opacity under 100%, your gradient blends over <b>your wallpaper</b> like tinted glass. Needs the same one-time wallpaper setup as Glass (run the script in Scriptable → <b>Set wallpaper photo…</b>); without it, the widget falls back to a solid gradient.";
   } else if (current.background === "glass") {
     bgHint.style.display = "block";
-    bgHint.innerHTML = "🧊 Glass shows a frosted, blurred slice of <b>your wallpaper</b> behind the widget (the preview here is a stand-in). Opacity controls the frost strength. One-time setup on your iPhone: screenshot your empty wallpaper page, then run the WidgetKing script inside Scriptable and choose <b>Set wallpaper photo…</b>";
+    bgHint.innerHTML = "🧊 Glass = a frosted slice of <b>your wallpaper</b> (preview shows a stand-in). Opacity sets frost strength. Needs the one-time wallpaper setup — see the ✨ step in the Install wizard.";
   } else if (current.background === "clear") {
     bgHint.style.display = "block";
-    bgHint.innerHTML = "🫥 Clear shows the exact wallpaper slice behind the widget so it looks fully transparent. Needs the same one-time wallpaper setup as Glass, plus the widget's <b>Parameter</b> set to <b>Name | position</b> (e.g. <b>My Clock | top-left</b>) for pixel-perfect alignment. Alignment uses exact per-iPhone measurements — if your Home Screen <b>hides app labels</b> (Large icons), flip the toggle in the script's in-app menu.";
+    bgHint.innerHTML = "🫥 Clear = the exact wallpaper slice, fully transparent. Needs the one-time wallpaper setup (✨ step in the Install wizard) and the widget Parameter set to <b>Name | position</b>, e.g. <b>My Clock | top-left</b>.";
   } else {
     bgHint.style.display = "none";
   }
@@ -4076,8 +4197,9 @@ function renderAll() {
 }
 function updateMagicHint() {
   document.getElementById("magicHint").textContent = getApiKey()
-    ? "Claude AI is on — describe anything and it designs the whole widget. (API usage costs a few cents per request.)"
+    ? "Claude AI is on — describe anything and it designs the whole widget. (A few cents per request.)"
     : "Built instantly in your browser — free, offline, no AI. It understands launchers, countdowns, quotes, clocks, battery, decorations, and “says …” phrases. For open-ended ideas, add a Claude API key below.";
+  document.getElementById("cloneBtn").style.display = getApiKey() ? "block" : "none";
 }
 
 // ==================== Wiring ====================
@@ -4192,36 +4314,116 @@ for (const example of EXAMPLES) {
   button.onclick = function () { document.getElementById("magicInput").value = example; };
   magicChips.appendChild(button);
 }
+function deliverMagicDesign(design, message) {
+  loadIntoEditor(design);
+  switchTab("editor");
+  popCanvas();
+  if (message) toast(message);
+  if (current.kind === "launcher" && current.apps.some(function (a) { return !a.iconUrl; })) {
+    fetchIconsForApps(current);
+  }
+}
 document.getElementById("magicBtn").onclick = async function () {
   const idea = document.getElementById("magicInput").value.trim();
   if (!idea) return;
+  document.getElementById("magicFallback").style.display = "none";
   const button = document.getElementById("magicBtn");
   const key = getApiKey();
-  let design = null;
   if (key) {
     button.disabled = true;
     button.textContent = "Asking Claude… 🤖";
     try {
-      design = await callClaude([{ role: "user", content: idea }], key);
-      toast("Designed by Claude ✨ Tweak it below, then Save.");
+      const design = await callClaude([{ role: "user", content: idea }], key);
+      deliverMagicDesign(design, "Designed by Claude ✨ Tweak it, then Save.");
     } catch (error) {
-      design = parseIdea(idea);
-      toast("Claude failed (" + error.message + ") — built with the free parser instead.");
+      // Never silently downgrade a detailed idea into a text note — say why.
+      toast("⚠️ Claude couldn't build it: " + error.message);
     } finally {
       button.disabled = false;
       button.textContent = "Build it ✨";
     }
-  } else {
-    design = parseIdea(idea);
-    toast("Built! Tweak it below, then Save.");
+    return;
   }
-  loadIntoEditor(design);
-  switchTab("editor");
-  popCanvas();
-  if (current.kind === "launcher" && current.apps.some(function (a) { return !a.iconUrl; })) {
-    toast("Fetching real app icons…");
-    fetchIconsForApps(current);
+  const design = parseIdea(idea);
+  // Low confidence = the parser is about to flatten a rich idea into a plain
+  // widget (the "my prompt became the widget text" failure). Signals: note
+  // fallback, the idea echoed into the text, or many features named at once.
+  const lower = idea.toLowerCase();
+  const featureWords = ["ring", "dashboard", "calendar", "weather", "progress", "photo",
+    "glass", "transparent", "layer", "gradient", "battery", "clock", "countdown", "quote", "launcher", "icon"];
+  const featureHits = featureWords.filter(function (w) { return lower.includes(w); }).length;
+  const echoed = (design.primaryText || "").length > 25 &&
+    lower.includes(design.primaryText.toLowerCase().slice(0, 25));
+  const lowConfidence =
+    (design.kind === "note" && (design.primaryText === idea || idea.length > 60)) ||
+    echoed || featureHits >= 3 || (idea.length > 90 && featureHits >= 2);
+  if (lowConfidence) {
+    document.getElementById("magicFallback").style.display = "block";
+    return;
   }
+  deliverMagicDesign(design, "Built! Tweak it below, then Save.");
+};
+document.getElementById("mfBuilder").onclick = function () {
+  document.getElementById("magicFallback").style.display = "none";
+  document.getElementById("builderBtn").onclick();
+};
+document.getElementById("mfAI").onclick = function () {
+  document.getElementById("magicFallback").style.display = "none";
+  document.querySelector("#magicSection details").open = true;
+  document.getElementById("apiKeyInput").focus();
+};
+document.getElementById("mfNote").onclick = function () {
+  document.getElementById("magicFallback").style.display = "none";
+  deliverMagicDesign(parseIdea(document.getElementById("magicInput").value.trim()), "Saved as a note — tweak away.");
+};
+// 📷 Clone a widget: screenshot in, editable design out (vision, needs a key).
+document.getElementById("cloneBtn").onclick = function () {
+  document.getElementById("cloneInput").click();
+};
+document.getElementById("cloneInput").onchange = function (event) {
+  const file = event.target.files[0];
+  event.target.value = "";
+  if (!file) return;
+  const key = getApiKey();
+  if (!key) { toast("Cloning needs Claude — add your API key first"); return; }
+  const button = document.getElementById("cloneBtn");
+  const reader = new FileReader();
+  reader.onload = function () {
+    const img = new Image();
+    img.onload = async function () {
+      const maxSide = 900;
+      const ratio = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(img.width * ratio));
+      c.height = Math.max(1, Math.round(img.height * ratio));
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      const b64 = c.toDataURL("image/jpeg", 0.85).split(",")[1];
+      button.disabled = true;
+      button.textContent = "Studying the widget… 🔍";
+      try {
+        const design = await callClaude([{
+          role: "user",
+          content: [
+            { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } },
+            { type: "text", text: "Recreate the widget shown in this image as closely as the spec allows: match its layout, colors (use two custom backgroundColors), typography feel (closest font), and every visible element. If it shows a photo, use a photo placeholder. Recreate only the single widget design, not the surrounding screen." }
+          ]
+        }], key);
+        deliverMagicDesign(design, "🪄 Cloned! It's fully editable — photos become placeholders you can fill.");
+      } catch (error) {
+        toast("⚠️ Couldn't clone it: " + error.message);
+      } finally {
+        button.disabled = false;
+        button.textContent = "📷 Clone a widget from a photo";
+      }
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+};
+const polishCheck = document.getElementById("aiPolish");
+polishCheck.checked = localStorage.getItem("widgetking.aipolish") === "1";
+polishCheck.onchange = function () {
+  localStorage.setItem("widgetking.aipolish", polishCheck.checked ? "1" : "0");
 };
 
 document.getElementById("remixBtn").onclick = async function () {
@@ -4346,9 +4548,6 @@ function fallbackCopy(text) {
 }
 document.getElementById("downloadScriptBtn").onclick = async function () {
   download("WidgetKing.js", await buildScript(), "text/javascript");
-};
-document.getElementById("exportJsonBtn").onclick = function () {
-  download("widgetking-designs.json", JSON.stringify(designs, null, 2), "application/json");
 };
 document.getElementById("backupBtn").onclick = function () {
   const stamp = new Date().toISOString().slice(0, 10);
