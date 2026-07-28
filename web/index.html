@@ -798,27 +798,45 @@ function weatherText(el, wx) {
   if (el.unit === "c") temp = Math.round((wx.tempF - 32) * 5 / 9);
   return weatherEmoji(wx.code) + " " + temp + "°";
 }
-// Next calendar event (asks for calendar permission on first run).
-async function fetchNextEvent() {
+// Upcoming calendar events (asks for calendar permission on first run).
+// Gathers today through next week, including all-day events like birthdays.
+async function fetchUpcomingEvents(count) {
   try {
     const now = new Date();
-    let events = (await CalendarEvent.today([])).filter(function (e) { return !e.isAllDay && e.endDate > now; });
-    if (events.length === 0) {
-      events = (await CalendarEvent.tomorrow([])).filter(function (e) { return !e.isAllDay; });
-    }
-    if (events.length === 0) return { none: true };
-    events.sort(function (a, b) { return a.startDate - b.startDate; });
+    let events = [];
+    try { events = events.concat(await CalendarEvent.today([])); } catch (e) {}
+    try { events = events.concat(await CalendarEvent.tomorrow([])); } catch (e) {}
+    try { events = events.concat(await CalendarEvent.thisWeek([])); } catch (e) {}
+    try { events = events.concat(await CalendarEvent.nextWeek([])); } catch (e) {}
+    const seen = {};
+    events = events.filter(function (e) {
+      if (!e || !e.endDate || e.endDate <= now) return false;
+      const k = e.identifier || (String(e.title) + e.startDate);
+      if (seen[k]) return false;
+      seen[k] = true;
+      return true;
+    }).sort(function (a, b) { return a.startDate - b.startDate; });
     const df = new DateFormatter();
     df.useShortTimeStyle();
-    return { title: String(events[0].title || "Event"), time: df.string(events[0].startDate) };
+    const out = [];
+    for (const e of events.slice(0, count)) {
+      let title = String(e.title || "Event");
+      if (title.length > 20) title = title.slice(0, 19) + "…";
+      const dayDiff = Math.round(
+        (new Date(e.startDate.getFullYear(), e.startDate.getMonth(), e.startDate.getDate()) -
+         new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
+      const when = dayDiff <= 0 ? (e.isAllDay ? "today" : df.string(e.startDate))
+        : dayDiff === 1 ? "tomorrow" : "in " + dayDiff + "d";
+      out.push({ title: title, when: when });
+    }
+    return out;
   } catch (e) { return null; }
 }
-function calendarText(ev) {
-  if (!ev) return "Calendar off";
-  if (ev.none) return "No events ✓";
-  let title = ev.title;
-  if (title.length > 18) title = title.slice(0, 17) + "…";
-  return title + " · " + ev.time;
+function calendarText(el, events) {
+  if (!events) return "Calendar off";
+  if (events.length === 0) return "No events ✓";
+  const n = Math.min(Math.max(Number(el.count) || 1, 1), 4);
+  return events.slice(0, n).map(function (e) { return e.title + " · " + e.when; }).join("\n");
 }
 // Live Sleeper fantasy matchup (public API, no login) — cached 20 min per
 // league so widget refreshes stay fast and the last score shows offline.
@@ -899,7 +917,11 @@ async function liveDataFor(design) {
   const els = design.canvasElements || [];
   const live = {};
   if (els.some(function (e) { return e.kind === "weather"; })) live.weather = await fetchWeather();
-  if (els.some(function (e) { return e.kind === "calendar"; })) live.event = await fetchNextEvent();
+  const calEls = els.filter(function (e) { return e.kind === "calendar"; });
+  if (calEls.length) {
+    const maxCount = Math.max.apply(null, calEls.map(function (e) { return Math.min(Math.max(Number(e.count) || 1, 1), 4); }));
+    live.events = await fetchUpcomingEvents(maxCount);
+  }
   const sleeperEls = els.filter(function (e) { return (e.kind === "sleeper" || e.kind === "sleeperlogo") && e.leagueID; });
   if (sleeperEls.length) {
     live.sleeper = {};
@@ -1277,6 +1299,44 @@ function drawFreestyle(design, family, bgImg, live) {
       }
       continue;
     }
+    if (el.kind === "month") {
+      // Mini month calendar: weekday header + date grid, today circled.
+      const fsM = (el.size || 9) * scale;
+      const gw = (el.w || 0.6) * W;
+      const cell = gw / 7;
+      const now2 = new Date();
+      const first = new Date(now2.getFullYear(), now2.getMonth(), 1);
+      const startDow = first.getDay();
+      const daysIn = new Date(now2.getFullYear(), now2.getMonth() + 1, 0).getDate();
+      const rows = Math.ceil((startDow + daysIn) / 7);
+      const rowH = fsM * 1.7;
+      const gh = rowH * (rows + 1);
+      const x0 = px - gw / 2, y0 = py - gh / 2;
+      const headers = ["S", "M", "T", "W", "T", "F", "S"];
+      ctx.setTextAlignedCenter();
+      ctx.setFont(fontFor(el.font || design.fontStyle, fsM * 0.9, true));
+      ctx.setTextColor(new Color(el.colorHex || "#FFFFFF", op * 0.6));
+      for (let c = 0; c < 7; c++) {
+        ctx.drawTextInRect(headers[c], new Rect(x0 + c * cell, y0, cell, rowH));
+      }
+      for (let d = 1; d <= daysIn; d++) {
+        const idx = startDow + d - 1;
+        const r = Math.floor(idx / 7), c = idx % 7;
+        const cx2 = x0 + c * cell, cy2 = y0 + (r + 1) * rowH;
+        if (d === now2.getDate()) {
+          ctx.setFillColor(new Color(el.accentHex || "#4A90F6", op));
+          const dia = Math.min(cell, rowH) * 0.95;
+          ctx.fillEllipse(new Rect(cx2 + (cell - dia) / 2, cy2 + (rowH - dia) / 2, dia, dia));
+          ctx.setFont(fontFor(el.font || design.fontStyle, fsM, true));
+          ctx.setTextColor(new Color("#FFFFFF", 1));
+        } else {
+          ctx.setFont(fontFor(el.font || design.fontStyle, fsM, false));
+          ctx.setTextColor(new Color(el.colorHex || "#FFFFFF", op * 0.9));
+        }
+        ctx.drawTextInRect(String(d), new Rect(cx2, cy2 + (rowH - fsM * 1.4) / 2, cell, fsM * 1.4));
+      }
+      continue;
+    }
     if (el.kind === "app" || el.kind === "sleeperlogo") continue; // rendered as overlay stacks
     let text;
     if (el.kind === "clock") { const df = new DateFormatter(); df.useShortTimeStyle(); text = df.string(new Date()); }
@@ -1286,7 +1346,7 @@ function drawFreestyle(design, family, bgImg, live) {
     else if (el.kind === "symbol") { text = SYMBOL_EMOJI[el.symbolName] || "⭐"; }
     else if (el.kind === "icon") { text = el.text || "★"; }
     else if (el.kind === "weather") { text = weatherText(el, live ? live.weather : null); }
-    else if (el.kind === "calendar") { text = calendarText(live ? live.event : null); }
+    else if (el.kind === "calendar") { text = calendarText(el, live ? live.events : null); }
     else if (el.kind === "sleeper") { text = sleeperText(el, live && live.sleeper ? live.sleeper[el.leagueID] : null); }
     else { text = el.text || "Text"; }
     const isBold = el.kind !== "text" || el.bold !== false;
@@ -1301,7 +1361,8 @@ function drawFreestyle(design, family, bgImg, live) {
       ctx.drawTextInRect(text, new Rect(px - boxW / 2, py - fs * 0.72, boxW, H));
     } else {
       ctx.setTextAlignedCenter();
-      ctx.drawTextInRect(text, new Rect(px - W / 2, py - fs * 0.72, W, fs * 1.7));
+      const lines = el.kind === "calendar" ? Math.min(Math.max(Number(el.count) || 1, 1), 4) : 1;
+      ctx.drawTextInRect(text, new Rect(px - W / 2, py - fs * 0.72, W, fs * 1.7 * lines));
     }
   }
   return ctx.getImage();
@@ -2027,6 +2088,14 @@ function normalizeDesign(design) {
       if (!["day", "refresh"].includes(el.rotate)) el.rotate = "day";
     }
     if (el.kind === "weather" && el.unit !== "c") el.unit = "f";
+    if (el.kind === "calendar") {
+      el.count = Math.min(Math.max(Math.round(Number(el.count) || 1), 1), 4);
+    }
+    if (el.kind === "month") {
+      if (typeof el.size !== "number" || el.size < 6 || el.size > 16) el.size = 9;
+      if (typeof el.w !== "number" || el.w <= 0 || el.w > 1) el.w = 0.6;
+      if (!/^#[0-9a-fA-F]{6}$/.test(el.accentHex || "")) el.accentHex = "#4A90F6";
+    }
     if (el.kind === "sleeper" || el.kind === "sleeperlogo") {
       if (typeof el.username !== "string") el.username = "";
       if (typeof el.userID !== "string") el.userID = "";
@@ -2382,7 +2451,7 @@ const AI_SCHEMA = {
       items: {
         type: "object",
         properties: {
-          kind: { type: "string", "enum": ["text", "clock", "date", "emoji", "icon", "shape", "battery", "countdown", "app", "weather", "calendar", "progress", "ring", "sleeper", "sleeperlogo"] },
+          kind: { type: "string", "enum": ["text", "clock", "date", "emoji", "icon", "shape", "battery", "countdown", "app", "weather", "calendar", "progress", "ring", "sleeper", "sleeperlogo", "month"] },
           text: { type: "string", description: "Text or emoji content; for kind=icon a single glyph like ★ ♥ ● ▲ ☾ ⚡ ✈ ⚙ →; empty for other kinds" },
           label: { type: "string", description: "App name for kind=app; empty otherwise" },
           url: { type: "string", description: "URL scheme to open for kind=app (e.g. spotify://); empty otherwise" },
@@ -2396,12 +2465,14 @@ const AI_SCHEMA = {
           w: { type: "number", description: "Shape width 0-1 of canvas (0 when unused). For kind=text: 0 = auto single line, >0 = wrapping text box of that width — use ~0.8 for quotes/long text" },
           h: { type: "number", description: "Shape height 0-1 of canvas; 0 when unused (ignored for circles)" },
           align: { type: "string", "enum": ["", "left", "center", "right"], description: "Text-box alignment when kind=text and w>0; empty otherwise" },
+          count: { type: "number", description: "For kind=calendar: how many upcoming events to list, 1-4 (multi-line). 0 otherwise" },
+          accentHex: { type: "string", description: "For kind=month only: #RRGGBB for the today-circle; empty otherwise" },
           mode: { type: "string", "enum": ["", "score", "record", "myteam", "opponent"], description: "For kind=sleeper: what to show (score/record/myteam name/opponent name). For kind=sleeperlogo: myteam or opponent picks whose circular team logo. Empty otherwise" },
           source: { type: "string", "enum": ["", "day", "year", "battery", "countdown"], description: "For kind=progress (bar) and kind=ring (circular gauge): what it measures; empty otherwise. Rings: w = diameter 0-1 of the short side, size = stroke thickness pt (5-10)" },
           bold: { type: "boolean", description: "For kind=text: false for lighter body text; true otherwise" },
           dateISO: { type: "string", description: "yyyy-MM-dd for countdown elements; empty otherwise" }
         },
-        required: ["kind", "text", "label", "url", "font", "x", "y", "size", "colorHex", "opacity", "shape", "w", "h", "align", "bold", "mode", "source", "dateISO"],
+        required: ["kind", "text", "label", "url", "font", "x", "y", "size", "colorHex", "opacity", "shape", "w", "h", "align", "bold", "count", "accentHex", "mode", "source", "dateISO"],
         additionalProperties: false
       }
     }
@@ -2417,10 +2488,10 @@ const AI_EX_RING = {
   backgroundColors: [], tapUrl: "", apps: [],
   canvasElements: [
     { kind: "ring", text: "", label: "", url: "", font: "", x: 0.3, y: 0.5, size: 7, colorHex: "#8FD3FE", opacity: 1, shape: "", w: 0.52, h: 0, align: "", bold: true, source: "battery", dateISO: "" },
-    { kind: "battery", text: "", label: "", url: "", font: "", x: 0.3, y: 0.5, size: 21, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, mode: "", source: "", dateISO: "" },
-    { kind: "text", text: "POWER", label: "", url: "", font: "", x: 0.72, y: 0.3, size: 10, colorHex: "#8FD3FE", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, mode: "", source: "", dateISO: "" },
+    { kind: "battery", text: "", label: "", url: "", font: "", x: 0.3, y: 0.5, size: 21, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
+    { kind: "text", text: "POWER", label: "", url: "", font: "", x: 0.72, y: 0.3, size: 10, colorHex: "#8FD3FE", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
     { kind: "date", text: "", label: "", url: "", font: "", x: 0.72, y: 0.46, size: 11, colorHex: "#FFFFFF", opacity: 0.85, shape: "", w: 0, h: 0, align: "", bold: false, source: "", dateISO: "" },
-    { kind: "shape", text: "", label: "", url: "", font: "", x: 0.72, y: 0.58, size: 0, colorHex: "#FFFFFF", opacity: 0.25, shape: "rect", w: 0.3, h: 0.006, align: "", bold: true, mode: "", source: "", dateISO: "" },
+    { kind: "shape", text: "", label: "", url: "", font: "", x: 0.72, y: 0.58, size: 0, colorHex: "#FFFFFF", opacity: 0.25, shape: "rect", w: 0.3, h: 0.006, align: "", bold: true, count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
     { kind: "progress", text: "", label: "", url: "", font: "", x: 0.72, y: 0.7, size: 5, colorHex: "#8FD3FE", opacity: 1, shape: "", w: 0.3, h: 0, align: "", bold: true, source: "day", dateISO: "" }
   ]
 };
@@ -2430,10 +2501,10 @@ const AI_EX_HERO = {
   background: "gradient", glassTint: "dark", bgOpacity: 1,
   backgroundColors: ["#2A1A34", "#B0626A"], tapUrl: "", apps: [],
   canvasElements: [
-    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.51, y: 0.462, size: 46, colorHex: "#141018", opacity: 0.45, shape: "", w: 0, h: 0, align: "", bold: true, mode: "", source: "", dateISO: "" },
-    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.5, y: 0.45, size: 46, colorHex: "#FFF6EC", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, mode: "", source: "", dateISO: "" },
-    { kind: "text", text: "golden hour", label: "", url: "", font: "script", x: 0.5, y: 0.66, size: 13, colorHex: "#F2B694", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, mode: "", source: "", dateISO: "" },
-    { kind: "icon", text: "\u2600", label: "", url: "", font: "", x: 0.86, y: 0.16, size: 14, colorHex: "#F2B694", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, mode: "", source: "", dateISO: "" }
+    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.51, y: 0.462, size: 46, colorHex: "#141018", opacity: 0.45, shape: "", w: 0, h: 0, align: "", bold: true, count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
+    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.5, y: 0.45, size: 46, colorHex: "#FFF6EC", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
+    { kind: "text", text: "golden hour", label: "", url: "", font: "script", x: 0.5, y: 0.66, size: 13, colorHex: "#F2B694", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
+    { kind: "icon", text: "\u2600", label: "", url: "", font: "", x: 0.86, y: 0.16, size: 14, colorHex: "#F2B694", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, count: 0, accentHex: "", mode: "", source: "", dateISO: "" }
   ]
 };
 
@@ -2441,7 +2512,7 @@ function aiSystemPrompt() {
   const today = new Date().toISOString().slice(0, 10);
   return "You are WidgetKing's expert widget designer. Design at the level of the most beautiful Home Screen setups people share online: intentional composition, real hierarchy, restraint. The user describes a widget; return a spec.\n" +
     "Kinds: clock (time+date), date (big day), countdown, quote, note, launcher (tappable app grid), battery, freestyle (a canvas of elements — PREFER freestyle for anything creative; simple kinds are only for plain requests).\n" +
-    "FREESTYLE ELEMENTS (max 16; array order is z-order, bottom first): text, clock, date, emoji, icon (monochrome glyph ★ ☆ ♥ ● ◆ ▲ ✦ ❀ ☀ ☾ ☁ ⚡ ♪ ☕ ✈ ⌂ ✉ ⚙ ✓ → ∞, tinted via colorHex — prefer over emoji for elegance), shape (rect/pill/circle), battery, countdown, app (tappable icon: set label+url), weather (live temp), calendar (next event), progress (bar), ring (circular gauge; w=diameter 0-1 of short side, size=stroke pt 5-10; source day/year/battery/countdown).\n" +
+    "FREESTYLE ELEMENTS (max 16; array order is z-order, bottom first): text, clock, date, emoji, icon (monochrome glyph ★ ☆ ♥ ● ◆ ▲ ✦ ❀ ☀ ☾ ☁ ⚡ ♪ ☕ ✈ ⌂ ✉ ⚙ ✓ → ∞, tinted via colorHex — prefer over emoji for elegance), shape (rect/pill/circle), battery, countdown, app (tappable icon: set label+url), weather (live temp), calendar (next event), progress (bar), ring (circular gauge; w=diameter 0-1 of short side, size=stroke pt 5-10; source day/year/battery/countdown), month (full mini month-calendar grid with today circled: size=day-number pt 8-10, w=grid width, accentHex=today circle color), calendar with count 2-4 = a multi-line upcoming-events list.\n" +
     "ARCHETYPES — proven layouts; pick one and adapt, or blend two:\n" +
     "1 Ring Dashboard: ring at x .3 y .5 w .5 + its stat text centered on it (battery/countdown, size 18-22) + right column at x .72: label 10pt, date/calendar 11pt, thin divider, small progress bar.\n" +
     "2 Hero Type: one oversized clock/countdown/date size 44-58 at y .42-.48, tiny styled caption .16 below, one accent glyph in a corner.\n" +
@@ -2539,7 +2610,7 @@ function specToDesign(spec) {
     return { emoji: app.emoji || "🌐", label: (app.label || "App").slice(0, 12), url: app.url || "" };
   });
   design.canvasElements = (spec.canvasElements || []).slice(0, 16).map(function (el) {
-    const kind = ["text","clock","date","emoji","icon","shape","battery","countdown","app","weather","calendar","progress","ring","sleeper","sleeperlogo"].includes(el.kind) ? el.kind : "text";
+    const kind = ["text","clock","date","emoji","icon","shape","battery","countdown","app","weather","calendar","progress","ring","sleeper","sleeperlogo","month"].includes(el.kind) ? el.kind : "text";
     const rawW = Number(el.w) || 0;
     const out = {
       id: uid(),
@@ -2573,6 +2644,12 @@ function specToDesign(spec) {
     }
     if (kind === "icon" && !out.text) out.text = "★";
     if (kind === "weather") out.unit = "f";
+    if (kind === "calendar") out.count = Math.min(Math.max(Math.round(Number(el.count) || 1), 1), 4);
+    if (kind === "month") {
+      out.size = Math.min(Math.max(Number(el.size) || 9, 6), 16);
+      out.w = Math.min(Math.max(rawW || 0.6, 0.3), 1);
+      out.accentHex = /^#[0-9a-fA-F]{6}$/.test(el.accentHex || "") ? el.accentHex.toUpperCase() : "#4A90F6";
+    }
     if (kind === "sleeper" || kind === "sleeperlogo") {
       out.username = ""; out.userID = ""; out.leagueID = ""; out.leagueName = "";
       if (kind === "sleeper") out.mode = ["score","record","myteam","opponent"].includes(el.mode) ? el.mode : "score";
@@ -2799,6 +2876,33 @@ function renderFreestyleInto(node, design, w, h, interactive) {
         ";pointer-events:none";
       div.appendChild(fill);
       div.classList.add("cel-shape");
+    } else if (el.kind === "month") {
+      const fsM = (el.size || 9) * scale;
+      const gw = (el.w || 0.6) * w;
+      const now2 = new Date();
+      const first = new Date(now2.getFullYear(), now2.getMonth(), 1);
+      const startDow = first.getDay();
+      const daysIn = new Date(now2.getFullYear(), now2.getMonth() + 1, 0).getDate();
+      const accent = /^#[0-9a-fA-F]{6}$/.test(el.accentHex || "") ? el.accentHex : "#4A90F6";
+      let html = '<div style="display:grid;grid-template-columns:repeat(7,1fr);justify-items:center;' +
+        'width:' + gw + 'px;line-height:1.7;font-size:' + fsM + 'px">';
+      for (const h of ["S", "M", "T", "W", "T", "F", "S"]) {
+        html += '<span style="opacity:.6;font-weight:700;font-size:' + (fsM * 0.9) + 'px">' + h + '</span>';
+      }
+      for (let b = 0; b < startDow; b++) html += "<span></span>";
+      for (let d = 1; d <= daysIn; d++) {
+        if (d === now2.getDate()) {
+          html += '<span style="background:' + accent + ';color:#fff;border-radius:50%;width:' + (fsM * 1.5) +
+            'px;height:' + (fsM * 1.5) + 'px;display:flex;align-items:center;justify-content:center;font-weight:700">' + d + '</span>';
+        } else {
+          html += "<span>" + d + "</span>";
+        }
+      }
+      html += "</div>";
+      div.innerHTML = html;
+      div.style.color = el.colorHex || "#FFFFFF";
+      div.style.opacity = el.opacity;
+      if (el.font && FONT_CSS[el.font]) div.style.fontFamily = FONT_CSS[el.font];
     } else if (el.kind === "sleeperlogo") {
       const pt = (el.size || 34) * scale;
       div.style.cssText += "width:" + pt + "px;height:" + pt + "px;border-radius:50%;" +
@@ -2857,7 +2961,12 @@ function renderFreestyleInto(node, design, w, h, interactive) {
       else if (el.kind === "symbol") div.textContent = SYMBOL_EMOJI[el.symbolName] || "⭐";
       else if (el.kind === "icon") div.textContent = el.text || "★";
       else if (el.kind === "weather") div.textContent = "☀️ " + (el.unit === "c" ? "22°" : "72°");
-      else if (el.kind === "calendar") div.textContent = "Team call · 2:30 PM";
+      else if (el.kind === "calendar") {
+        const n = Math.min(Math.max(Number(el.count) || 1, 1), 4);
+        div.textContent = ["Team call · 2:30 PM", "! Band · tomorrow", "Birthday 🎂 · in 5d", "Gym · in 6d"].slice(0, n).join("\n");
+        div.style.whiteSpace = "pre-line";
+        div.style.lineHeight = "1.55";
+      }
       else if (el.kind === "sleeper") div.textContent = el.mode === "record" ? "7-2 · #3"
         : el.mode === "myteam" ? "Birds of Prey" : el.mode === "opponent" ? "Waiver Wire FC" : "112.4 – 98.7";
       else div.textContent = el.text || "Text";
@@ -3019,7 +3128,7 @@ function attachDrag(div, el) {
 
 // ==================== Freestyle palette & inspector ====================
 const ELEMENT_PALETTE = [["text", "Text"], ["photo", "🖼 Photo"], ["app", "📲 App icon"],
-  ["clock", "🕐 Clock"], ["date", "📅 Date"], ["weather", "☀️ Weather"], ["calendar", "📆 Calendar"],
+  ["clock", "🕐 Clock"], ["date", "📅 Date"], ["weather", "☀️ Weather"], ["calendar", "📆 Calendar"], ["month", "🗓 Month"],
   ["progress", "▬ Progress"], ["ring", "◯ Ring"], ["sleeper", "🏈 Fantasy"], ["sleeperlogo", "🛡 Team logo"], ["icon", "◆ Icon"], ["emoji", "✨ Emoji"],
   ["shape", "▢ Shape"], ["battery", "🔋 Battery"], ["countdown", "⏳ Countdown"]];
 
@@ -3066,7 +3175,7 @@ function addElement(kind) {
       : kind === "battery" ? 30 : kind === "countdown" ? 34 : kind === "shape" ? 0
       : kind === "icon" ? 26 : kind === "app" ? 40 : kind === "weather" ? 26
       : kind === "calendar" ? 12 : kind === "progress" ? 8 : kind === "ring" ? 7
-      : kind === "sleeper" ? 24 : 18,
+      : kind === "sleeper" ? 24 : kind === "month" ? 9 : 18,
     colorHex: "#FFFFFF", opacity: kind === "shape" ? 0.25 : 1
   };
   if (kind === "shape") { el.shape = "rect"; el.w = 0.5; el.h = 0.25; }
@@ -3075,6 +3184,8 @@ function addElement(kind) {
   if (kind === "weather") { el.unit = "f"; }
   if (kind === "progress") { el.source = "day"; el.w = 0.7; }
   if (kind === "ring") { el.source = "battery"; el.w = 0.55; }
+  if (kind === "month") { el.w = 0.6; el.accentHex = "#4A90F6"; }
+  if (kind === "calendar") { el.count = 1; }
   if (kind === "sleeper" || kind === "sleeperlogo") {
     el.mode = "score"; el.side = "me";
     el.username = ""; el.userID = ""; el.leagueID = ""; el.leagueName = "";
@@ -3149,7 +3260,8 @@ function labelForElement(el) {
   if (el.kind === "app") return "📲 " + (el.label || "App");
   if (el.kind === "icon") return "◆ " + (el.text || "★");
   if (el.kind === "weather") return "☀️ Weather";
-  if (el.kind === "calendar") return "📆 Calendar";
+  if (el.kind === "calendar") return "📆 Events ×" + (el.count || 1);
+  if (el.kind === "month") return "🗓 Month";
   if (el.kind === "progress") return "▬ " + (el.source || "day");
   if (el.kind === "ring") return "◯ " + (el.source || "battery");
   if (el.kind === "sleeper") return "🏈 " + (el.leagueName || "Fantasy");
@@ -3380,10 +3492,40 @@ function buildInspectorContent(inspector) {
   }
 
   if (el.kind === "calendar") {
+    const countRow = document.createElement("div");
+    countRow.className = "row";
+    const countLabel = document.createElement("span");
+    countLabel.textContent = "Events";
+    countLabel.style.cssText = "font-size:12px;color:var(--muted);width:52px";
+    const countSel = document.createElement("select");
+    for (const n of [1, 2, 3, 4]) {
+      const option = document.createElement("option");
+      option.value = String(n);
+      option.textContent = n === 1 ? "Next event only" : "Next " + n + " events (list)";
+      countSel.appendChild(option);
+    }
+    countSel.value = String(Math.min(Math.max(Number(el.count) || 1, 1), 4));
+    countSel.onchange = function () { el.count = Number(countSel.value); refreshEditors(); };
+    countRow.append(countLabel, countSel);
+    inspector.appendChild(countRow);
     const calHint = document.createElement("p");
     calHint.className = "hint";
-    calHint.textContent = "Shows your next calendar event (today, then tomorrow). Scriptable asks for calendar access on first run.";
+    calHint.textContent = "Upcoming events from your calendar (incl. birthdays). Scriptable asks for calendar access on first run.";
     inspector.appendChild(calHint);
+  }
+
+  if (el.kind === "month") {
+    const accentRow = document.createElement("div");
+    accentRow.className = "row";
+    const accentLabel = document.createElement("span");
+    accentLabel.textContent = "Today";
+    accentLabel.style.cssText = "font-size:12px;color:var(--muted);width:52px";
+    const accentInput = document.createElement("input");
+    accentInput.type = "color";
+    accentInput.value = /^#[0-9a-fA-F]{6}$/.test(el.accentHex || "") ? el.accentHex.toLowerCase() : "#4a90f6";
+    accentInput.oninput = function () { el.accentHex = accentInput.value.toUpperCase(); refreshCanvases(); };
+    accentRow.append(accentLabel, accentInput);
+    inspector.appendChild(accentRow);
   }
 
   if (el.kind === "sleeper" || el.kind === "sleeperlogo") {
@@ -3613,6 +3755,9 @@ function buildInspectorContent(inspector) {
   } else if (el.kind === "ring") {
     sliderRow("Size", 15, 100, Math.round((el.w || 0.55) * 100), function (v) { el.w = v / 100; });
     sliderRow("Thick", 2, 24, el.size || 7, function (v) { el.size = v; });
+  } else if (el.kind === "month") {
+    sliderRow("Width", 30, 100, Math.round((el.w || 0.6) * 100), function (v) { el.w = v / 100; });
+    sliderRow("Text", 6, 16, el.size || 9, function (v) { el.size = v; });
   } else {
     sliderRow("Size", 8, 80, el.size, function (v) { el.size = v; });
   }
@@ -4690,7 +4835,7 @@ document.getElementById("cloneInput").onchange = function (event) {
           role: "user",
           content: [
             { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } },
-            { type: "text", text: "Recreate the widget shown in this image as closely as the spec allows: match its layout, colors (use two custom backgroundColors), typography feel (closest font), and every visible element. If it shows a photo, use a photo placeholder. Recreate only the single widget design, not the surrounding screen." }
+            { type: "text", text: "Recreate the widget shown in this image as closely as the spec allows: match its layout, colors (use two custom backgroundColors), typography feel (closest font), and every visible element. Map a month-calendar grid to kind=month; map an upcoming-events list to kind=calendar with count 2-4; map circular gauges to kind=ring; map bars to kind=progress. If it shows a photo, use a photo placeholder. Recreate only the single widget design, not the surrounding screen." }
           ]
         }], key);
         deliverMagicDesign(design, "🪄 Cloned! It's fully editable — photos become placeholders you can fill.");
