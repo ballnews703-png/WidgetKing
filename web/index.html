@@ -99,6 +99,20 @@
   }
   #tabbar button .tab-ico { font-size: 21px; line-height: 1.15; }
   #tabbar button.active { color: var(--accent); background: var(--card2); }
+  details.dcard { background: var(--card2); border: 1px solid var(--line); border-radius: 16px;
+    padding: 0; margin-bottom: 12px; }
+  details.dcard > summary { list-style: none; cursor: pointer; padding: 14px 16px;
+    font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px;
+    -webkit-tap-highlight-color: transparent; }
+  details.dcard > summary::-webkit-details-marker { display: none; }
+  details.dcard > summary::after { content: "›"; margin-left: auto; color: var(--muted);
+    font-size: 19px; transition: transform .18s ease; }
+  details.dcard[open] > summary::after { transform: rotate(90deg); }
+  details.dcard > .dbody { padding: 2px 16px 14px; }
+  #saveRow { position: sticky; bottom: calc(74px + env(safe-area-inset-bottom)); z-index: 20;
+    background: var(--card); padding: 10px 0 4px; }
+  .method-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 10px; }
+  .method-cards button { min-height: 54px; font-size: 14px; }
   .pane { display: none; }
   .pane.active { display: block; animation: paneIn .22s ease; }
   @keyframes paneIn { from { opacity: .4; transform: translateY(6px); } to { opacity: 1; transform: none; } }
@@ -260,9 +274,13 @@
 </header>
 
 <section id="builderSection" class="pane pane-create">
-  <h2>Not sure what you want?</h2>
+  <h2>What are we making today?</h2>
   <button class="primary" id="builderBtn" style="width:100%;font-size:16px;padding:15px">✨ Build it for me — 3 quick questions</button>
-  <button id="pageStudioBtn" style="width:100%;margin-top:8px;font-size:15px;padding:13px">📱 Design a whole page</button>
+  <div class="method-cards">
+    <button id="cloneBtn" style="display:none">📷 Clone a widget<br><span style="font-size:11px;color:var(--muted)">from any photo</span></button>
+    <button id="pageStudioBtn">📱 Design a page<br><span style="font-size:11px;color:var(--muted)">whole Home Screen</span></button>
+  </div>
+  <input type="file" id="cloneInput" accept="image/*" style="display:none">
 </section>
 
 <section id="templatesSection" class="pane pane-create">
@@ -277,8 +295,6 @@
   <textarea id="magicInput" placeholder="A launcher with Spotify, Instagram and YouTube"></textarea>
   <div class="chips" id="magicChips"></div>
   <button class="primary" id="magicBtn">Build it ✨</button>
-  <button id="cloneBtn" style="display:none;width:100%;margin-top:8px">📷 Clone a widget from a photo</button>
-  <input type="file" id="cloneInput" accept="image/*" style="display:none">
   <div id="magicFallback" style="display:none;margin-top:10px">
     <p class="hint">🤔 That idea is too detailed for the free built-in parser — it would just become a text note. Better options:</p>
     <div class="row">
@@ -315,10 +331,8 @@
       <button id="resetSpend">Reset</button>
     </div>
     <p class="hint" style="margin-top:6px">
-      The designer tallies each request's real token usage and stops calling
-      Claude once your budget is reached. For a hard guarantee, load only $5 of
-      credit in your Anthropic account and leave auto-reload off — prepaid
-      credits can never overspend.
+      Requests stop automatically at your budget. Hard guarantee: keep only $5
+      of prepaid credit with auto-reload off.
     </p>
   </details>
 </section>
@@ -360,8 +374,10 @@
       <input type="file" id="photoInput" accept="image/*" style="display:none">
     </div>
     <div>
+      <details class="dcard" open><summary>✏️ Name &amp; type</summary><div class="dbody">
       <div class="field"><label>Name</label><input type="text" id="nameInput"></div>
       <div class="field"><label>Type</label><div class="row kind-buttons" id="kindButtons"></div></div>
+      </div></details>
       <div class="field" id="fCountdown" style="display:none">
         <label>Countdown</label>
         <input type="text" id="countTitle" placeholder="Event title" style="margin-bottom:8px">
@@ -428,12 +444,13 @@
           <label style="font-size:12px;display:flex;align-items:center;gap:4px">
             <input type="checkbox" id="showLabels" checked> Labels
           </label>
-          <span class="hint" style="flex:1">Big icons + many rows can overflow — the preview shows what fits.</span>
+
         </div>
         <div class="hint" id="shortcutHint" style="display:none;margin-top:8px"></div>
-        <p class="hint" style="margin-top:6px">Heads-up: iOS only allows multiple tap targets on <b>Medium and Large</b> widgets. On a Small widget, tapping anywhere opens the first app. Widget taps always flash through Scriptable for a moment — that's an Apple rule for <i>every</i> widget app. For instant, no-flash launching:</p>
+        <p class="hint" style="margin-top:6px">Taps work per-icon on <b>Medium/Large</b> (Small opens the first app) and flash through Scriptable for a moment — an iOS rule. For instant taps:</p>
         <button id="toIconMakerBtn" style="width:100%">⚡ Make these zero-flash Home Screen icons instead</button>
       </div>
+      <details class="dcard" open><summary>🎨 Colors &amp; style</summary><div class="dbody">
       <div class="field">
         <label>Background</label>
         <div class="row kind-buttons" id="bgButtons"></div>
@@ -474,6 +491,8 @@
         <option value="serif">Serif</option><option value="mono">Mono</option>
       </select></div>
       <div class="field"><label>Text color</label><input type="color" id="textColor" value="#ffffff"></div>
+      </div></details>
+      <details class="dcard"><summary>⚡ Extras</summary><div class="dbody">
       <div class="field" id="fTap">
         <label>Tap action — open an app when the widget is tapped (optional)</label>
         <div class="row">
@@ -481,13 +500,14 @@
           <input type="text" id="tapUrlInput" placeholder="or custom URL / scheme" style="flex:1.4">
         </div>
       </div>
-      <div class="row">
-        <button class="primary" id="saveBtn">Save design</button>
-        <button id="newBtn">New</button>
-      </div>
       <div class="row" id="remixRow" style="margin-top:10px;display:none">
         <input type="text" id="remixInput" placeholder="✨ Remix with AI: make it warmer, add stars…" style="flex:1">
         <button id="remixBtn">✨ Remix</button>
+      </div>
+      </div></details>
+      <div class="row" id="saveRow">
+        <button class="primary" id="saveBtn" style="flex:2">💾 Save design</button>
+        <button id="newBtn" style="flex:1">＋ New</button>
       </div>
     </div>
   </div>
@@ -526,8 +546,8 @@
 </section>
 
 <section id="iconMakerSection" class="pane pane-install">
-  <h2>🎨 App Icon Maker</h2>
-  <p class="hint">Restyle your <b>real Home Screen app icons</b> to match your widgets — the thing other apps charge for, free here. Pick a style, pick your apps, save the icons, and apply them with Shortcuts (guide below).</p>
+  <details class="dcard"><summary>🎨 App Icon Maker — restyle your real app icons</summary><div class="dbody">
+  <p class="hint">Real App Store artwork or styled packs for your Home Screen icons — free, applied with Shortcuts (guide below).</p>
   <label style="font-size:12px;color:var(--muted)">Icon style</label>
   <div class="chips" id="iconStyleChips"></div>
   <label style="font-size:12px;color:var(--muted);margin-top:6px;display:block">Your apps (tap to add — search works for any App Store app)</label>
@@ -549,14 +569,15 @@
       <li>Optional: hide the original icon (long-press → Remove from Home Screen — it stays in your App Library).</li>
     </ol>
   </details>
+  </div></details>
 </section>
 
 <section id="shortcutGuideSection" class="pane pane-install">
-  <h2>⚡ Your Shortcut Guide</h2>
-  <p class="hint">Auto-generated from the widgets you've saved: what each app button does on tap, and the exact Shortcuts to create for the few that need one. (Apple doesn't let any app install Shortcuts for you — this reads your designs so there's zero guesswork.)</p>
-  <p class="hint">⚡ <b>Zero-flash tip:</b> widget taps normally hop through Scriptable for a moment. For a widget that opens <b>one</b> app, skip that entirely: long-press the widget → <b>Edit Widget</b> → <b>When Interacting → Open URL</b> → paste the app's link (copy buttons below). iOS then opens the app directly — Scriptable never appears. Multi-icon launchers can't do per-icon direct taps (a Scriptable limit), so for a flash-free grid use the App Icon Maker above.</p>
+  <details class="dcard"><summary>⚡ Your Shortcut Guide — reads your widgets</summary><div class="dbody">
+  <p class="hint">What each app button does on tap, auto-generated from your saved widgets. Zero-flash tip: a single-app widget can skip Scriptable entirely — long-press it → <b>Edit Widget → When Interacting → Open URL</b> → paste the link (📋 below).</p>
   <div id="shortcutGuideList"></div>
   <a class="wiz-action" href="shortcuts://" style="margin-top:10px">🚀 Open the Shortcuts app</a>
+  </div></details>
 </section>
 
 <div id="setupWizard">
@@ -1342,6 +1363,19 @@ function drawFreestyle(design, family, bgImg, live) {
       ctx.setTextColor(new Color(el.colorHex || "#FFFFFF", op * 0.6));
       for (let c = 0; c < 7; c++) {
         ctx.drawTextInRect(headers[c], new Rect(x0 + c * cell, y0, cell, rowH));
+      }
+      const prevDays = new Date(now2.getFullYear(), now2.getMonth(), 0).getDate();
+      ctx.setFont(fontFor(el.font || design.fontStyle, fsM, false));
+      ctx.setTextColor(new Color(el.colorHex || "#FFFFFF", op * 0.3));
+      for (let b = 0; b < startDow; b++) {
+        ctx.drawTextInRect(String(prevDays - startDow + 1 + b),
+          new Rect(x0 + b * cell, y0 + rowH + (rowH - fsM * 1.4) / 2, cell, fsM * 1.4));
+      }
+      const tail = rows * 7 - (startDow + daysIn);
+      for (let a = 0; a < tail; a++) {
+        const idx2 = startDow + daysIn + a;
+        ctx.drawTextInRect(String(a + 1),
+          new Rect(x0 + (idx2 % 7) * cell, y0 + (Math.floor(idx2 / 7) + 1) * rowH + (rowH - fsM * 1.4) / 2, cell, fsM * 1.4));
       }
       for (let d = 1; d <= daysIn; d++) {
         const idx = startDow + d - 1;
@@ -3042,7 +3076,10 @@ function renderFreestyleInto(node, design, w, h, interactive) {
       for (const h of ["S", "M", "T", "W", "T", "F", "S"]) {
         html += '<span style="opacity:.6;font-weight:700;font-size:' + (fsM * 0.9) + 'px">' + h + '</span>';
       }
-      for (let b = 0; b < startDow; b++) html += "<span></span>";
+      const prevDays = new Date(now2.getFullYear(), now2.getMonth(), 0).getDate();
+      for (let b = 0; b < startDow; b++) {
+        html += '<span style="opacity:.3">' + (prevDays - startDow + 1 + b) + "</span>";
+      }
       for (let d = 1; d <= daysIn; d++) {
         if (d === now2.getDate()) {
           html += '<span style="background:' + accent + ';color:#fff;border-radius:50%;width:' + (fsM * 1.5) +
@@ -3050,6 +3087,10 @@ function renderFreestyleInto(node, design, w, h, interactive) {
         } else {
           html += "<span>" + d + "</span>";
         }
+      }
+      const rowsM = Math.ceil((startDow + daysIn) / 7);
+      for (let a = 0; a < rowsM * 7 - (startDow + daysIn); a++) {
+        html += '<span style="opacity:.3">' + (a + 1) + "</span>";
       }
       html += "</div>";
       div.innerHTML = html;
@@ -5089,7 +5130,7 @@ document.getElementById("cloneInput").onchange = function (event) {
         toast("⚠️ Couldn't clone it: " + error.message);
       } finally {
         button.disabled = false;
-        button.textContent = "📷 Clone a widget from a photo";
+        button.innerHTML = "📷 Clone a widget<br><span style=\"font-size:11px;color:var(--muted)\">from any photo</span>";
       }
     };
     img.src = reader.result;
