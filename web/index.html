@@ -3116,7 +3116,7 @@ function renderFreestyleInto(node, design, w, h, interactive) {
       else if (el.kind === "weather") div.textContent = "☀️ " + (el.unit === "c" ? "22°" : "72°");
       else if (el.kind === "calendar") {
         const n = Math.min(Math.max(Number(el.count) || 1, 1), 4);
-        div.textContent = ["Team call · 2:30 PM", "! Band · tomorrow", "Birthday 🎂 · in 5d", "Gym · in 6d"].slice(0, n).join("\n");
+        div.textContent = ["Team call · 2:30 PM", "Dinner out · tomorrow", "Birthday 🎂 · in 5d", "Gym · in 6d"].slice(0, n).join("\n");
         div.style.whiteSpace = "pre-line";
         div.style.lineHeight = "1.55";
       }
