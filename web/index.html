@@ -1262,6 +1262,17 @@ function drawFreestyle(design, family, bgImg, live) {
       }
       continue;
     }
+    if (el.kind === "art") {
+      // Pre-baked in the designer (curved/rotated text, gradients) — just draw.
+      if (el.b64 && el.artW) {
+        try {
+          const img = Image.fromData(Data.fromBase64String(el.b64));
+          const wPx = el.artW * scale, hPx = (el.artH || el.artW) * scale;
+          ctx.drawImageInRect(img, new Rect(px - wPx / 2, py - hPx / 2, wPx, hPx));
+        } catch (e) {}
+      }
+      continue;
+    }
     if (el.kind === "progress") {
       const pct = Math.min(Math.max(progressPct(el), 0), 1);
       const wPx = (el.w || 0.7) * W;
@@ -1900,6 +1911,90 @@ const GLYPHS = ["★","☆","♥","♡","●","○","◆","◇","■","□","▲
   "☀","☾","☁","☂","❆","⚡","♪","♫","☕","✈","⚑","⌂","✉","☏","⚙","☮","☯","♻",
   "✓","✕","✚","→","←","↑","↓","⇄","∞","§","❝","❞"];
 const EMOJI_PICKS = ["⭐","❤️","⚡","🌙","☀️","☁️","🍃","🔥","✨","🎵","🐾","👑"];
+// Baked "art" elements: things the phone's renderer can't draw live (curved
+// text, rotation, gradient fills) are drawn here on a canvas and shipped to
+// the widget as a transparent PNG — the same bake pipeline photos use.
+// Static by nature: never used for live values like the time.
+function renderArtCanvas(el, res, designFont) {
+  const basePt = 158;
+  const fs = (el.size || 16) * res;
+  const family = FONT_CSS[el.font] || FONT_CSS[designFont] || FONT_CSS.rounded;
+  const weight = el.bold === false ? "400" : "700";
+  const color = /^#[0-9a-fA-F]{6}$/.test(el.colorHex || "") ? el.colorHex : "#FFFFFF";
+  const color2 = /^#[0-9a-fA-F]{6}$/.test(el.color2Hex || "") ? el.color2Hex : "#8F52FA";
+  const text = el.text || "curved text";
+  const c = document.createElement("canvas");
+  if (el.artType === "gradshape") {
+    const wPx = Math.max(8, (el.w || 0.5) * basePt * res);
+    const hPx = el.shape === "circle" ? wPx : Math.max(8, (el.h || 0.25) * basePt * res);
+    c.width = Math.ceil(wPx); c.height = Math.ceil(hPx);
+    const x = c.getContext("2d");
+    const ang = ((Number(el.angle) || 135) % 360) * Math.PI / 180;
+    const cx = wPx / 2, cy = hPx / 2, rad = Math.sqrt(cx * cx + cy * cy);
+    const g = x.createLinearGradient(cx - Math.cos(ang) * rad, cy - Math.sin(ang) * rad,
+      cx + Math.cos(ang) * rad, cy + Math.sin(ang) * rad);
+    g.addColorStop(0, color);
+    g.addColorStop(1, color2);
+    x.globalAlpha = (el.opacity == null) ? 1 : el.opacity;
+    x.fillStyle = g;
+    x.beginPath();
+    const r = el.shape === "circle" ? wPx / 2
+      : el.shape === "pill" ? Math.min(wPx, hPx) / 2
+      : Math.min((typeof el.radius === "number" ? el.radius : 6) * res, Math.min(wPx, hPx) / 2);
+    if (x.roundRect) x.roundRect(0, 0, wPx, hPx, r); else x.rect(0, 0, wPx, hPx);
+    x.fill();
+    return c;
+  }
+  if (el.artType === "rotated") {
+    const probe = document.createElement("canvas").getContext("2d");
+    probe.font = weight + " " + fs + "px " + family;
+    const tw = probe.measureText(text).width;
+    const th = fs * 1.25;
+    const ang = (Number(el.angle) || 0) * Math.PI / 180;
+    const bw = Math.abs(tw * Math.cos(ang)) + Math.abs(th * Math.sin(ang)) + fs * 0.4;
+    const bh = Math.abs(tw * Math.sin(ang)) + Math.abs(th * Math.cos(ang)) + fs * 0.4;
+    c.width = Math.ceil(bw); c.height = Math.ceil(bh);
+    const x = c.getContext("2d");
+    x.globalAlpha = (el.opacity == null) ? 1 : el.opacity;
+    x.fillStyle = color;
+    x.font = weight + " " + fs + "px " + family;
+    x.textAlign = "center";
+    x.textBaseline = "middle";
+    x.translate(bw / 2, bh / 2);
+    x.rotate(ang);
+    x.fillText(text, 0, 0);
+    return c;
+  }
+  // arc (curved text along a circle, centered at 12 o'clock — or 6 with flip)
+  const dia = Math.max(20, (el.w || 0.7) * basePt * res);
+  const radius = dia / 2;
+  const side = Math.ceil(dia + fs * 2.6);
+  c.width = side; c.height = side;
+  const x = c.getContext("2d");
+  x.globalAlpha = (el.opacity == null) ? 1 : el.opacity;
+  x.fillStyle = color;
+  x.font = weight + " " + fs + "px " + family;
+  x.textAlign = "center";
+  x.textBaseline = "middle";
+  const widths = [];
+  let total = 0;
+  for (const ch of text) { const cw = x.measureText(ch).width; widths.push(cw); total += cw; }
+  const totalAngle = total / radius;
+  const flip = el.flip === true;
+  let angle = flip ? Math.PI / 2 + totalAngle / 2 : -Math.PI / 2 - totalAngle / 2;
+  const chars = [...text];
+  for (let i = 0; i < chars.length; i++) {
+    const step = (widths[i] / radius) * (flip ? -1 : 1);
+    angle += step / 2;
+    x.save();
+    x.translate(side / 2 + Math.cos(angle) * radius, side / 2 + Math.sin(angle) * radius);
+    x.rotate(angle + (flip ? -Math.PI / 2 : Math.PI / 2));
+    x.fillText(chars[i], 0, 0);
+    x.restore();
+    angle += step / 2;
+  }
+  return c;
+}
 // Themed launcher-icon styles — must match ICON_THEMES in the Scriptable
 // template so preview and widget agree.
 const ICON_THEMES = {
@@ -2107,6 +2202,16 @@ function normalizeDesign(design) {
     if (el.kind === "weather" && el.unit !== "c") el.unit = "f";
     if (el.kind === "calendar") {
       el.count = Math.min(Math.max(Math.round(Number(el.count) || 1), 1), 4);
+    }
+    if (el.kind === "art") {
+      if (!["arc", "rotated", "gradshape"].includes(el.artType)) el.artType = "arc";
+      if (el.text == null || el.text === "") el.text = "curved text";
+      if (typeof el.angle !== "number") el.angle = el.artType === "gradshape" ? 135 : 0;
+      if (!/^#[0-9a-fA-F]{6}$/.test(el.color2Hex || "")) el.color2Hex = "#8F52FA";
+      if (typeof el.w !== "number" || el.w <= 0 || el.w > 1) el.w = el.artType === "gradshape" ? 0.5 : 0.7;
+      if (typeof el.h !== "number" || el.h <= 0 || el.h > 1) el.h = 0.25;
+      if (!["rect", "pill", "circle"].includes(el.shape)) el.shape = "pill";
+      if (el.flip !== true) el.flip = false;
     }
     if (el.kind === "month") {
       if (typeof el.size !== "number" || el.size < 6 || el.size > 16) el.size = 9;
@@ -2468,7 +2573,7 @@ const AI_SCHEMA = {
       items: {
         type: "object",
         properties: {
-          kind: { type: "string", "enum": ["text", "clock", "date", "emoji", "icon", "shape", "battery", "countdown", "app", "weather", "calendar", "progress", "ring", "sleeper", "sleeperlogo", "month"] },
+          kind: { type: "string", "enum": ["text", "clock", "date", "emoji", "icon", "shape", "battery", "countdown", "app", "weather", "calendar", "progress", "ring", "sleeper", "sleeperlogo", "month", "art"] },
           text: { type: "string", description: "Text or emoji content; for kind=icon a single glyph like ★ ♥ ● ▲ ☾ ⚡ ✈ ⚙ →; empty for other kinds" },
           label: { type: "string", description: "App name for kind=app; empty otherwise" },
           url: { type: "string", description: "URL scheme to open for kind=app (e.g. spotify://); empty otherwise" },
@@ -2487,12 +2592,13 @@ const AI_SCHEMA = {
           borderHex: { type: "string", description: "#RRGGBB border color for kind=shape when border>0; empty otherwise" },
           count: { type: "number", description: "For kind=calendar: how many upcoming events to list, 1-4 (multi-line). 0 otherwise" },
           accentHex: { type: "string", description: "For kind=month only: #RRGGBB for the today-circle; empty otherwise" },
-          mode: { type: "string", "enum": ["", "score", "record", "myteam", "opponent"], description: "For kind=sleeper: what to show (score/record/myteam name/opponent name). For kind=sleeperlogo: myteam or opponent picks whose circular team logo. Empty otherwise" },
+          angle: { type: "number", description: "For kind=art: rotated text angle in degrees (-90..90) or gradshape gradient direction (0-360). 0 otherwise" },
+          mode: { type: "string", "enum": ["", "score", "record", "myteam", "opponent", "arc", "rotated", "gradshape"], description: "For kind=sleeper: score/record/myteam/opponent. For kind=sleeperlogo: myteam or opponent. For kind=art: arc (text curved along a circle, w=diameter), rotated (tilted text, use angle), or gradshape (gradient-filled shape colorHex->borderHex at angle; w/h/shape/radius apply). Empty otherwise" },
           source: { type: "string", "enum": ["", "day", "year", "battery", "countdown"], description: "For kind=progress (bar) and kind=ring (circular gauge): what it measures; empty otherwise. Rings: w = diameter 0-1 of the short side, size = stroke thickness pt (5-10)" },
           bold: { type: "boolean", description: "For kind=text: false for lighter body text; true otherwise" },
           dateISO: { type: "string", description: "yyyy-MM-dd for countdown elements; empty otherwise" }
         },
-        required: ["kind", "text", "label", "url", "font", "x", "y", "size", "colorHex", "opacity", "shape", "w", "h", "align", "bold", "radius", "border", "borderHex", "count", "accentHex", "mode", "source", "dateISO"],
+        required: ["kind", "text", "label", "url", "font", "x", "y", "size", "colorHex", "opacity", "shape", "w", "h", "align", "bold", "radius", "border", "borderHex", "count", "accentHex", "angle", "mode", "source", "dateISO"],
         additionalProperties: false
       }
     }
@@ -2508,10 +2614,10 @@ const AI_EX_RING = {
   backgroundColors: [], tapUrl: "", apps: [],
   canvasElements: [
     { kind: "ring", text: "", label: "", url: "", font: "", x: 0.3, y: 0.5, size: 7, colorHex: "#8FD3FE", opacity: 1, shape: "", w: 0.52, h: 0, align: "", bold: true, source: "battery", dateISO: "" },
-    { kind: "battery", text: "", label: "", url: "", font: "", x: 0.3, y: 0.5, size: 21, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
-    { kind: "text", text: "POWER", label: "", url: "", font: "", x: 0.72, y: 0.3, size: 10, colorHex: "#8FD3FE", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
+    { kind: "battery", text: "", label: "", url: "", font: "", x: 0.3, y: 0.5, size: 21, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
+    { kind: "text", text: "POWER", label: "", url: "", font: "", x: 0.72, y: 0.3, size: 10, colorHex: "#8FD3FE", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
     { kind: "date", text: "", label: "", url: "", font: "", x: 0.72, y: 0.46, size: 11, colorHex: "#FFFFFF", opacity: 0.85, shape: "", w: 0, h: 0, align: "", bold: false, source: "", dateISO: "" },
-    { kind: "shape", text: "", label: "", url: "", font: "", x: 0.72, y: 0.58, size: 0, colorHex: "#FFFFFF", opacity: 0.25, shape: "rect", w: 0.3, h: 0.006, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
+    { kind: "shape", text: "", label: "", url: "", font: "", x: 0.72, y: 0.58, size: 0, colorHex: "#FFFFFF", opacity: 0.25, shape: "rect", w: 0.3, h: 0.006, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
     { kind: "progress", text: "", label: "", url: "", font: "", x: 0.72, y: 0.7, size: 5, colorHex: "#8FD3FE", opacity: 1, shape: "", w: 0.3, h: 0, align: "", bold: true, source: "day", dateISO: "" }
   ]
 };
@@ -2521,10 +2627,10 @@ const AI_EX_HERO = {
   background: "gradient", glassTint: "dark", bgOpacity: 1,
   backgroundColors: ["#2A1A34", "#B0626A"], tapUrl: "", apps: [],
   canvasElements: [
-    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.51, y: 0.462, size: 46, colorHex: "#141018", opacity: 0.45, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
-    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.5, y: 0.45, size: 46, colorHex: "#FFF6EC", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
-    { kind: "text", text: "golden hour", label: "", url: "", font: "script", x: 0.5, y: 0.66, size: 13, colorHex: "#F2B694", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
-    { kind: "icon", text: "\u2600", label: "", url: "", font: "", x: 0.86, y: 0.16, size: 14, colorHex: "#F2B694", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", mode: "", source: "", dateISO: "" }
+    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.51, y: 0.462, size: 46, colorHex: "#141018", opacity: 0.45, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
+    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.5, y: 0.45, size: 46, colorHex: "#FFF6EC", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
+    { kind: "text", text: "golden hour", label: "", url: "", font: "script", x: 0.5, y: 0.66, size: 13, colorHex: "#F2B694", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
+    { kind: "icon", text: "\u2600", label: "", url: "", font: "", x: 0.86, y: 0.16, size: 14, colorHex: "#F2B694", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" }
   ]
 };
 
@@ -2532,7 +2638,7 @@ function aiSystemPrompt() {
   const today = new Date().toISOString().slice(0, 10);
   return "You are WidgetKing's expert widget designer. Design at the level of the most beautiful Home Screen setups people share online: intentional composition, real hierarchy, restraint. The user describes a widget; return a spec.\n" +
     "Kinds: clock (time+date), date (big day), countdown, quote, note, launcher (tappable app grid), battery, freestyle (a canvas of elements — PREFER freestyle for anything creative; simple kinds are only for plain requests).\n" +
-    "FREESTYLE ELEMENTS (max 24; array order is z-order, bottom first): text, clock, date, emoji, icon (monochrome glyph ★ ☆ ♥ ● ◆ ▲ ✦ ❀ ☀ ☾ ☁ ⚡ ♪ ☕ ✈ ⌂ ✉ ⚙ ✓ → ∞, tinted via colorHex — prefer over emoji for elegance), shape (rect/pill/circle), battery, countdown, app (tappable icon: set label+url), weather (live temp), calendar (next event), progress (bar), ring (circular gauge; w=diameter 0-1 of short side, size=stroke pt 5-10; source day/year/battery/countdown), month (full mini month-calendar grid with today circled: size=day-number pt 8-10, w=grid width, accentHex=today circle color), calendar with count 2-4 = a multi-line upcoming-events list.\n" +
+    "FREESTYLE ELEMENTS (max 24; array order is z-order, bottom first): text, clock, date, emoji, icon (monochrome glyph ★ ☆ ♥ ● ◆ ▲ ✦ ❀ ☀ ☾ ☁ ⚡ ♪ ☕ ✈ ⌂ ✉ ⚙ ✓ → ∞, tinted via colorHex — prefer over emoji for elegance), shape (rect/pill/circle), battery, countdown, app (tappable icon: set label+url), weather (live temp), calendar (next event), progress (bar), ring (circular gauge; w=diameter 0-1 of short side, size=stroke pt 5-10; source day/year/battery/countdown), month (full mini month-calendar grid with today circled: size=day-number pt 8-10, w=grid width, accentHex=today circle color), calendar with count 2-4 = a multi-line upcoming-events list, art (baked decorative graphics — mode arc: STATIC text curved along a circle (w=diameter, size=font pt); mode rotated: tilted static text (angle deg); mode gradshape: gradient-filled shape colorHex to borderHex at angle. Art is for decoration only, NEVER for live values like time).\n" +
     "ARCHETYPES — proven layouts; pick one and adapt, or blend two:\n" +
     "1 Ring Dashboard: ring at x .3 y .5 w .5 + its stat text centered on it (battery/countdown, size 18-22) + right column at x .72: label 10pt, date/calendar 11pt, thin divider, small progress bar.\n" +
     "2 Hero Type: one oversized clock/countdown/date size 44-58 at y .42-.48, tiny styled caption .16 below, one accent glyph in a corner.\n" +
@@ -2632,7 +2738,7 @@ function specToDesign(spec) {
     return { emoji: app.emoji || "🌐", label: (app.label || "App").slice(0, 12), url: app.url || "" };
   });
   design.canvasElements = (spec.canvasElements || []).slice(0, 24).map(function (el) {
-    const kind = ["text","clock","date","emoji","icon","shape","battery","countdown","app","weather","calendar","progress","ring","sleeper","sleeperlogo","month"].includes(el.kind) ? el.kind : "text";
+    const kind = ["text","clock","date","emoji","icon","shape","battery","countdown","app","weather","calendar","progress","ring","sleeper","sleeperlogo","month","art"].includes(el.kind) ? el.kind : "text";
     const rawW = Number(el.w) || 0;
     const out = {
       id: uid(),
@@ -2673,6 +2779,16 @@ function specToDesign(spec) {
     if (kind === "icon" && !out.text) out.text = "★";
     if (kind === "weather") out.unit = "f";
     if (kind === "calendar") out.count = Math.min(Math.max(Math.round(Number(el.count) || 1), 1), 4);
+    if (kind === "art") {
+      out.artType = ["arc","rotated","gradshape"].includes(el.mode) ? el.mode : "arc";
+      out.text = el.text || "curved text";
+      out.angle = Math.max(-360, Math.min(360, Number(el.angle) || (out.artType === "gradshape" ? 135 : 0)));
+      out.w = Math.min(Math.max(rawW || (out.artType === "gradshape" ? 0.5 : 0.7), 0.05), 1);
+      out.h = Math.min(Math.max(Number(el.h) || 0.25, 0.05), 1);
+      out.shape = ["rect","pill","circle"].includes(el.shape) ? el.shape : "pill";
+      if (/^#[0-9a-fA-F]{6}$/.test(el.borderHex || "")) out.color2Hex = el.borderHex.toUpperCase();
+      if (isFinite(Number(el.radius)) && el.radius >= 0) out.radius = Math.min(Number(el.radius), 40);
+    }
     if (kind === "month") {
       out.size = Math.min(Math.max(Number(el.size) || 9, 6), 16);
       out.w = Math.min(Math.max(rawW || 0.6, 0.3), 1);
@@ -2906,6 +3022,13 @@ function renderFreestyleInto(node, design, w, h, interactive) {
         ";pointer-events:none";
       div.appendChild(fill);
       div.classList.add("cel-shape");
+    } else if (el.kind === "art") {
+      const canvas = renderArtCanvas(el, scale * 1.5, design.fontStyle);
+      const img = document.createElement("img");
+      img.src = canvas.toDataURL("image/png");
+      const wPx = (canvas.width / 1.5);
+      img.style.cssText = "width:" + wPx + "px;display:block;pointer-events:none";
+      div.appendChild(img);
     } else if (el.kind === "month") {
       const fsM = (el.size || 9) * scale;
       const gw = (el.w || 0.6) * w;
@@ -3160,7 +3283,7 @@ function attachDrag(div, el) {
 const ELEMENT_PALETTE = [["text", "Text"], ["photo", "🖼 Photo"], ["app", "📲 App icon"],
   ["clock", "🕐 Clock"], ["date", "📅 Date"], ["weather", "☀️ Weather"], ["calendar", "📆 Calendar"], ["month", "🗓 Month"],
   ["progress", "▬ Progress"], ["ring", "◯ Ring"], ["sleeper", "🏈 Fantasy"], ["sleeperlogo", "🛡 Team logo"], ["icon", "◆ Icon"], ["emoji", "✨ Emoji"],
-  ["shape", "▢ Shape"], ["battery", "🔋 Battery"], ["countdown", "⏳ Countdown"]];
+  ["shape", "▢ Shape"], ["art", "🌀 Art"], ["battery", "🔋 Battery"], ["countdown", "⏳ Countdown"]];
 
 function dayOfYear(d) {
   const start = new Date(d.getFullYear(), 0, 0);
@@ -3205,7 +3328,7 @@ function addElement(kind) {
       : kind === "battery" ? 30 : kind === "countdown" ? 34 : kind === "shape" ? 0
       : kind === "icon" ? 26 : kind === "app" ? 40 : kind === "weather" ? 26
       : kind === "calendar" ? 12 : kind === "progress" ? 8 : kind === "ring" ? 7
-      : kind === "sleeper" ? 24 : kind === "month" ? 9 : 18,
+      : kind === "sleeper" ? 24 : kind === "month" ? 9 : kind === "art" ? 15 : 18,
     colorHex: "#FFFFFF", opacity: kind === "shape" ? 0.25 : 1
   };
   if (kind === "shape") { el.shape = "rect"; el.w = 0.5; el.h = 0.25; }
@@ -3215,6 +3338,7 @@ function addElement(kind) {
   if (kind === "progress") { el.source = "day"; el.w = 0.7; }
   if (kind === "ring") { el.source = "battery"; el.w = 0.55; }
   if (kind === "month") { el.w = 0.6; el.accentHex = "#4A90F6"; }
+  if (kind === "art") { el.artType = "arc"; el.text = "curved text"; el.w = 0.7; el.size = 15; el.angle = 0; el.color2Hex = "#8F52FA"; el.flip = false; }
   if (kind === "calendar") { el.count = 1; }
   if (kind === "sleeper" || kind === "sleeperlogo") {
     el.mode = "score"; el.side = "me";
@@ -3292,6 +3416,7 @@ function labelForElement(el) {
   if (el.kind === "weather") return "☀️ Weather";
   if (el.kind === "calendar") return "📆 Events ×" + (el.count || 1);
   if (el.kind === "month") return "🗓 Month";
+  if (el.kind === "art") return "🌀 " + (el.artType === "gradshape" ? "Gradient" : el.artType === "rotated" ? "Tilted" : "Curve");
   if (el.kind === "progress") return "▬ " + (el.source || "day");
   if (el.kind === "ring") return "◯ " + (el.source || "battery");
   if (el.kind === "sleeper") return "🏈 " + (el.leagueName || "Fantasy");
@@ -3544,6 +3669,80 @@ function buildInspectorContent(inspector) {
     inspector.appendChild(calHint);
   }
 
+  if (el.kind === "art") {
+    const typeRow = document.createElement("div");
+    typeRow.className = "row";
+    const typeSel = document.createElement("select");
+    for (const [value, label] of [["arc", "🌀 Curved text"], ["rotated", "↗️ Tilted text"], ["gradshape", "🎨 Gradient shape"]]) {
+      const option = document.createElement("option");
+      option.value = value; option.textContent = label;
+      typeSel.appendChild(option);
+    }
+    typeSel.value = el.artType || "arc";
+    typeSel.onchange = function () {
+      el.artType = typeSel.value;
+      if (el.artType === "gradshape" && (!el.angle || el.angle === 0)) el.angle = 135;
+      refreshEditors();
+    };
+    typeRow.appendChild(typeSel);
+    inspector.appendChild(typeRow);
+    if (el.artType !== "gradshape") {
+      const textInput = document.createElement("input");
+      textInput.type = "text";
+      textInput.value = el.text || "";
+      textInput.oninput = function () { el.text = textInput.value; refreshCanvases(); };
+      inspector.appendChild(textInput);
+    }
+    if (el.artType === "arc") {
+      sliderRow("Circle", 20, 100, Math.round((el.w || 0.7) * 100), function (v) { el.w = v / 100; });
+      const flipLabel = document.createElement("label");
+      flipLabel.style.cssText = "font-size:12px;display:flex;align-items:center;gap:4px;margin:6px 0";
+      const flipCheck = document.createElement("input");
+      flipCheck.type = "checkbox";
+      flipCheck.checked = el.flip === true;
+      flipCheck.onchange = function () { el.flip = flipCheck.checked; refreshCanvases(); };
+      flipLabel.append(flipCheck, document.createTextNode("Curve downward (smile)"));
+      inspector.appendChild(flipLabel);
+    }
+    if (el.artType === "rotated") {
+      sliderRow("Angle", -90, 90, Math.round(el.angle || 0), function (v) { el.angle = v; });
+    }
+    if (el.artType === "gradshape") {
+      const shapeSel = document.createElement("select");
+      for (const [value, label] of [["rect", "▢ Rectangle"], ["pill", "▭ Pill"], ["circle", "◯ Circle"]]) {
+        const option = document.createElement("option");
+        option.value = value; option.textContent = label;
+        shapeSel.appendChild(option);
+      }
+      shapeSel.value = el.shape || "pill";
+      shapeSel.onchange = function () { el.shape = shapeSel.value; refreshEditors(); };
+      const shapeRow2 = document.createElement("div");
+      shapeRow2.className = "row";
+      shapeRow2.appendChild(shapeSel);
+      inspector.appendChild(shapeRow2);
+      sliderRow("Width", 5, 100, Math.round((el.w || 0.5) * 100), function (v) { el.w = v / 100; });
+      if (el.shape !== "circle") {
+        sliderRow("Height", 5, 100, Math.round((el.h || 0.25) * 100), function (v) { el.h = v / 100; });
+      }
+      sliderRow("Angle", 0, 360, Math.round(el.angle || 135), function (v) { el.angle = v; });
+      const c2Row = document.createElement("div");
+      c2Row.className = "row";
+      const c2Label = document.createElement("span");
+      c2Label.textContent = "Color 2";
+      c2Label.style.cssText = "font-size:12px;color:var(--muted);width:52px";
+      const c2Input = document.createElement("input");
+      c2Input.type = "color";
+      c2Input.value = /^#[0-9a-fA-F]{6}$/.test(el.color2Hex || "") ? el.color2Hex.toLowerCase() : "#8f52fa";
+      c2Input.oninput = function () { el.color2Hex = c2Input.value.toUpperCase(); refreshCanvases(); };
+      c2Row.append(c2Label, c2Input);
+      inspector.appendChild(c2Row);
+    }
+    const artHint = document.createElement("p");
+    artHint.className = "hint";
+    artHint.textContent = "Art is baked into the widget as an image at export — perfect for decoration, but it can't show live values like the time.";
+    inspector.appendChild(artHint);
+  }
+
   if (el.kind === "month") {
     const accentRow = document.createElement("div");
     accentRow.className = "row";
@@ -3670,7 +3869,7 @@ function buildInspectorContent(inspector) {
     }
   }
 
-  if (["text", "clock", "date", "countdown", "battery", "icon", "weather", "calendar", "sleeper"].includes(el.kind)) {
+  if (["text", "clock", "date", "countdown", "battery", "icon", "weather", "calendar", "sleeper", "art"].includes(el.kind)) {
     const fontRow = document.createElement("div");
     fontRow.className = "row";
     const fontLabel = document.createElement("span");
@@ -4997,6 +5196,14 @@ async function buildScript() {
         el.b64 = el.b64s[0] || "";
         delete el.dataUrl;
         delete el.photos;
+      }
+      if (el.kind === "art") {
+        try {
+          const canvas = renderArtCanvas(el, 3, design.fontStyle);
+          el.b64 = canvas.toDataURL("image/png").split(",")[1] || "";
+          el.artW = canvas.width / 3;
+          el.artH = canvas.height / 3;
+        } catch (e) { el.b64 = ""; }
       }
     }
   }
