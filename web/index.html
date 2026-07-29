@@ -1216,15 +1216,28 @@ function drawFreestyle(design, family, bgImg, live) {
       if (shapeType === "circle") { wPx = hPx = (el.w || 0.5) * Math.min(W, H); }
       else { wPx = (el.w || 0.5) * W; hPx = (el.h || 0.25) * H; }
       const rect = new Rect(px - wPx / 2, py - hPx / 2, wPx, hPx);
-      ctx.setFillColor(new Color(el.colorHex || "#FFFFFF", op));
-      const path = new Path();
-      if (shapeType === "circle") { path.addEllipse(rect); }
-      else {
-        const r = shapeType === "pill" ? Math.min(wPx, hPx) / 2 : 6 * scale;
-        path.addRoundedRect(rect, r, r);
+      const rr2 = shapeType === "pill" ? Math.min(wPx, hPx) / 2
+        : (typeof el.radius === "number" ? el.radius * scale : 6 * scale);
+      if (op > 0.02) {
+        ctx.setFillColor(new Color(el.colorHex || "#FFFFFF", op));
+        const path = new Path();
+        if (shapeType === "circle") { path.addEllipse(rect); }
+        else { path.addRoundedRect(rect, rr2, rr2); }
+        ctx.addPath(path);
+        ctx.fillPath();
       }
-      ctx.addPath(path);
-      ctx.fillPath();
+      const bw = (Number(el.border) || 0) * scale;
+      if (bw > 0) {
+        ctx.setStrokeColor(new Color(el.borderHex || el.colorHex || "#FFFFFF", 1));
+        ctx.setLineWidth(bw);
+        const inset = bw / 2;
+        const srect = new Rect(rect.x + inset, rect.y + inset, rect.width - bw, rect.height - bw);
+        const spath = new Path();
+        if (shapeType === "circle") { spath.addEllipse(srect); }
+        else { spath.addRoundedRect(srect, Math.max(0, rr2 - inset), Math.max(0, rr2 - inset)); }
+        ctx.addPath(spath);
+        ctx.strokePath();
+      }
       continue;
     }
     if (el.kind === "photo") {
@@ -2070,11 +2083,15 @@ function normalizeDesign(design) {
     if (typeof el.y !== "number") el.y = 0.5;
     if (typeof el.size !== "number" || el.size <= 0) el.size = 18;
     if (!el.colorHex) el.colorHex = "#FFFFFF";
-    if (typeof el.opacity !== "number" || el.opacity < 0.05 || el.opacity > 1) el.opacity = 1;
+    const minOp = el.kind === "shape" ? 0 : 0.05;
+    if (typeof el.opacity !== "number" || el.opacity < minOp || el.opacity > 1) el.opacity = 1;
     if (el.kind === "shape") {
       if (!["rect", "pill", "circle"].includes(el.shape)) el.shape = "rect";
       if (typeof el.w !== "number" || el.w <= 0) el.w = 0.5;
       if (typeof el.h !== "number" || el.h <= 0) el.h = 0.25;
+      if (typeof el.radius !== "number" || el.radius < 0 || el.radius > 40) delete el.radius;
+      if (typeof el.border !== "number" || el.border <= 0 || el.border > 20) delete el.border;
+      if (!/^#[0-9a-fA-F]{6}$/.test(el.borderHex || "")) delete el.borderHex;
     }
     if (el.kind === "photo") {
       if (typeof el.dataUrl !== "string") el.dataUrl = "";
@@ -2447,7 +2464,7 @@ const AI_SCHEMA = {
     },
     canvasElements: {
       type: "array",
-      description: "For freestyle widgets only, max 16; empty otherwise. Position is normalized 0-1 from top-left; size is point size on a 158pt canvas. Array order is z-order: put shapes/shadows BEFORE the elements that sit on them.",
+      description: "For freestyle widgets only, max 24; empty otherwise. Position is normalized 0-1 from top-left; size is point size on a 158pt canvas. Array order is z-order: put shapes/shadows BEFORE the elements that sit on them.",
       items: {
         type: "object",
         properties: {
@@ -2465,6 +2482,9 @@ const AI_SCHEMA = {
           w: { type: "number", description: "Shape width 0-1 of canvas (0 when unused). For kind=text: 0 = auto single line, >0 = wrapping text box of that width — use ~0.8 for quotes/long text" },
           h: { type: "number", description: "Shape height 0-1 of canvas; 0 when unused (ignored for circles)" },
           align: { type: "string", "enum": ["", "left", "center", "right"], description: "Text-box alignment when kind=text and w>0; empty otherwise" },
+          radius: { type: "number", description: "For kind=shape rect: corner radius in pt (0 = sharp square). 0 otherwise" },
+          border: { type: "number", description: "For kind=shape: stroke width in pt (0 = no border). Enables outlined shapes and frames; with opacity 0 the shape is outline-only" },
+          borderHex: { type: "string", description: "#RRGGBB border color for kind=shape when border>0; empty otherwise" },
           count: { type: "number", description: "For kind=calendar: how many upcoming events to list, 1-4 (multi-line). 0 otherwise" },
           accentHex: { type: "string", description: "For kind=month only: #RRGGBB for the today-circle; empty otherwise" },
           mode: { type: "string", "enum": ["", "score", "record", "myteam", "opponent"], description: "For kind=sleeper: what to show (score/record/myteam name/opponent name). For kind=sleeperlogo: myteam or opponent picks whose circular team logo. Empty otherwise" },
@@ -2472,7 +2492,7 @@ const AI_SCHEMA = {
           bold: { type: "boolean", description: "For kind=text: false for lighter body text; true otherwise" },
           dateISO: { type: "string", description: "yyyy-MM-dd for countdown elements; empty otherwise" }
         },
-        required: ["kind", "text", "label", "url", "font", "x", "y", "size", "colorHex", "opacity", "shape", "w", "h", "align", "bold", "count", "accentHex", "mode", "source", "dateISO"],
+        required: ["kind", "text", "label", "url", "font", "x", "y", "size", "colorHex", "opacity", "shape", "w", "h", "align", "bold", "radius", "border", "borderHex", "count", "accentHex", "mode", "source", "dateISO"],
         additionalProperties: false
       }
     }
@@ -2488,10 +2508,10 @@ const AI_EX_RING = {
   backgroundColors: [], tapUrl: "", apps: [],
   canvasElements: [
     { kind: "ring", text: "", label: "", url: "", font: "", x: 0.3, y: 0.5, size: 7, colorHex: "#8FD3FE", opacity: 1, shape: "", w: 0.52, h: 0, align: "", bold: true, source: "battery", dateISO: "" },
-    { kind: "battery", text: "", label: "", url: "", font: "", x: 0.3, y: 0.5, size: 21, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
-    { kind: "text", text: "POWER", label: "", url: "", font: "", x: 0.72, y: 0.3, size: 10, colorHex: "#8FD3FE", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
+    { kind: "battery", text: "", label: "", url: "", font: "", x: 0.3, y: 0.5, size: 21, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
+    { kind: "text", text: "POWER", label: "", url: "", font: "", x: 0.72, y: 0.3, size: 10, colorHex: "#8FD3FE", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
     { kind: "date", text: "", label: "", url: "", font: "", x: 0.72, y: 0.46, size: 11, colorHex: "#FFFFFF", opacity: 0.85, shape: "", w: 0, h: 0, align: "", bold: false, source: "", dateISO: "" },
-    { kind: "shape", text: "", label: "", url: "", font: "", x: 0.72, y: 0.58, size: 0, colorHex: "#FFFFFF", opacity: 0.25, shape: "rect", w: 0.3, h: 0.006, align: "", bold: true, count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
+    { kind: "shape", text: "", label: "", url: "", font: "", x: 0.72, y: 0.58, size: 0, colorHex: "#FFFFFF", opacity: 0.25, shape: "rect", w: 0.3, h: 0.006, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
     { kind: "progress", text: "", label: "", url: "", font: "", x: 0.72, y: 0.7, size: 5, colorHex: "#8FD3FE", opacity: 1, shape: "", w: 0.3, h: 0, align: "", bold: true, source: "day", dateISO: "" }
   ]
 };
@@ -2501,10 +2521,10 @@ const AI_EX_HERO = {
   background: "gradient", glassTint: "dark", bgOpacity: 1,
   backgroundColors: ["#2A1A34", "#B0626A"], tapUrl: "", apps: [],
   canvasElements: [
-    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.51, y: 0.462, size: 46, colorHex: "#141018", opacity: 0.45, shape: "", w: 0, h: 0, align: "", bold: true, count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
-    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.5, y: 0.45, size: 46, colorHex: "#FFF6EC", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
-    { kind: "text", text: "golden hour", label: "", url: "", font: "script", x: 0.5, y: 0.66, size: 13, colorHex: "#F2B694", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
-    { kind: "icon", text: "\u2600", label: "", url: "", font: "", x: 0.86, y: 0.16, size: 14, colorHex: "#F2B694", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, count: 0, accentHex: "", mode: "", source: "", dateISO: "" }
+    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.51, y: 0.462, size: 46, colorHex: "#141018", opacity: 0.45, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
+    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.5, y: 0.45, size: 46, colorHex: "#FFF6EC", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
+    { kind: "text", text: "golden hour", label: "", url: "", font: "script", x: 0.5, y: 0.66, size: 13, colorHex: "#F2B694", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", mode: "", source: "", dateISO: "" },
+    { kind: "icon", text: "\u2600", label: "", url: "", font: "", x: 0.86, y: 0.16, size: 14, colorHex: "#F2B694", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", mode: "", source: "", dateISO: "" }
   ]
 };
 
@@ -2512,7 +2532,7 @@ function aiSystemPrompt() {
   const today = new Date().toISOString().slice(0, 10);
   return "You are WidgetKing's expert widget designer. Design at the level of the most beautiful Home Screen setups people share online: intentional composition, real hierarchy, restraint. The user describes a widget; return a spec.\n" +
     "Kinds: clock (time+date), date (big day), countdown, quote, note, launcher (tappable app grid), battery, freestyle (a canvas of elements — PREFER freestyle for anything creative; simple kinds are only for plain requests).\n" +
-    "FREESTYLE ELEMENTS (max 16; array order is z-order, bottom first): text, clock, date, emoji, icon (monochrome glyph ★ ☆ ♥ ● ◆ ▲ ✦ ❀ ☀ ☾ ☁ ⚡ ♪ ☕ ✈ ⌂ ✉ ⚙ ✓ → ∞, tinted via colorHex — prefer over emoji for elegance), shape (rect/pill/circle), battery, countdown, app (tappable icon: set label+url), weather (live temp), calendar (next event), progress (bar), ring (circular gauge; w=diameter 0-1 of short side, size=stroke pt 5-10; source day/year/battery/countdown), month (full mini month-calendar grid with today circled: size=day-number pt 8-10, w=grid width, accentHex=today circle color), calendar with count 2-4 = a multi-line upcoming-events list.\n" +
+    "FREESTYLE ELEMENTS (max 24; array order is z-order, bottom first): text, clock, date, emoji, icon (monochrome glyph ★ ☆ ♥ ● ◆ ▲ ✦ ❀ ☀ ☾ ☁ ⚡ ♪ ☕ ✈ ⌂ ✉ ⚙ ✓ → ∞, tinted via colorHex — prefer over emoji for elegance), shape (rect/pill/circle), battery, countdown, app (tappable icon: set label+url), weather (live temp), calendar (next event), progress (bar), ring (circular gauge; w=diameter 0-1 of short side, size=stroke pt 5-10; source day/year/battery/countdown), month (full mini month-calendar grid with today circled: size=day-number pt 8-10, w=grid width, accentHex=today circle color), calendar with count 2-4 = a multi-line upcoming-events list.\n" +
     "ARCHETYPES — proven layouts; pick one and adapt, or blend two:\n" +
     "1 Ring Dashboard: ring at x .3 y .5 w .5 + its stat text centered on it (battery/countdown, size 18-22) + right column at x .72: label 10pt, date/calendar 11pt, thin divider, small progress bar.\n" +
     "2 Hero Type: one oversized clock/countdown/date size 44-58 at y .42-.48, tiny styled caption .16 below, one accent glyph in a corner.\n" +
@@ -2527,6 +2547,8 @@ function aiSystemPrompt() {
     "- Glow: duplicate first in the accent color, opacity .2-.3, size +6, then the real element. Neon moods.\n" +
     "- Dividers: skinny rect shapes (h .005-.008) at opacity .25-.35 to separate rows.\n" +
     "- Layered cards: two shapes slightly offset with opacities .12 and .22 for depth.\n" +
+    "- Shapes support radius (rect corner pt, 0 = sharp), border (stroke pt) + borderHex; opacity 0 + border = outline-only frame.\n" +
+    "- Tile grids & logo art: recreate tile-based artwork (game grids, logos, pixel art) from geometry — one bordered rounded-rect frame, then equal tiles laid out with exact math: for N columns of width tw with gap g centered at X, tile i x = X + (i - (N-1)/2) * (tw + g). Letters = bold text centered on each tile. Up to 24 elements makes real grids possible.\n" +
     "- Font pairing: ONE display font (didot, script, futura, marker, copperplate) for the hero element only via its font field; classic/avenir/optima for data and captions. Never three fonts.\n" +
     "- Color discipline: ONE accent color used 2-3 times (ring, caption, glyph); everything else white/near-black at varied opacities. Text must contrast the background.\n" +
     "SPACING: keep everything inside x/y .08-.92; give the hero room; captions sit .12-.16 below their hero; fewer, larger elements beat many small ones.\n" +
@@ -2609,7 +2631,7 @@ function specToDesign(spec) {
   design.apps = (spec.apps || []).slice(0, 8).map(function (app) {
     return { emoji: app.emoji || "🌐", label: (app.label || "App").slice(0, 12), url: app.url || "" };
   });
-  design.canvasElements = (spec.canvasElements || []).slice(0, 16).map(function (el) {
+  design.canvasElements = (spec.canvasElements || []).slice(0, 24).map(function (el) {
     const kind = ["text","clock","date","emoji","icon","shape","battery","countdown","app","weather","calendar","progress","ring","sleeper","sleeperlogo","month"].includes(el.kind) ? el.kind : "text";
     const rawW = Number(el.w) || 0;
     const out = {
@@ -2627,6 +2649,12 @@ function specToDesign(spec) {
       out.shape = ["rect","pill","circle"].includes(el.shape) ? el.shape : "rect";
       out.w = Math.min(Math.max(rawW || 0.5, 0.02), 1);
       out.h = Math.min(Math.max(Number(el.h) || 0.25, 0.02), 1);
+      out.opacity = Math.min(Math.max(Number(el.opacity) || 0, 0), 1);
+      if (isFinite(Number(el.radius)) && el.radius >= 0) out.radius = Math.min(Number(el.radius), 40);
+      if (Number(el.border) > 0) {
+        out.border = Math.min(Number(el.border), 20);
+        if (/^#[0-9a-fA-F]{6}$/.test(el.borderHex || "")) out.borderHex = el.borderHex.toUpperCase();
+      }
     }
     if (kind === "text") {
       // w=0 keeps auto-width single-line text; >0 makes a wrapping box.
@@ -2821,11 +2849,13 @@ function renderFreestyleInto(node, design, w, h, interactive) {
       else { wPx = (el.w || 0.5) * w; hPx = (el.h || 0.25) * h; }
       div.style.width = wPx + "px";
       div.style.height = hPx + "px";
-      div.style.background = el.colorHex;
+      const fillColor = /^#[0-9a-fA-F]{6}$/.test(el.colorHex || "") ? el.colorHex : "#FFFFFF";
+      div.style.background = (el.opacity || 0) > 0.02 ? hexToRgba(fillColor, el.opacity) : "transparent";
       div.style.borderRadius = shapeType === "circle" ? "50%"
         : shapeType === "pill" ? (Math.min(wPx, hPx) / 2) + "px"
-        : (6 * scale) + "px";
-      div.style.opacity = el.opacity;
+        : ((typeof el.radius === "number" ? el.radius : 6) * scale) + "px";
+      const bw = (Number(el.border) || 0) * scale;
+      if (bw > 0) div.style.boxShadow = "inset 0 0 0 " + bw + "px " + (el.borderHex || fillColor);
       div.classList.add("cel-shape");
     } else if (el.kind === "photo") {
       let wPx, hPx;
@@ -3685,6 +3715,23 @@ function buildInspectorContent(inspector) {
     if (el.shape !== "circle") {
       sliderRow("Height", 2, 100, Math.round((el.h || 0.25) * 100), function (v) { el.h = v / 100; });
     }
+    if (el.shape === "rect") {
+      sliderRow("Corner", 0, 30, typeof el.radius === "number" ? el.radius : 6, function (v) { el.radius = v; });
+    }
+    sliderRow("Border", 0, 12, el.border || 0, function (v) {
+      if (v > 0) { el.border = v; } else { delete el.border; }
+    });
+    const borderRow = document.createElement("div");
+    borderRow.className = "row";
+    const borderLabel = document.createElement("span");
+    borderLabel.textContent = "B. color";
+    borderLabel.style.cssText = "font-size:12px;color:var(--muted);width:52px";
+    const borderInput = document.createElement("input");
+    borderInput.type = "color";
+    borderInput.value = /^#[0-9a-fA-F]{6}$/.test(el.borderHex || "") ? el.borderHex.toLowerCase() : "#111111";
+    borderInput.oninput = function () { el.borderHex = borderInput.value.toUpperCase(); refreshCanvases(); };
+    borderRow.append(borderLabel, borderInput);
+    inspector.appendChild(borderRow);
   } else if (el.kind === "photo") {
     const shapeRow = document.createElement("div");
     shapeRow.className = "row";
@@ -3776,7 +3823,7 @@ function buildInspectorContent(inspector) {
     inspector.appendChild(colorRow);
   }
   if (el.kind !== "emoji") {
-    sliderRow("Opacity", 5, 100, Math.round((el.opacity || 1) * 100), function (v) { el.opacity = v / 100; });
+    sliderRow("Opacity", el.kind === "shape" ? 0 : 5, 100, Math.round((el.opacity || 0) * 100), function (v) { el.opacity = v / 100; });
   }
 
   // Layer / arrange / nudge controls.
@@ -4835,7 +4882,7 @@ document.getElementById("cloneInput").onchange = function (event) {
           role: "user",
           content: [
             { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } },
-            { type: "text", text: "Recreate the widget shown in this image as closely as the spec allows: match its layout, colors (use two custom backgroundColors), typography feel (closest font), and every visible element. Map a month-calendar grid to kind=month; map an upcoming-events list to kind=calendar with count 2-4; map circular gauges to kind=ring; map bars to kind=progress. If it shows a photo, use a photo placeholder. Recreate only the single widget design, not the surrounding screen." }
+            { type: "text", text: "Recreate the widget shown in this image as closely as the spec allows: match its layout, colors (use two custom backgroundColors), typography feel (closest font), and every visible element. Map a month-calendar grid to kind=month; map an upcoming-events list to kind=calendar with count 2-4; map circular gauges to kind=ring; map bars to kind=progress. Rebuild logos, game grids, and tile art from geometry: bordered/outlined shapes (border, borderHex, radius, opacity 0 for outline-only), one shape per tile with exact even spacing, and a bold text letter per lettered tile — up to 24 elements. If it shows a photo, use a photo placeholder. Recreate only the single widget design, not the surrounding screen." }
           ]
         }], key);
         deliverMagicDesign(design, "🪄 Cloned! It's fully editable — photos become placeholders you can fill.");
