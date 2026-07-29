@@ -138,6 +138,7 @@
   .cel { position: absolute; transform: translate(-50%, -50%); cursor: grab;
     white-space: nowrap; line-height: 1.1; touch-action: none; }
   .cel.selected { outline: 1.5px dashed rgba(255,255,255,.9); outline-offset: 3px; border-radius: 6px; }
+  .cel.in-group { outline: 1.5px dashed rgba(255,255,255,.4); outline-offset: 3px; border-radius: 6px; }
   .cel-shape { pointer-events: auto; }
   .snap-guide { position: absolute; background: rgba(255,255,255,.75); pointer-events: none; z-index: 5; }
   .cel-photo img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
@@ -351,7 +352,7 @@
     <div class="chips" id="studioPalette"></div>
     <div id="studioLayers"></div>
     <div id="studioInspector" style="display:none"></div>
-    <p class="hint" id="studioHint">Add elements above, drag them on the canvas (they snap to center lines), tap one to fine-tune it. Layers run left → right, back → front.</p>
+    <p class="hint" id="studioHint">Add elements above, drag them on the canvas (they snap to center lines), tap one to fine-tune it. Hold an item and pinch with a second finger to resize it. 🔗 Group items makes several move as one. Layers run left → right, back → front.</p>
   </div>
 </div>
 
@@ -369,7 +370,7 @@
       <div id="freestyleTools" style="display:none; width: 100%; max-width: 380px;">
         <div class="chips" id="palette"></div>
         <div id="inspector" style="display:none;"></div>
-        <p class="hint" id="freestyleHint">Tap a chip to add an element, then drag it anywhere — it snaps to center lines. Click an element to edit, layer, and fine-tune it.</p>
+        <p class="hint" id="freestyleHint">Tap a chip to add an element, then drag it anywhere — it snaps to center lines. Click an element to edit, layer, and fine-tune it. Pinch a held element with a second finger to resize.</p>
       </div>
       <input type="file" id="photoInput" accept="image/*" style="display:none">
     </div>
@@ -2312,6 +2313,7 @@ let designs = loadDesigns();
 let current = newDesign();
 let previewSize = "small";
 let selectedElId = null;
+let multiSelect = null; // Set of element ids while "group items" picking is on
 let snapGuides = { x: false, y: false };
 
 function loadDesigns() {
@@ -2987,9 +2989,13 @@ function renderFreestyleInto(node, design, w, h, interactive) {
   node.innerHTML = "";
   const scale = Math.min(w, h) / 158;
   const now = new Date();
+  const selEl = interactive && !multiSelect && selectedElId
+    ? design.canvasElements.find(function (e) { return e.id === selectedElId; }) : null;
   for (const el of design.canvasElements) {
     const div = document.createElement("div");
-    div.className = "cel" + (interactive && el.id === selectedElId ? " selected" : "");
+    const isSel = interactive && (multiSelect ? multiSelect.has(el.id) : el.id === selectedElId);
+    const inGroup = !isSel && selEl && selEl.groupId && el.groupId === selEl.groupId;
+    div.className = "cel" + (isSel ? " selected" : "") + (inGroup ? " in-group" : "");
     div.style.left = (el.x * 100) + "%";
     div.style.top = (el.y * 100) + "%";
     if (el.kind === "shape") {
@@ -3238,6 +3244,7 @@ function restoreSnapshot(snap) {
   current = normalizeDesign(JSON.parse(snap));
   lastCommitted = snap;
   selectedElId = null;
+  multiSelect = null;
   syncControls();
   renderAll();
   if (studioOpen) { renderStudioUI(); renderStudioCanvas(); }
@@ -3291,34 +3298,113 @@ function refreshEditors() {
   if (studioOpen) renderStudioUI();
   refreshCanvases();
 }
+function groupMembersOf(el) {
+  if (!el.groupId) return [];
+  return current.canvasElements.filter(function (e) { return e.groupId === el.groupId && e.id !== el.id; });
+}
+// One shared gesture at a time: one finger drags (whole group follows),
+// a second finger anywhere turns it into a pinch that resizes the element.
+let gesture = null;
+function startPinchPointer(event) {
+  gesture.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  if (gesture.pointers.size !== 2) return;
+  const pts = Array.from(gesture.pointers.values());
+  gesture.mode = "pinch";
+  gesture.baseDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+  const el = gesture.el;
+  gesture.base = { size: el.size || 18, w: el.w || 0, h: el.h || 0 };
+  snapGuides = { x: false, y: false };
+}
+function applyPinch(el, base, ratio) {
+  function lim(v, lo, hi) { return Math.min(Math.max(v, lo), hi); }
+  if (el.kind === "shape" || el.kind === "art") {
+    el.w = lim(base.w * ratio, 0.05, 1);
+    el.h = lim(base.h * ratio, 0.05, 1);
+  } else if (el.kind === "photo" || el.kind === "ring" || el.kind === "month" || el.kind === "progress") {
+    el.w = lim((base.w || 0.55) * ratio, 0.1, 1);
+  } else {
+    el.size = lim(Math.round(base.size * ratio), 6, 120);
+  }
+}
+function gestureMove(ev) {
+  if (!gesture || !gesture.pointers.has(ev.pointerId)) return;
+  gesture.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  const el = gesture.el;
+  if (gesture.mode === "pinch") {
+    if (gesture.pointers.size < 2) return;
+    const pts = Array.from(gesture.pointers.values());
+    const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+    applyPinch(el, gesture.base, dist / gesture.baseDist);
+    refreshCanvases();
+    return;
+  }
+  const rect = gesture.rect;
+  let nx = (ev.clientX - rect.left) / rect.width - gesture.grabX;
+  let ny = (ev.clientY - rect.top) / rect.height - gesture.grabY;
+  snapGuides.x = Math.abs(nx - 0.5) < 0.03;
+  snapGuides.y = Math.abs(ny - 0.5) < 0.03;
+  if (snapGuides.x) nx = 0.5;
+  if (snapGuides.y) ny = 0.5;
+  el.x = Math.min(Math.max(nx, 0), 1);
+  el.y = Math.min(Math.max(ny, 0), 1);
+  const dx = el.x - gesture.startX;
+  const dy = el.y - gesture.startY;
+  for (const s of gesture.members) {
+    s.m.x = Math.min(Math.max(s.x + dx, 0), 1);
+    s.m.y = Math.min(Math.max(s.y + dy, 0), 1);
+  }
+  refreshCanvases();
+}
+function gestureUp(ev) {
+  if (!gesture) return;
+  gesture.pointers.delete(ev.pointerId);
+  if (gesture.pointers.size > 0) return; // wait until every finger lifts
+  const pinched = gesture.mode === "pinch";
+  gesture = null;
+  snapGuides = { x: false, y: false };
+  window.removeEventListener("pointermove", gestureMove);
+  window.removeEventListener("pointerup", gestureUp);
+  window.removeEventListener("pointercancel", gestureUp);
+  if (pinched) refreshEditors(); else refreshCanvases();
+}
 function attachDrag(div, el) {
   div.addEventListener("pointerdown", function (event) {
     event.preventDefault();
+    event.stopPropagation();
+    if (multiSelect) { toggleMultiPick(el.id); return; }
+    if (gesture) { // second finger → pinch the element already being held
+      if (!gesture.pointers.has(event.pointerId)) startPinchPointer(event);
+      return;
+    }
     const canvasNode = div.parentElement;
     selectedElId = el.id;
     refreshEditors();
     const rect = canvasNode.getBoundingClientRect();
-    function move(ev) {
-      let nx = (ev.clientX - rect.left) / rect.width;
-      let ny = (ev.clientY - rect.top) / rect.height;
-      snapGuides.x = Math.abs(nx - 0.5) < 0.03;
-      snapGuides.y = Math.abs(ny - 0.5) < 0.03;
-      if (snapGuides.x) nx = 0.5;
-      if (snapGuides.y) ny = 0.5;
-      el.x = Math.min(Math.max(nx, 0), 1);
-      el.y = Math.min(Math.max(ny, 0), 1);
-      refreshCanvases();
-    }
-    function up() {
-      snapGuides = { x: false, y: false };
-      refreshCanvases();
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    }
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
+    gesture = {
+      el: el, rect: rect, mode: "drag",
+      pointers: new Map([[event.pointerId, { x: event.clientX, y: event.clientY }]]),
+      grabX: (event.clientX - rect.left) / rect.width - el.x,
+      grabY: (event.clientY - rect.top) / rect.height - el.y,
+      startX: el.x, startY: el.y,
+      members: groupMembersOf(el).map(function (m) { return { m: m, x: m.x, y: m.y }; })
+    };
+    window.addEventListener("pointermove", gestureMove);
+    window.addEventListener("pointerup", gestureUp);
+    window.addEventListener("pointercancel", gestureUp);
   });
 }
+function toggleMultiPick(id) {
+  if (multiSelect.has(id)) multiSelect.delete(id); else multiSelect.add(id);
+  refreshEditors();
+}
+// A second finger may land on empty canvas — fold it into the active gesture
+// before any background handler can steal it (capture phase).
+window.addEventListener("pointerdown", function (event) {
+  if (gesture && !gesture.pointers.has(event.pointerId)) {
+    event.preventDefault();
+    startPinchPointer(event);
+  }
+}, true);
 
 // ==================== Freestyle palette & inspector ====================
 const ELEMENT_PALETTE = [["text", "Text"], ["photo", "🖼 Photo"], ["app", "📲 App icon"],
@@ -4079,14 +4165,28 @@ function buildInspectorContent(inspector) {
     button.onclick = onClick;
     return button;
   }
+  function nudgeSel(dx, dy) {
+    for (const it of [el].concat(groupMembersOf(el))) {
+      it.x = Math.min(Math.max(it.x + dx, 0), 1);
+      it.y = Math.min(Math.max(it.y + dy, 0), 1);
+    }
+    refreshCanvases();
+  }
   arrangeRow.append(
     smallButton("⧉", "Duplicate", false, function () {
-      const copy = JSON.parse(JSON.stringify(el));
-      copy.id = uid();
-      copy.x = Math.min(copy.x + 0.05, 1);
-      copy.y = Math.min(copy.y + 0.05, 1);
-      current.canvasElements.push(copy);
-      selectedElId = copy.id;
+      // A grouped element duplicates its whole group (as a new group).
+      const members = el.groupId
+        ? current.canvasElements.filter(function (e) { return e.groupId === el.groupId; }) : [el];
+      const gid = el.groupId ? uid() : null;
+      for (const m of members) {
+        const copy = JSON.parse(JSON.stringify(m));
+        copy.id = uid();
+        if (gid) copy.groupId = gid;
+        copy.x = Math.min(copy.x + 0.05, 1);
+        copy.y = Math.min(copy.y + 0.05, 1);
+        current.canvasElements.push(copy);
+        if (m === el) selectedElId = copy.id;
+      }
       refreshEditors();
     }),
     smallButton("⬆︎", "Bring forward", index === current.canvasElements.length - 1, function () {
@@ -4101,17 +4201,38 @@ function buildInspectorContent(inspector) {
       current.canvasElements[index] = t;
       refreshEditors();
     }),
-    smallButton("◀", "Nudge left", false, function () { el.x = Math.max(el.x - 0.01, 0); refreshCanvases(); }),
-    smallButton("▲", "Nudge up", false, function () { el.y = Math.max(el.y - 0.01, 0); refreshCanvases(); }),
-    smallButton("▼", "Nudge down", false, function () { el.y = Math.min(el.y + 0.01, 1); refreshCanvases(); }),
-    smallButton("▶", "Nudge right", false, function () { el.x = Math.min(el.x + 0.01, 1); refreshCanvases(); }),
+    smallButton("◀", "Nudge left", false, function () { nudgeSel(-0.01, 0); }),
+    smallButton("▲", "Nudge up", false, function () { nudgeSel(0, -0.01); }),
+    smallButton("▼", "Nudge down", false, function () { nudgeSel(0, 0.01); }),
+    smallButton("▶", "Nudge right", false, function () { nudgeSel(0.01, 0); }),
     smallButton("🗑", "Delete", false, function () {
       current.canvasElements.splice(index, 1);
+      if (el.groupId) { // a group of one is no group at all
+        const rest = current.canvasElements.filter(function (e) { return e.groupId === el.groupId; });
+        if (rest.length === 1) delete rest[0].groupId;
+      }
       selectedElId = null;
       refreshEditors();
     })
   );
   inspector.appendChild(arrangeRow);
+  if (el.groupId) {
+    const groupRow = document.createElement("div");
+    groupRow.className = "row";
+    groupRow.style.marginTop = "6px";
+    const note = document.createElement("span");
+    note.className = "hint";
+    note.style.margin = "0";
+    const count = current.canvasElements.filter(function (e) { return e.groupId === el.groupId; }).length;
+    note.textContent = "🔗 Grouped (" + count + ") — they move as one.";
+    groupRow.appendChild(note);
+    groupRow.appendChild(smallButton("Ungroup", "Split this group back into single items", false, function () {
+      const gid = el.groupId;
+      for (const e of current.canvasElements) if (e.groupId === gid) delete e.groupId;
+      refreshEditors();
+    }));
+    inspector.appendChild(groupRow);
+  }
   return true;
 }
 
@@ -4162,18 +4283,55 @@ function renderStudioUI() {
   }
   const layers = document.getElementById("studioLayers");
   layers.innerHTML = "";
+  // Group-mode controls live with the layer chips.
+  if (current.canvasElements.length >= 2) {
+    const groupChip = document.createElement("div");
+    groupChip.className = "layer-chip" + (multiSelect ? " active" : "");
+    if (multiSelect) {
+      groupChip.textContent = "✓ Group (" + multiSelect.size + ")";
+      groupChip.onclick = function () {
+        if (multiSelect.size >= 2) {
+          const gid = uid();
+          let firstId = null;
+          for (const e of current.canvasElements) {
+            if (multiSelect.has(e.id)) { e.groupId = gid; if (!firstId) firstId = e.id; }
+          }
+          selectedElId = firstId;
+          toast("Grouped ✓ — drag any one and they all move");
+        }
+        multiSelect = null;
+        refreshEditors();
+      };
+      const cancelChip = document.createElement("div");
+      cancelChip.className = "layer-chip";
+      cancelChip.textContent = "✕ Cancel";
+      cancelChip.onclick = function () { multiSelect = null; refreshEditors(); };
+      layers.append(groupChip, cancelChip);
+    } else {
+      groupChip.textContent = "🔗 Group items";
+      groupChip.onclick = function () {
+        multiSelect = new Set(selectedElId ? [selectedElId] : []);
+        toast("Tap the items that belong together, then ✓ Group");
+        refreshEditors();
+      };
+      layers.appendChild(groupChip);
+    }
+  }
   current.canvasElements.forEach(function (el) {
     const chip = document.createElement("div");
-    chip.className = "layer-chip" + (el.id === selectedElId ? " active" : "");
+    const active = multiSelect ? multiSelect.has(el.id) : el.id === selectedElId;
+    chip.className = "layer-chip" + (active ? " active" : "");
+    if (el.groupId) chip.appendChild(document.createTextNode("🔗 "));
     if (el.kind === "photo" && el.dataUrl) {
       const img = document.createElement("img");
       img.src = el.dataUrl;
       chip.appendChild(img);
       chip.appendChild(document.createTextNode("Photo"));
     } else {
-      chip.textContent = labelForElement(el);
+      chip.appendChild(document.createTextNode(labelForElement(el)));
     }
     chip.onclick = function () {
+      if (multiSelect) { toggleMultiPick(el.id); return; }
       selectedElId = el.id === selectedElId ? null : el.id;
       refreshEditors();
     };
@@ -4181,7 +4339,7 @@ function renderStudioUI() {
   });
   const inspector = document.getElementById("studioInspector");
   const hint = document.getElementById("studioHint");
-  const hasSelection = buildInspectorContent(inspector);
+  const hasSelection = !multiSelect && buildInspectorContent(inspector);
   inspector.style.display = hasSelection ? "block" : "none";
   hint.style.display = hasSelection ? "none" : "block";
 }
@@ -4244,6 +4402,7 @@ function openStudio() {
 }
 function closeStudio() {
   studioOpen = false;
+  multiSelect = null;
   document.getElementById("studio").classList.remove("open");
   document.body.style.overflow = "";
   syncControls();
@@ -4251,6 +4410,7 @@ function closeStudio() {
 }
 document.getElementById("openStudioBtn").onclick = openStudio;
 document.getElementById("studioCanvas").addEventListener("pointerdown", function (event) {
+  if (gesture || multiSelect) return;
   if (event.target === this) { selectedElId = null; refreshEditors(); }
 });
 document.getElementById("studioCloseBtn").onclick = closeStudio;
@@ -4720,6 +4880,7 @@ function popCanvas() {
 function loadIntoEditor(design) {
   current = normalizeDesign(JSON.parse(JSON.stringify(design)));
   selectedElId = null;
+  multiSelect = null;
   syncControls();
   renderAll();
 }
