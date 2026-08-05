@@ -757,7 +757,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 44;
+const WK_VERSION = 45;
 
 const THEMES = {
   midnight: ["#232526", "#414345"], royal: ["#5B2C98", "#8E44AD"],
@@ -1362,8 +1362,15 @@ function drawFreestyle(design, family, bgImg, live) {
       } else {
         // No image data made it into the script (photos don't travel in sync
         // links) — say so on the widget instead of leaving a silent hole.
+        // Mid-gray on a translucent chip stays readable on ANY background
+        // (white-on-cream was invisible).
+        ctx.setFillColor(new Color("#808080", 0.25));
+        const chipPath = new Path();
+        chipPath.addRoundedRect(new Rect(px - 74, py - 10, 148, 20), 10, 10);
+        ctx.addPath(chipPath);
+        ctx.fillPath();
         ctx.setFont(Font.mediumSystemFont(9));
-        ctx.setTextColor(new Color("#FFFFFF", 0.55));
+        ctx.setTextColor(new Color("#606060", 0.95));
         ctx.setTextAlignedCenter();
         ctx.drawTextInRect("photo missing - re-add in designer", new Rect(px - 70, py - 6, 140, 14));
       }
@@ -1379,7 +1386,7 @@ function drawFreestyle(design, family, bgImg, live) {
         } catch (e) {}
       } else {
         ctx.setFont(Font.mediumSystemFont(9));
-        ctx.setTextColor(new Color("#FFFFFF", 0.55));
+        ctx.setTextColor(new Color("#606060", 0.95));
         ctx.drawTextInRect("art missing - re-copy the script", new Rect(px - 70, py - 6, 140, 14));
       }
       continue;
