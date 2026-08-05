@@ -45,7 +45,7 @@
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: var(--bg); color: var(--text);
-    padding: 16px 16px calc(84px + env(safe-area-inset-bottom)); max-width: 1080px; margin: 0 auto;
+    padding: calc(12px + env(safe-area-inset-top)) 16px calc(84px + env(safe-area-inset-bottom)); max-width: 1080px; margin: 0 auto;
     transition: background .25s ease, color .25s ease;
   }
   header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
@@ -128,7 +128,7 @@
   .swatch.active { border-color: var(--text); }
   #canvasWrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
   /* The preview + size + undo controls stay pinned; everything below scrolls. */
-  #previewDock { position: sticky; top: 0; z-index: 25;
+  #previewDock { position: sticky; top: env(safe-area-inset-top); z-index: 25;
     display: flex; flex-direction: column; align-items: center; gap: 10px;
     background: var(--bg); padding: 6px 0 10px; margin-bottom: 4px;
     border-bottom: 1px solid var(--line); }
@@ -152,7 +152,7 @@
   .snap-guide { position: absolute; background: rgba(255,255,255,.75); pointer-events: none; z-index: 5; }
   .cel-photo img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
   #studio { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: none;
-    flex-direction: column; overscroll-behavior: contain; }
+    flex-direction: column; overscroll-behavior: contain; padding-top: env(safe-area-inset-top); }
   #studio.open { display: flex; }
   #studioHead { display: flex; align-items: center; gap: 8px; padding: 10px 14px;
     border-bottom: 1px solid var(--line); flex-wrap: wrap; }
@@ -193,7 +193,7 @@
     border: none; border-radius: 10px; padding: 11px 16px; font-size: 14px; font-weight: 600;
     text-decoration: none; cursor: pointer; }
   #builderModal { position: fixed; inset: 0; z-index: 60; background: var(--bg); display: none;
-    flex-direction: column; overscroll-behavior: contain; }
+    flex-direction: column; overscroll-behavior: contain; padding-top: env(safe-area-inset-top); }
   #builderModal.open { display: flex; }
   .modal-head { display: flex; align-items: center; justify-content: space-between;
     padding: 14px 16px; border-bottom: 1px solid var(--line); }
@@ -204,7 +204,7 @@
   .chips button.sel { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 700; }
   #bPreviewWrap { display: flex; justify-content: center; margin-top: 16px; }
   #pageStudio { position: fixed; inset: 0; z-index: 60; background: var(--bg); display: none;
-    flex-direction: column; overscroll-behavior: contain; }
+    flex-direction: column; overscroll-behavior: contain; padding-top: env(safe-area-inset-top); }
   #pageStudio.open { display: flex; }
   #pageBody { flex: 1; overflow-y: auto; padding: 14px 16px calc(24px + env(safe-area-inset-bottom));
     -webkit-overflow-scrolling: touch; max-width: 560px; margin: 0 auto; width: 100%; }
@@ -257,11 +257,14 @@
   .tpl-card:hover { transform: translateY(-3px); }
   .tpl-name { font-size: 12px; font-weight: 600; margin-top: 6px; }
   .tpl-cat { font-size: 10px; color: var(--muted); }
-  .lib-item { display: flex; align-items: center; gap: 12px; padding: 10px;
+  .lib-item { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 10px;
     border-radius: 12px; background: var(--card2); margin-bottom: 8px; }
-  .lib-item .name { font-weight: 600; font-size: 14px; }
+  .lib-item .meta { flex: 1; min-width: 110px; overflow: hidden; }
+  .lib-item .name { font-weight: 600; font-size: 14px; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
   .lib-item .kind { color: var(--muted); font-size: 12px; }
-  .lib-item .spacer { flex: 1; }
+  .lib-item .actions { display: flex; gap: 6px; margin-left: auto;
+    flex-wrap: wrap; justify-content: flex-end; }
   .lib-item button { font-size: 12px; padding: 6px 10px; }
   .app-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
   .app-tag { display: flex; align-items: center; gap: 6px; background: var(--card2);
@@ -5218,10 +5221,9 @@ function renderLibrary() {
     item.className = "lib-item";
     item.appendChild(makeThumb(design, 0.3));
     const meta = document.createElement("div");
+    meta.className = "meta";
     meta.innerHTML = '<div class="name">' + esc(design.name) + '</div><div class="kind">' +
       (KIND_ICONS[design.kind] || "🧩") + ' ' + esc(design.kind) + '</div>';
-    const spacer = document.createElement("div");
-    spacer.className = "spacer";
     const editButton = document.createElement("button");
     editButton.textContent = "Edit";
     editButton.onclick = function () {
@@ -5250,7 +5252,10 @@ function renderLibrary() {
       persist();
       renderLibrary();
     };
-    item.append(meta, spacer, editButton, dupButton, shareButton, deleteButton);
+    const actions = document.createElement("div");
+    actions.className = "actions";
+    actions.append(editButton, dupButton, shareButton, deleteButton);
+    item.append(meta, actions);
     library.appendChild(item);
   }
 }
@@ -5933,20 +5938,31 @@ document.getElementById("modeToggle").onclick = function () {
 // ==================== Guided builder ====================
 const B_USES = [["time", "🕐 Tell time"], ["photos", "🖼 Show my photos"], ["apps", "🚀 Launch my apps"],
   ["countdown", "⏳ Count down to something"], ["quote", "💬 Motivate me"],
-  ["day", "🌤 My day at a glance"], ["surprise", "🎲 Surprise me"]];
+  ["day", "🌤 My day at a glance"], ["weather", "☀️ Check the weather"],
+  ["calendar", "🗓 My calendar & events"], ["fantasy", "🏈 My fantasy scores"],
+  ["battery", "🔋 Watch my battery"], ["year", "📈 Track the year"],
+  ["note", "📝 A note to myself"], ["surprise", "🎲 Surprise me"]];
 const B_VIBES = [["cute", "🌸 Cute"], ["minimal", "▫️ Minimal"], ["zen", "🍃 Zen"],
-  ["sports", "🏈 Sports"], ["work", "💼 Work"], ["neon", "⚡ Neon"], ["any", "🎲 Any vibe"]];
+  ["sports", "🏈 Sports"], ["work", "💼 Work"], ["neon", "⚡ Neon"],
+  ["sunset", "🌅 Sunset"], ["ocean", "🌊 Ocean"], ["retro", "👾 Retro"],
+  ["noir", "🖤 Noir"], ["cozy", "🍂 Cozy"], ["glam", "✨ Glam"], ["any", "🎲 Any vibe"]];
 const B_SIZES = [["small", "◻️ Small"], ["medium", "▭ Medium"], ["large", "⬜ Large"]];
 const B_BGS = [["gradient", "🎨 Colors"], ["glass", "🧊 Frosted glass"], ["clear", "🫥 Invisible"], ["any", "🎲 Dealer's choice"]];
 const VIBE_THEMES = {
   cute: ["rosegold", "blush", "lavender", "candy"], minimal: ["midnight", "mist", "paper", "navy"],
   zen: ["sage", "mist", "forest", "paper"], sports: ["lava", "navy", "forest", "royal"],
-  work: ["navy", "mist", "midnight", "cosmos"], neon: ["cosmos", "berry", "candy", "ocean"]
+  work: ["navy", "mist", "midnight", "cosmos"], neon: ["cosmos", "berry", "candy", "ocean"],
+  sunset: ["sunset", "rosegold", "lava", "mocha"], ocean: ["ocean", "navy", "mist", "aurora"],
+  retro: ["candy", "berry", "cosmos", "lava"], noir: ["midnight", "navy", "mocha", "royal"],
+  cozy: ["mocha", "rosegold", "forest", "blush"], glam: ["gold", "midnight", "royal", "sunset"]
 };
 const VIBE_FONTS = {
   cute: ["rounded", "chalkboard", "noteworthy", "script"], minimal: ["classic", "avenir", "optima", "mono"],
   zen: ["optima", "serif", "noteworthy", "palatino"], sports: ["futura", "mono", "classic", "typewriter"],
-  work: ["avenir", "classic", "optima", "serif"], neon: ["mono", "futura", "rounded", "didot"]
+  work: ["avenir", "classic", "optima", "serif"], neon: ["mono", "futura", "rounded", "didot"],
+  sunset: ["didot", "serif", "script", "rounded"], ocean: ["avenir", "optima", "rounded", "classic"],
+  retro: ["typewriter", "mono", "marker", "chalkboard"], noir: ["didot", "copperplate", "classic", "mono"],
+  cozy: ["noteworthy", "serif", "script", "palatino"], glam: ["didot", "copperplate", "serif", "optima"]
 };
 const VIBE_QUOTES = {
   cute: "You've got this 💕\nBe someone's sunshine\nToday is a good day\nSparkle on ✨",
@@ -5954,7 +5970,13 @@ const VIBE_QUOTES = {
   zen: "Inhale calm\nExhale worry\nBe here now\nLet it be easy",
   sports: "Leave it all out there\nHard work wins\nNext play\nEarn it every day",
   work: "Deep work, big wins\nDone beats perfect\nOne task at a time\nShip it",
-  neon: "Stay electric\nMake some noise\nBurn bright\nNo brakes tonight"
+  neon: "Stay electric\nMake some noise\nBurn bright\nNo brakes tonight",
+  sunset: "Chase the light\nGolden hour state of mind\nSlow down, look up\nEvery sunset is a reset",
+  ocean: "Salt in the air\nGo with the tide\nDeep breaths, blue water\nLet it wash over you",
+  retro: "Stay rad\nGame on\nBe kind, rewind\nHigh score energy",
+  noir: "Quietly unstoppable\nAll signal, no noise\nMidnight focus\nLess talk, more done",
+  cozy: "Slow mornings, warm mugs\nHome is a feeling\nSoft days, full heart\nLight the candle",
+  glam: "Shine without apology\nGolden standards only\nDress like you mean it\nMain character energy"
 };
 const VIBE_APPS = {
   cute: [{ emoji: "💬", label: "Messages", url: "sms://" }, { emoji: "📸", label: "Instagram", url: "instagram://" }, { emoji: "🖼", label: "Photos", url: "photos-redirect://" }, { emoji: "🎵", label: "Music", url: "music://" }],
@@ -5962,9 +5984,16 @@ const VIBE_APPS = {
   zen: [{ emoji: "🎧", label: "Podcasts", url: "podcasts://" }, { emoji: "📒", label: "Notes", url: "mobilenotes://" }, { emoji: "📚", label: "Books", url: "ibooks://" }, { emoji: "🌤", label: "Weather", url: "weather://" }],
   sports: [{ emoji: "🏈", label: "ESPN", url: "sportscenter://" }, { emoji: "📺", label: "YouTube", url: "youtube://" }, { emoji: "🎮", label: "Twitch", url: "twitch://" }, { emoji: "👽", label: "Reddit", url: "reddit://" }],
   work: [{ emoji: "💬", label: "Slack", url: "slack://" }, { emoji: "🎥", label: "Zoom", url: "zoomus://" }, { emoji: "📮", label: "Gmail", url: "googlegmail://" }, { emoji: "🗓", label: "Calendar", url: "calshow://" }],
-  neon: [{ emoji: "🎧", label: "Spotify", url: "spotify://" }, { emoji: "🎬", label: "TikTok", url: "tiktok://" }, { emoji: "🎮", label: "Discord", url: "discord://" }, { emoji: "👻", label: "Snapchat", url: "snapchat://" }]
+  neon: [{ emoji: "🎧", label: "Spotify", url: "spotify://" }, { emoji: "🎬", label: "TikTok", url: "tiktok://" }, { emoji: "🎮", label: "Discord", url: "discord://" }, { emoji: "👻", label: "Snapchat", url: "snapchat://" }],
+  sunset: [{ emoji: "🖼", label: "Photos", url: "photos-redirect://" }, { emoji: "📸", label: "Instagram", url: "instagram://" }, { emoji: "🎵", label: "Music", url: "music://" }, { emoji: "🌤", label: "Weather", url: "weather://" }],
+  ocean: [{ emoji: "🌤", label: "Weather", url: "weather://" }, { emoji: "🗺", label: "Maps", url: "maps://" }, { emoji: "🎧", label: "Podcasts", url: "podcasts://" }, { emoji: "🎵", label: "Music", url: "music://" }],
+  retro: [{ emoji: "📺", label: "YouTube", url: "youtube://" }, { emoji: "🎮", label: "Twitch", url: "twitch://" }, { emoji: "👽", label: "Reddit", url: "reddit://" }, { emoji: "🕹", label: "Discord", url: "discord://" }],
+  noir: [{ emoji: "📞", label: "Phone", url: "tel://" }, { emoji: "💬", label: "Messages", url: "sms://" }, { emoji: "✉️", label: "Mail", url: "mailto:" }, { emoji: "📒", label: "Notes", url: "mobilenotes://" }],
+  cozy: [{ emoji: "📚", label: "Books", url: "ibooks://" }, { emoji: "🎧", label: "Podcasts", url: "podcasts://" }, { emoji: "📒", label: "Notes", url: "mobilenotes://" }, { emoji: "💬", label: "Messages", url: "sms://" }],
+  glam: [{ emoji: "🗓", label: "Calendar", url: "calshow://" }, { emoji: "📌", label: "Pinterest", url: "pinterest://" }, { emoji: "📸", label: "Instagram", url: "instagram://" }, { emoji: "🖼", label: "Photos", url: "photos-redirect://" }]
 };
-const VIBE_ICON_THEME = { cute: "pastel", minimal: "line", zen: "zen", sports: "noir", work: "line", neon: "neon" };
+const VIBE_ICON_THEME = { cute: "pastel", minimal: "line", zen: "zen", sports: "noir", work: "line", neon: "neon",
+  sunset: "pastel", ocean: "zen", retro: "neon", noir: "noir", cozy: "pastel", glam: "line" };
 
 const builder = { use: null, vibe: null, size: null, bg: null };
 let builderDesign = null;
@@ -5996,7 +6025,9 @@ function renderBuilderUI() {
 }
 function composeFromBuilder() {
   const vibe = builder.vibe === "any" ? bPick(Object.keys(VIBE_THEMES)) : builder.vibe;
-  const use = builder.use === "surprise" ? bPick(["time", "photos", "apps", "countdown", "quote", "day"]) : builder.use;
+  const use = builder.use === "surprise"
+    ? bPick(["time", "photos", "apps", "countdown", "quote", "day", "weather", "calendar", "battery", "year", "note"])
+    : builder.use;
   let bg = builder.bg === "any" ? bPick(["gradient", "gradient", "glass", "clear"]) : builder.bg;
   const theme = bPick(VIBE_THEMES[vibe]);
   const font = bPick(VIBE_FONTS[vibe]);
@@ -6071,6 +6102,51 @@ function composeFromBuilder() {
       el({ kind: "calendar", y: 0.5, size: 11 }),
       el({ kind: "progress", source: "day", y: 0.74, size: 6, w: 0.66, colorHex: accent })
     ];
+  } else if (use === "weather") {
+    design.name = bPick(["Sky Today", "Weather Now", "Forecast", "Outside"]);
+    design.kind = "freestyle";
+    design.canvasElements = [
+      el({ kind: "weather", y: 0.42, size: 30, unit: "f" }),
+      el({ kind: "date", y: 0.66, size: 11, opacity: 0.85 }),
+      el({ kind: "icon", text: bPick(["☀", "☁", "✦"]), x: bPick([0.16, 0.84]), y: 0.15, size: 15, colorHex: accent })
+    ];
+  } else if (use === "calendar") {
+    design.name = bPick(["My Month", "Calendar", "Coming Up", "The Plan"]);
+    design.kind = "freestyle";
+    design.canvasElements = [
+      el({ kind: "month", y: 0.42, w: 0.86, size: 9, accentHex: accent }),
+      el({ kind: "calendar", y: 0.85, size: 10, count: 1, opacity: 0.9 })
+    ];
+  } else if (use === "fantasy") {
+    design.name = bPick(["Game Day", "My Matchup", "League Live", "Scoreboard"]);
+    design.kind = "freestyle";
+    design.canvasElements = [
+      el({ kind: "text", text: "LIVE MATCHUP", y: 0.16, size: 9, colorHex: accent, bold: true, w: 0, align: "center" }),
+      el({ kind: "sleeper", mode: "score", y: 0.45, size: 24 }),
+      el({ kind: "shape", shape: "rect", w: 0.6, h: 0.006, y: 0.62, size: 0, opacity: 0.3 }),
+      el({ kind: "sleeper", mode: "record", y: 0.75, size: 10, opacity: 0.85 })
+    ];
+  } else if (use === "battery") {
+    design.name = bPick(["Power Check", "Juice", "Battery Hub", "Charge"]);
+    design.kind = "freestyle";
+    design.canvasElements = [
+      el({ kind: "ring", source: "battery", y: 0.46, w: 0.58, size: 7, colorHex: accent }),
+      el({ kind: "battery", y: 0.46, size: 20 }),
+      el({ kind: "text", text: "charge", y: 0.82, size: 10, opacity: 0.75, bold: false, w: 0, align: "center" })
+    ];
+  } else if (use === "year") {
+    const yr = String(new Date().getFullYear());
+    design.name = bPick(["Year Progress", "The Year", yr + " Loading"]).slice(0, 20);
+    design.kind = "freestyle";
+    design.canvasElements = [
+      el({ kind: "text", text: yr, y: 0.34, size: 30, bold: true, w: 0, align: "center" }),
+      el({ kind: "progress", source: "year", y: 0.58, size: 8, w: 0.72, colorHex: accent }),
+      el({ kind: "text", text: "loading…", y: 0.74, size: 10, opacity: 0.8, bold: false, w: 0, align: "center" })
+    ];
+  } else if (use === "note") {
+    design.name = bPick(["Sticky Note", "Reminder", "Note to Self", "Don't Forget"]);
+    design.kind = "note";
+    design.primaryText = bPick(["Drink water 💧", "One thing at a time", "Call Mom", "You're doing great"]);
   }
   return normalizeDesign(design);
 }
@@ -6114,7 +6190,11 @@ document.getElementById("bKeep").onclick = function () {
   closeBuilder();
   switchTab("editor");
   popCanvas();
-  toast("It's yours — tweak anything, then Save 💜");
+  if ((builderDesign.canvasElements || []).some(function (e) { return e.kind === "sleeper" && !e.leagueID; })) {
+    toast("🏈 Tap the score in the preview to link your Sleeper league, then Save");
+  } else {
+    toast("It's yours — tweak anything, then Save 💜");
+  }
   if (builderDesign.kind === "launcher") fetchIconsForApps(current);
 };
 document.getElementById("bAI").onclick = function () {
