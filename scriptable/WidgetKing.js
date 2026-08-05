@@ -29,7 +29,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 49;
+const WK_VERSION = 50;
 
 const THEMES = {
   midnight: ["#232526", "#414345"], royal: ["#5B2C98", "#8E44AD"],
@@ -946,14 +946,26 @@ function themedIconTile(app, themeName, index, pt) {
 }
 async function loadIcon(url) {
   try {
+    // Widgets have a hard memory cap — ten 512px icons plus a full-res
+    // wallpaper crop can kill the run (iOS then shows a stale snapshot
+    // forever). Ask iTunes for small artwork and cache a 216px version.
+    url = url.replace(/\/[0-9]{3,4}x[0-9]{3,4}(bb)?\./, "/216x216bb.");
     const fm = FileManager.local();
     const dir = fm.cacheDirectory();
     // Hash the FULL url — icon URLs share identical endings across apps, so
     // suffix-based names collide and serve the wrong app's icon.
-    const name = "wk2_" + hashString(url) + "_" + url.length + ".png";
+    const name = "wk3_" + hashString(url) + "_" + url.length + ".png";
     const path = fm.joinPath(dir, name);
     if (fm.fileExists(path)) return fm.readImage(path);
-    const img = await new Request(url).loadImage();
+    let img = await new Request(url).loadImage();
+    if (img && img.size && img.size.width > 240) {
+      const dc = new DrawContext();
+      dc.size = new Size(216, 216);
+      dc.opaque = false;
+      dc.respectScreenScale = false;
+      dc.drawImageInRect(img, new Rect(0, 0, 216, 216));
+      img = dc.getImage();
+    }
     fm.writeImage(path, img);
     return img;
   } catch (e) { return null; }
