@@ -386,8 +386,21 @@ const SCREEN_FRAMES = {
   "2079": { labels: [423, 875, 933, 42, 494, 186, 696, 1206] },
   "1792": { labels: [338, 720, 758, 55, 437, 159, 579, 999] },
   "1624": { labels: [310, 658, 690, 46, 394, 142, 522, 902] },
-  "1334": { labels: [296, 642, 648, 54, 400, 60, 412, 764], nolabels: [309, 667, 667, 41, 399, 67, 425, 783] }
+  "1334": { labels: [296, 642, 648, 54, 400, 60, 412, 764], nolabels: [309, 667, 667, 41, 399, 67, 425, 783] },
+  "2208": { labels: [471, 1044, 1071, 99, 672, 114, 696, 1278] },
+  "2001": { labels: [444, 963, 972, 81, 600, 90, 618, 1146] },
+  "1136": { labels: [282, 584, 622, 30, 332, 59, 399, 399] }
 };
+// Named models for the in-app picker (screen-height key -> label).
+const DEVICE_MODELS = [
+  ["2868", "iPhone 17 Pro Max / 16 Pro Max"],
+  ["2622", "iPhone 17 Pro / 17 / 16 Pro"],
+  ["2796", "iPhone 16 Plus / 15 Pro Max / 15 Plus / 14 Pro Max"],
+  ["2556", "iPhone 16e / 16 / 15 / 15 Pro / 14 Pro"],
+  ["2532", "iPhone 14 / 13 / 13 Pro / 12 / 12 Pro"],
+  ["2436", "iPhone 13 mini / 12 mini / 11 Pro / XS / X"],
+  ["1334", "iPhone SE (2nd/3rd gen)"]
+];
 function prefsPath() {
   const fm = FileManager.local();
   return fm.joinPath(fm.documentsDirectory(), "widgetking-prefs.json");
@@ -406,12 +419,21 @@ function savePrefs(prefs) {
 // measured pixel frames (frame px / screen scale). Assuming a generic size
 // makes iOS stretch the layout — the spacing then looks nothing like the
 // designer preview.
+// Which frame table applies to THIS iPhone: the user's explicit model pick
+// beats auto-detection from the hardware.
+function frameEntryKey() {
+  const prefs = loadPrefs();
+  if (prefs.screenKey && SCREEN_FRAMES[String(prefs.screenKey)]) return String(prefs.screenKey);
+  try {
+    const hPx = Math.round(Math.max(Device.screenSize().width, Device.screenSize().height) * Device.screenScale());
+    if (SCREEN_FRAMES[String(hPx)]) return String(hPx);
+  } catch (e) {}
+  return "";
+}
 function widgetPointSizes(family) {
   try {
     const scale = Device.screenScale();
-    const size = Device.screenSize();
-    const hPx = Math.round(Math.max(size.width, size.height) * scale);
-    const entry = SCREEN_FRAMES[String(hPx)];
+    const entry = SCREEN_FRAMES[frameEntryKey()];
     if (entry) {
       const f = (loadPrefs().iconLabels === false && entry.nolabels) ? entry.nolabels : entry.labels;
       const small = f[0] / scale, med = f[1] / scale, large = f[2] / scale;
@@ -428,10 +450,17 @@ function widgetRect(imgW, imgH, family, position) {
   const posParts = pos.split("-");
   const row = posParts[0] || "top";
   const side = posParts[1] || "left";
-  const entry = SCREEN_FRAMES[String(Math.round(imgH))];
+  // Identify the device first (model pick / hardware), not the screenshot:
+  // resized or iCloud-optimized screenshots must not land in the wrong row.
+  let key = frameEntryKey();
+  if (!key && SCREEN_FRAMES[String(Math.round(imgH))]) key = String(Math.round(imgH));
+  const entry = SCREEN_FRAMES[key];
   let x, y, w, h, rows;
   if (entry) {
-    const f = (loadPrefs().iconLabels === false && entry.nolabels) ? entry.nolabels : entry.labels;
+    const raw = (loadPrefs().iconLabels === false && entry.nolabels) ? entry.nolabels : entry.labels;
+    // If the saved image was scaled down, scale the frame with it.
+    const sc = imgH / Number(key);
+    const f = raw.map(function (v) { return v * sc; });
     rows = { top: f[5], middle: f[6], bottom: f[7] };
     x = f[3];
     w = h = f[0];
@@ -644,6 +673,13 @@ function drawFreestyle(design, family, bgImg, live) {
           else { wPx = (el.w || 0.55) * W; hPx = wPx * (el.aspect || 1); }
           ctx.drawImageInRect(img, new Rect(px - wPx / 2, py - hPx / 2, wPx, hPx));
         } catch (e) {}
+      } else {
+        // No image data made it into the script (photos don't travel in sync
+        // links) — say so on the widget instead of leaving a silent hole.
+        ctx.setFont(Font.mediumSystemFont(9));
+        ctx.setTextColor(new Color("#FFFFFF", 0.55));
+        ctx.setTextAlignedCenter();
+        ctx.drawTextInRect("photo missing - re-add in designer", new Rect(px - 70, py - 6, 140, 14));
       }
       continue;
     }
@@ -1127,6 +1163,8 @@ if (config.runsInApp) {
   menu.addAction("Set wallpaper photo…");
   menu.addAction("Nudge Clear alignment…");
   menu.addAction("Icon labels on Home Screen: " + (labelsShown ? "Shown" : "Hidden"));
+  const pickedModel = DEVICE_MODELS.find(function (m) { return m[0] === String(prefs.screenKey || ""); });
+  menu.addAction("iPhone model: " + (pickedModel ? pickedModel[1].split(" / ")[0] : "Auto-detect"));
   menu.addAction("Set up app shortcuts…");
   menu.addCancelAction("Cancel");
   const choice = await menu.presentAlert();
@@ -1163,7 +1201,9 @@ if (config.runsInApp) {
     nudge.addAction("⬇︎ Move picture down 10");
     nudge.addAction("⬇︎ Move picture down 30");
     nudge.addAction("⬅︎ Move picture left 10");
+    nudge.addAction("⬅︎ Move picture left 30");
     nudge.addAction("➡︎ Move picture right 10");
+    nudge.addAction("➡︎ Move picture right 30");
     nudge.addAction("Reset to 0");
     nudge.addCancelAction("Cancel");
     const pick = await nudge.presentAlert();
@@ -1174,8 +1214,10 @@ if (config.runsInApp) {
       if (pick === 2) prefs.offsetY = (Number(prefs.offsetY) || 0) - 10;
       if (pick === 3) prefs.offsetY = (Number(prefs.offsetY) || 0) - 30;
       if (pick === 4) prefs.offsetX = (Number(prefs.offsetX) || 0) + 10;
-      if (pick === 5) prefs.offsetX = (Number(prefs.offsetX) || 0) - 10;
-      if (pick === 6) { prefs.offsetY = 0; prefs.offsetX = 0; }
+      if (pick === 5) prefs.offsetX = (Number(prefs.offsetX) || 0) + 30;
+      if (pick === 6) prefs.offsetX = (Number(prefs.offsetX) || 0) - 10;
+      if (pick === 7) prefs.offsetX = (Number(prefs.offsetX) || 0) - 30;
+      if (pick === 8) { prefs.offsetY = 0; prefs.offsetX = 0; }
       savePrefs(prefs);
       const done = new Alert();
       done.title = "Alignment nudged ✓";
@@ -1196,6 +1238,32 @@ if (config.runsInApp) {
     done.addAction("OK");
     await done.presentAlert();
   } else if (choice === 4) {
+    runPreview = false;
+    const dm = new Alert();
+    dm.title = "Which iPhone is this?";
+    let detected = "";
+    try {
+      detected = Math.round(Device.screenSize().width * Device.screenScale()) + " x " +
+        Math.round(Device.screenSize().height * Device.screenScale()) + " px";
+    } catch (e) {}
+    dm.message = "Clear/Glass alignment uses measured frames for your exact model. Auto-detect reads the hardware" +
+      (detected ? " (this phone reports " + detected + ")" : "") + " — pick a model only if Auto looks wrong.";
+    dm.addAction("Auto-detect (recommended)");
+    for (const m of DEVICE_MODELS) dm.addAction(m[1]);
+    dm.addCancelAction("Cancel");
+    const dmPick = await dm.presentAlert();
+    if (dmPick === 0) { delete prefs.screenKey; savePrefs(prefs); }
+    else if (dmPick > 0) { prefs.screenKey = DEVICE_MODELS[dmPick - 1][0]; savePrefs(prefs); }
+    if (dmPick >= 0) {
+      const done = new Alert();
+      done.title = "Alignment updated ✓";
+      done.message = "Clear/Glass widgets now align using " +
+        (dmPick === 0 ? "auto-detection" : DEVICE_MODELS[dmPick - 1][1]) +
+        ". Widgets refresh within a few minutes.";
+      done.addAction("OK");
+      await done.presentAlert();
+    }
+  } else if (choice === 5) {
     runPreview = false;
     // Scan every embedded widget for app buttons that rely on a Shortcut,
     // then hand each one to the Shortcuts app with the exact name copied.
