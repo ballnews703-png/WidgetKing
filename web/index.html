@@ -762,7 +762,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 47;
+const WK_VERSION = 48;
 
 const THEMES = {
   midnight: ["#232526", "#414345"], royal: ["#5B2C98", "#8E44AD"],
@@ -1776,7 +1776,10 @@ async function buildWidget(design, position) {
   const bgImg = backgroundImageFor(design, family, position);
   if (bgImg && design.kind !== "freestyle") {
     w.backgroundImage = bgImg;
-  } else if (!bgImg) {
+  } else if (!bgImg && design.kind !== "freestyle") {
+    // Freestyle paints its own background INTO its image — setting a widget
+    // gradient too would layer ON TOP of that image (Scriptable draws
+    // backgroundGradient above backgroundImage), hiding every element.
     const colors = themeColors(design);
     const g = new LinearGradient();
     g.colors = [new Color(colors[0]), new Color(colors[1])];
