@@ -529,7 +529,9 @@ function backgroundImageFor(design, family, position) {
   const wall = loadWallpaper();
   if (!wall) return null;
   let rect;
-  if (position) {
+  if (position || design.background === "clear") {
+    // Clear must always slice a real widget frame — without a position it
+    // assumes the top spot (set "Name | position" in the Parameter to fix).
     rect = widgetRect(wall.size.width, wall.size.height, family, position);
   } else {
     const aspect = family === "medium" ? 2.14 : family === "large" ? 0.955 : 1;

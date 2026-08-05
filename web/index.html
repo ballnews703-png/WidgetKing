@@ -127,11 +127,15 @@
   .swatch:hover { transform: scale(1.12); }
   .swatch.active { border-color: var(--text); }
   #canvasWrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-  /* The preview + size + undo controls stay pinned; everything below scrolls. */
+  /* The preview + size + undo controls stay pinned; everything below scrolls.
+     Blends with the card and, once stuck, paints an opaque cover above and
+     beside itself so scrolled controls never peek around the widget. */
   #previewDock { position: sticky; top: env(safe-area-inset-top); z-index: 25;
     display: flex; flex-direction: column; align-items: center; gap: 10px;
-    background: var(--bg); padding: 6px 0 10px; margin-bottom: 4px;
-    border-bottom: 1px solid var(--line); }
+    background: var(--card); padding: 6px 18px 10px; margin: 0 -18px 4px; }
+  #previewDock.stuck { border-bottom: 1px solid var(--line); box-shadow: 0 10px 24px var(--shadow); }
+  #previewDock.stuck::before { content: ""; position: absolute; left: -16px; right: -16px;
+    bottom: 100%; height: calc(env(safe-area-inset-top) + 40px); background: var(--bg); }
   #canvas {
     border-radius: 28px; overflow: hidden; position: relative;
     box-shadow: 0 10px 30px rgba(0,0,0,.45);
@@ -176,7 +180,7 @@
   #studioInspector .row { margin-bottom: 8px; }
   .align-buttons button.active { background: var(--accent); border-color: var(--accent); }
   #setupWizard { position: fixed; inset: 0; z-index: 60; background: var(--bg); display: none;
-    flex-direction: column; overscroll-behavior: contain; }
+    flex-direction: column; overscroll-behavior: contain; padding-top: env(safe-area-inset-top); }
   #setupWizard.open { display: flex; }
   #wizardHead { display: flex; align-items: center; justify-content: space-between;
     padding: 14px 16px; border-bottom: 1px solid var(--line); }
@@ -270,6 +274,7 @@
   .app-tag { display: flex; align-items: center; gap: 6px; background: var(--card2);
     border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: 13px; }
   .app-tag button { border: none; background: none; padding: 0 2px; font-size: 13px; color: var(--muted); min-height: 0; }
+  textarea::placeholder, input::placeholder { color: var(--muted); opacity: .55; font-style: italic; }
   details { margin-top: 10px; }
   summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   ol { padding-left: 20px; }
@@ -322,14 +327,14 @@
     <p class="hint">🤔 That idea is too detailed for the free built-in parser — it would just become a text note. Better options:</p>
     <div class="row">
       <button id="mfBuilder">🪄 Answer 3 quick questions</button>
-      <button id="mfAI">✨ Set up Claude AI</button>
+      <button id="mfAI">✨ Set up the AI designer</button>
       <button id="mfNote">📝 Keep it as a note</button>
     </div>
   </div>
   <details>
-    <summary>🤖 Optional: use Claude AI for smarter results</summary>
+    <summary>🤖 Optional: AI designer for smarter results</summary>
     <p class="hint" style="margin-top:8px">
-      Paste an Anthropic API key and Claude designs whole widgets from your
+      Paste an Anthropic API key and WidgetKing’s AI designer builds whole widgets from your
       words (and clones them from photos). <b>The only paid thing in
       WidgetKing</b> — a few cents per widget, key stored only in this browser.
       Sharing with family: use <b>📲 Send all to my other device</b> and include
@@ -340,8 +345,8 @@
     <div class="row" style="margin-top:8px">
       <span style="font-size:12px;color:var(--muted)">Model</span>
       <select id="aiModel" style="flex:1">
-        <option value="claude-opus-5">Best quality — Claude Opus (~1–4¢ per widget)</option>
-        <option value="claude-haiku-4-5">Fast &amp; cheap — Claude Haiku (a fraction of a cent)</option>
+        <option value="claude-opus-5">Best quality (~1–4¢ per widget)</option>
+        <option value="claude-haiku-4-5">Fast &amp; cheap (a fraction of a cent)</option>
       </select>
     </div>
     <label style="font-size:13px;display:flex;align-items:center;gap:6px;margin-top:8px">
@@ -379,7 +384,8 @@
 </div>
 
 <section id="editorSection" class="pane pane-editor">
-  <h2>Make it yours</h2>
+  <div class="chips" id="editorSubTabs" style="margin-bottom:10px"></div>
+  <h2 id="editorTitle">Make it yours</h2>
   <div id="previewDock">
     <div id="canvas"></div>
     <div class="row size-buttons" id="sizeButtons"></div>
@@ -540,6 +546,8 @@
 
 <section id="librarySection" class="pane pane-widgets">
   <h2>My Widgets</h2>
+  <div class="chips" id="libFolders" style="margin-bottom:4px"></div>
+  <div class="row" id="libSortRow" style="margin-bottom:8px"></div>
   <div id="library"></div>
   <div class="row" style="margin-top:12px">
     <button class="primary" id="copyScriptBtn">📋 Copy Scriptable Script</button>
@@ -570,12 +578,14 @@
   <p class="hint">iOS refreshes Scriptable widgets on its own schedule (every few minutes), so clock and battery values are close but not live to-the-second. Everything runs on your devices — nothing is uploaded anywhere.</p>
 </section>
 
-<section id="iconMakerSection" class="pane pane-install">
-  <details class="dcard"><summary>🎨 App Icon Maker — restyle your real app icons</summary><div class="dbody">
-  <p class="hint">Real App Store artwork or styled packs for your Home Screen icons — free, applied with Shortcuts (guide below).</p>
-  <label style="font-size:12px;color:var(--muted)">Icon style</label>
+<section id="iconMakerSection" class="pane pane-editor">
+  <h2>🎨 App Icon Maker</h2>
+  <p class="hint">Restyle your real Home Screen app icons — pick a pack, add your apps, save the icons. Free, applied with Shortcuts (guide on the Install tab).</p>
+  <label style="font-size:12px;color:var(--muted)">Quick-start packs — one tap picks the style and starter apps</label>
+  <div class="chips" id="iconPackChips"></div>
+  <label style="font-size:12px;color:var(--muted);margin-top:6px;display:block">Icon style</label>
   <div class="chips" id="iconStyleChips"></div>
-  <label style="font-size:12px;color:var(--muted);margin-top:6px;display:block">Your apps (tap to add — search works for any App Store app)</label>
+  <label style="font-size:12px;color:var(--muted);margin-top:6px;display:block">Your apps (tap a chip to remove — search works for any App Store app)</label>
   <div class="row">
     <input type="text" id="iconAppSearch" placeholder="Type an app name… (e.g. Instagram)" style="flex:1">
     <button id="iconAppAdd">＋ Add</button>
@@ -594,7 +604,6 @@
       <li>Optional: hide the original icon (long-press → Remove from Home Screen — it stays in your App Library).</li>
     </ol>
   </details>
-  </div></details>
 </section>
 
 <section id="shortcutGuideSection" class="pane pane-install">
@@ -716,7 +725,7 @@
         <button id="bAgain">🎲 Show me another</button>
         <button class="primary" id="bKeep">💜 Perfect — let me tweak it</button>
       </div>
-      <button id="bAI" style="width:100%;margin-top:10px;display:none">✨ Ask Claude for an even fancier one</button>
+      <button id="bAI" style="width:100%;margin-top:10px;display:none">👑 Have WidgetKing fancy it up</button>
     </div>
   </div>
 </div>
@@ -1235,7 +1244,9 @@ function backgroundImageFor(design, family, position) {
   const wall = loadWallpaper();
   if (!wall) return null;
   let rect;
-  if (position) {
+  if (position || design.background === "clear") {
+    // Clear must always slice a real widget frame — without a position it
+    // assumes the top spot (set "Name | position" in the Parameter to fix).
     rect = widgetRect(wall.size.width, wall.size.height, family, position);
   } else {
     const aspect = family === "medium" ? 2.14 : family === "large" ? 0.955 : 1;
@@ -2814,7 +2825,7 @@ function aiSystemPrompt() {
 }
 async function callClaudeOnce(messages, key, schema) {
   if (getSpend() >= getBudget()) {
-    throw new Error("AI budget reached ($" + getBudget().toFixed(2) + ") — raise the budget in the AI section to keep using Claude");
+    throw new Error("AI budget reached ($" + getBudget().toFixed(2) + ") — raise the budget in the AI section to keep using the AI");
   }
   const model = localStorage.getItem("widgetking.aimodel") || "claude-opus-5";
   const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -2834,15 +2845,15 @@ async function callClaudeOnce(messages, key, schema) {
     })
   });
   if (!response.ok) {
-    let message = "Claude API error " + response.status;
+    let message = "AI designer error " + response.status;
     try { const j = await response.json(); if (j.error && j.error.message) message = j.error.message; } catch (e) {}
     throw new Error(message);
   }
   const data = await response.json();
   if (data.usage) addSpend(model, data.usage);
-  if (data.stop_reason === "refusal") throw new Error("Claude declined this request");
+  if (data.stop_reason === "refusal") throw new Error("The AI designer declined this request");
   const block = (data.content || []).find(function (b) { return b.type === "text"; });
-  if (!block) throw new Error("Empty response from Claude");
+  if (!block) throw new Error("Empty response from the AI designer");
   return JSON.parse(block.text);
 }
 async function callClaude(messages, key) {
@@ -3170,8 +3181,16 @@ function renderFreestyleInto(node, design, w, h, interactive) {
         img.src = el.dataUrl;
         div.appendChild(img);
       } else {
-        div.style.background = "rgba(255,255,255,.15)";
+        div.style.cssText += "background:rgba(255,255,255,.14);border:1.5px dashed rgba(255,255,255,.55);" +
+          "display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;" +
+          "font-size:" + Math.round(Math.max(16, Math.min(wPx, hPx) * 0.26)) + "px";
         div.textContent = "🖼";
+        if (hPx > 70) {
+          const tip = document.createElement("span");
+          tip.textContent = "your photo here";
+          tip.style.cssText = "font-size:10px;color:rgba(255,255,255,.75)";
+          div.appendChild(tip);
+        }
       }
     } else if (el.kind === "ring") {
       const pct = Math.min(Math.max(progressPctPreview(el), 0), 1);
@@ -3348,6 +3367,20 @@ function renderPreview() {
     canvas.innerHTML = designPreviewHTML(current, previewSize);
   }
 }
+// Track when the dock is actually pinned so its opaque cover only appears
+// mid-scroll (at rest it would hide the section heading above it).
+(function () {
+  const dock = document.getElementById("previewDock");
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:fixed;top:0;height:env(safe-area-inset-top);width:0;visibility:hidden;pointer-events:none";
+  document.body.appendChild(probe);
+  function update() {
+    const sat = probe.getBoundingClientRect().height;
+    dock.classList.toggle("stuck", dock.getBoundingClientRect().top <= sat + 2);
+  }
+  window.addEventListener("scroll", update, { passive: true });
+  update();
+})();
 function makeThumb(design, scale) {
   const outer = document.createElement("div");
   outer.style.cssText = "width:" + Math.round(158 * scale) + "px;height:" + Math.round(158 * scale) +
@@ -4399,6 +4432,12 @@ function buildInspectorContent(inspector) {
       for (const e of current.canvasElements) if (e.groupId === gid) delete e.groupId;
       refreshEditors();
     }));
+    groupRow.appendChild(smallButton("🗑 All", "Delete every item in this group", false, function () {
+      const gid = el.groupId;
+      current.canvasElements = current.canvasElements.filter(function (e) { return e.groupId !== gid; });
+      selectedElId = null;
+      refreshEditors();
+    }));
     inspector.appendChild(groupRow);
     // Scales every member's size and spacing around the group's center.
     // Base is captured when the inspector renders, so the slider is relative.
@@ -4474,11 +4513,21 @@ function renderStudioUI() {
         multiSelect = null;
         refreshEditors();
       };
+      const delChip = document.createElement("div");
+      delChip.className = "layer-chip";
+      delChip.textContent = "🗑 Delete (" + multiSelect.size + ")";
+      delChip.onclick = function () {
+        if (!multiSelect.size) return;
+        current.canvasElements = current.canvasElements.filter(function (e) { return !multiSelect.has(e.id); });
+        if (selectedElId && multiSelect.has(selectedElId)) selectedElId = null;
+        multiSelect = null;
+        refreshEditors();
+      };
       const cancelChip = document.createElement("div");
       cancelChip.className = "layer-chip";
       cancelChip.textContent = "✕ Cancel";
       cancelChip.onclick = function () { multiSelect = null; refreshEditors(); };
-      layers.append(groupChip, cancelChip);
+      layers.append(groupChip, delChip, cancelChip);
     } else {
       groupChip.textContent = "🔗 Group items";
       groupChip.onclick = function () {
@@ -4787,9 +4836,10 @@ function setupLauncherControls() {
     iconMakerApps = apps.map(function (app) {
       return { label: app.label || "App", emoji: app.emoji || "", iconUrl: app.iconUrl || "" };
     });
-    renderIconMaker();
-    switchTab("install");
-    document.getElementById("iconMakerSection").scrollIntoView({ behavior: "smooth" });
+    editorSubTab = "icons";
+    localStorage.setItem("widgetking.editorsub", editorSubTab);
+    switchTab("editor");
+    applyEditorSubTab();
     toast("⚡ Your apps are in the Icon Maker — pick a style, save, done");
   };
   document.getElementById("appSearchBtn").onclick = searchAppStore;
@@ -5097,6 +5147,11 @@ function loadIntoEditor(design) {
   current = normalizeDesign(JSON.parse(JSON.stringify(design)));
   selectedElId = null;
   multiSelect = null;
+  if (editorSubTab !== "widget") {
+    editorSubTab = "widget";
+    localStorage.setItem("widgetking.editorsub", "widget");
+    applyEditorSubTab();
+  }
   syncControls();
   renderAll();
 }
@@ -5220,22 +5275,90 @@ function renderControls() {
     sizeButtons.appendChild(button);
   }
 }
+// Folders are just a `folder` string on each design (rides through save,
+// backup, and sync links untouched); sorting is a stored preference.
+let libFolder = localStorage.getItem("widgetking.folder") || "";
+let libSort = localStorage.getItem("widgetking.sort") || "new";
+function libFolderNames() {
+  const names = [];
+  for (const d of designs) {
+    if (typeof d.folder === "string" && d.folder && names.indexOf(d.folder) < 0) names.push(d.folder);
+  }
+  return names.sort();
+}
+function setDesignFolder(design) {
+  const existing = libFolderNames();
+  const answer = prompt("Folder for “" + design.name + "”\n(leave empty for no folder" +
+    (existing.length ? "; existing: " + existing.join(", ") : "") + ")", design.folder || "");
+  if (answer === null) return;
+  const name = answer.trim().slice(0, 24);
+  if (name) design.folder = name; else delete design.folder;
+  persist();
+  renderLibrary();
+}
 function renderLibrary() {
   renderShortcutGuide();
+  const folderRow = document.getElementById("libFolders");
+  const sortRow = document.getElementById("libSortRow");
+  folderRow.innerHTML = "";
+  sortRow.innerHTML = "";
   const library = document.getElementById("library");
   library.innerHTML = "";
   if (designs.length === 0) {
     library.innerHTML = '<p class="hint">No saved designs yet. Pick a template or build one above and hit Save.</p>';
     return;
   }
-  for (const design of designs) {
+  const folders = libFolderNames();
+  if (libFolder && folders.indexOf(libFolder) < 0) libFolder = "";
+  if (folders.length) {
+    const all = [["", "✨ All"]].concat(folders.map(function (f) { return [f, "📁 " + f]; }));
+    for (const pair of all) {
+      const chip = document.createElement("button");
+      chip.textContent = pair[1];
+      chip.className = libFolder === pair[0] ? "sel" : "";
+      chip.onclick = function () {
+        libFolder = pair[0];
+        localStorage.setItem("widgetking.folder", libFolder);
+        renderLibrary();
+      };
+      folderRow.appendChild(chip);
+    }
+  }
+  if (designs.length > 3) {
+    const sorts = [["new", "Newest"], ["az", "A–Z"], ["kind", "By type"]];
+    const label = document.createElement("span");
+    label.textContent = "Sort";
+    label.style.cssText = "font-size:12px;color:var(--muted)";
+    sortRow.appendChild(label);
+    for (const pair of sorts) {
+      const b = document.createElement("button");
+      b.textContent = pair[1];
+      b.className = libSort === pair[0] ? "sel" : "";
+      b.style.cssText = "font-size:12px;padding:6px 10px;min-height:32px";
+      b.onclick = function () {
+        libSort = pair[0];
+        localStorage.setItem("widgetking.sort", libSort);
+        renderLibrary();
+      };
+      sortRow.appendChild(b);
+    }
+  }
+  let shown = designs.filter(function (d) { return !libFolder || d.folder === libFolder; });
+  if (libSort === "az") shown = shown.slice().sort(function (a, b) { return (a.name || "").localeCompare(b.name || ""); });
+  else if (libSort === "kind") shown = shown.slice().sort(function (a, b) { return (a.kind || "").localeCompare(b.kind || "") || (a.name || "").localeCompare(b.name || ""); });
+  else shown = shown.slice().reverse(); // newest saves last in the array
+  if (!shown.length) {
+    library.innerHTML = '<p class="hint">Nothing in this folder yet — use 📁 on a widget to move it here.</p>';
+  }
+  for (const design of shown) {
     const item = document.createElement("div");
     item.className = "lib-item";
     item.appendChild(makeThumb(design, 0.3));
     const meta = document.createElement("div");
     meta.className = "meta";
     meta.innerHTML = '<div class="name">' + esc(design.name) + '</div><div class="kind">' +
-      (KIND_ICONS[design.kind] || "🧩") + ' ' + esc(design.kind) + '</div>';
+      (KIND_ICONS[design.kind] || "🧩") + ' ' + esc(design.kind) +
+      (design.folder ? ' · 📁 ' + esc(design.folder) : '') + '</div>';
     const editButton = document.createElement("button");
     editButton.textContent = "Edit";
     editButton.onclick = function () {
@@ -5257,6 +5380,10 @@ function renderLibrary() {
     shareButton.textContent = "🔗";
     shareButton.title = "Share this design as a link";
     shareButton.onclick = function () { shareDesign(design); };
+    const folderButton = document.createElement("button");
+    folderButton.textContent = "📁";
+    folderButton.title = "Move to a folder";
+    folderButton.onclick = function () { setDesignFolder(design); };
     const deleteButton = document.createElement("button");
     deleteButton.textContent = "Delete";
     deleteButton.onclick = function () {
@@ -5266,7 +5393,7 @@ function renderLibrary() {
     };
     const actions = document.createElement("div");
     actions.className = "actions";
-    actions.append(editButton, dupButton, shareButton, deleteButton);
+    actions.append(editButton, dupButton, shareButton, folderButton, deleteButton);
     item.append(meta, actions);
     library.appendChild(item);
   }
@@ -5293,8 +5420,8 @@ function renderAll() {
 }
 function updateMagicHint() {
   document.getElementById("magicHint").textContent = getApiKey()
-    ? "Claude AI is on — describe anything and it designs the whole widget. (A few cents per request.)"
-    : "Built instantly in your browser — free, offline, no AI. It understands launchers, countdowns, quotes, clocks, battery, decorations, and “says …” phrases. For open-ended ideas, add a Claude API key below.";
+    ? "AI is on — describe anything and WidgetKing designs the whole widget. (A few cents per request.)"
+    : "Built instantly in your browser — free, offline, no AI. It understands launchers, countdowns, quotes, clocks, battery, decorations, and “says …” phrases. For open-ended ideas, add an API key below.";
   document.getElementById("cloneBtn").style.display = getApiKey() ? "block" : "none";
 }
 
@@ -5427,13 +5554,13 @@ document.getElementById("magicBtn").onclick = async function () {
   const key = getApiKey();
   if (key) {
     button.disabled = true;
-    button.textContent = "Asking Claude… 🤖";
+    button.textContent = "Designing… 👑";
     try {
       const design = await callClaude([{ role: "user", content: idea + archiveExemplar(idea) }], key);
-      deliverMagicDesign(design, "Designed by Claude ✨ Tweak it, then Save.");
+      deliverMagicDesign(design, "Designed for you 👑 Tweak it, then Save.");
     } catch (error) {
       // Never silently downgrade a detailed idea into a text note — say why.
-      toast("⚠️ Claude couldn't build it: " + error.message);
+      toast("⚠️ The AI couldn't build it: " + error.message);
     } finally {
       button.disabled = false;
       button.textContent = "Build it ✨";
@@ -5481,7 +5608,7 @@ document.getElementById("cloneInput").onchange = function (event) {
   event.target.value = "";
   if (!file) return;
   const key = getApiKey();
-  if (!key) { toast("Cloning needs Claude — add your API key first"); return; }
+  if (!key) { toast("Cloning needs the AI designer — add your API key first"); return; }
   const button = document.getElementById("cloneBtn");
   const reader = new FileReader();
   reader.onload = function () {
@@ -5813,7 +5940,7 @@ document.getElementById("syncAllBtn").onclick = async function () {
   try {
     let includeAI = false;
     if (getApiKey()) {
-      includeAI = confirm("Include your Claude AI key in this link, so the other device gets AI with zero setup?\n\nOnly send the link to family/people you trust — anyone with the link can use your (capped) credits.");
+      includeAI = confirm("Include your AI key in this link, so the other device gets AI with zero setup?\n\nOnly send the link to family/people you trust — anyone with the link can use your (capped) credits.");
     }
     const link = await allDesignsLink(includeAI);
     if (link.hadPhotos) toast("Note: photos don't fit in a link — use 💾 Backup via iCloud Files for those");
@@ -6113,9 +6240,12 @@ function composeFromBuilder() {
   } else if (use === "photos") {
     design.name = bPick(["My People", "Memories", "Us", "Favorites"]);
     design.kind = "freestyle";
+    // The photo IS the widget: fill nearly the whole face, caption overlaid.
+    const fill = { small: [0.92, 0.92], medium: [0.94, 0.44], large: [0.94, 0.98] }[builder.size] || [0.92, 0.92];
     design.canvasElements = [
-      el({ kind: "photo", y: 0.44, w: bPick([0.52, 0.6]), shape: bPick(["circle", "rounded"]), aspect: 1 }),
-      el({ kind: "text", text: bPick(["us 💜", "my favorites", "memories", "the crew"]), y: 0.8, size: 12, bold: true, w: 0, align: "center" })
+      el({ kind: "photo", y: 0.5, w: fill[0], aspect: fill[1], shape: "rounded" }),
+      el({ kind: "text", text: bPick(["us 💜", "my favorites", "memories", "the crew"]),
+        y: 0.84, size: 13, colorHex: "#FFFFFF", bold: true, w: 0, align: "center" })
     ];
   } else if (use === "apps") {
     design.name = bPick(["My Launcher", "Quick Apps", "Go To", "One Tap"]);
@@ -6217,6 +6347,9 @@ function composeFromBuilder() {
 }
 function showBuilderResult() {
   builderDesign = composeFromBuilder();
+  renderBuilderPreview();
+}
+function renderBuilderPreview() {
   const wrap = document.getElementById("bPreviewWrap");
   wrap.innerHTML = "";
   const dims = SIZES[builder.size] || SIZES.small;
@@ -6262,16 +6395,33 @@ document.getElementById("bKeep").onclick = function () {
   }
   if (builderDesign.kind === "launcher") fetchIconsForApps(current);
 };
-document.getElementById("bAI").onclick = function () {
-  const useLabel = (B_USES.find(function (u) { return u[0] === builder.use; }) || ["", "a widget"])[1];
-  const vibeLabel = builder.vibe === "any" ? "any vibe" : builder.vibe;
-  const idea = "A " + builder.size + " " + vibeLabel + "-style widget to " + useLabel.replace(/^[^ ]+ /, "") +
-    (builder.bg === "glass" ? ", frosted glass background" : builder.bg === "clear" ? ", transparent background" : "") +
-    ". Make it beautiful and polished.";
-  closeBuilder();
-  switchTab("create");
-  document.getElementById("magicInput").value = idea;
-  document.getElementById("magicBtn").onclick();
+// Elevate the design that was actually built (not a fresh idea) so the
+// result keeps its purpose and layout instead of drifting somewhere worse.
+document.getElementById("bAI").onclick = async function () {
+  const key = getApiKey();
+  if (!key || !builderDesign) return;
+  const button = this;
+  button.disabled = true;
+  button.textContent = "Fancying it up… 👑";
+  try {
+    const design = await callClaude([{ role: "user", content:
+      "Elevate this exact widget design. KEEP its purpose, its " + (builder.size || "small") +
+      " size, its background style, and every element type it uses — photo elements must stay LARGE " +
+      "(w 0.85+, filling the widget face, caption overlaid). Improve what's weak: composition, hierarchy, " +
+      "typography (one display font on the hero), one accent color used 2-3 times, and add 2-3 craft touches " +
+      "(divider, outline frame, corner glyphs, shadow duplicate on the hero only). Do not shrink content to " +
+      "make room for decoration.\nDesign JSON: " + JSON.stringify(slimDesign(builderDesign))
+    }], key);
+    design.name = builderDesign.name;
+    builderDesign = design;
+    renderBuilderPreview();
+    toast("Fancied up 👑 Tap 💜 to keep it");
+  } catch (error) {
+    toast("⚠️ Couldn't fancy it up: " + error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = "👑 Have WidgetKing fancy it up";
+  }
 };
 
 // ==================== Page Studio: design a whole Home Screen page ====================
@@ -6350,7 +6500,7 @@ function renderPageFrame() {
   const layout = PAGE_LAYOUTS[pageState.layout];
   if (!layout) { // "auto" — the AI chooses the arrangement when it designs
     frame.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;text-align:center">' +
-      '<span class="hint" style="margin:0">🤖 Claude will pick the best layout for your idea — describe the page below and tap ✨ Design my page.</span></div>';
+      '<span class="hint" style="margin:0">🤖 The AI will pick the best layout for your idea — describe the page below and tap ✨ Design my page.</span></div>';
     return;
   }
   for (const slot of layout.slots) {
@@ -6622,7 +6772,44 @@ function drawHomeIcon(app, styleName, index) {
   x.fillText(glyph, S / 2, S * 0.54);
   return c.toDataURL("image/png");
 }
+// Editor sub-tabs: the widget editor and the App Icon Maker share the tab.
+let editorSubTab = localStorage.getItem("widgetking.editorsub") || "widget";
+function applyEditorSubTab() {
+  const row = document.getElementById("editorSubTabs");
+  row.innerHTML = "";
+  for (const pair of [["widget", "🧩 Widget"], ["icons", "📱 App icons"]]) {
+    const chip = document.createElement("button");
+    chip.textContent = pair[1];
+    chip.className = editorSubTab === pair[0] ? "sel" : "";
+    chip.onclick = function () {
+      editorSubTab = pair[0];
+      localStorage.setItem("widgetking.editorsub", editorSubTab);
+      applyEditorSubTab();
+    };
+    row.appendChild(chip);
+  }
+  const widgetMode = editorSubTab !== "icons";
+  document.getElementById("editorTitle").style.display = widgetMode ? "" : "none";
+  document.getElementById("previewDock").style.display = widgetMode ? "" : "none";
+  document.querySelector("#editorSection .editor-grid").style.display = widgetMode ? "" : "none";
+  document.getElementById("iconMakerSection").style.display = widgetMode ? "none" : "";
+  if (!widgetMode) renderIconMaker();
+}
 function renderIconMaker() {
+  const packChips = document.getElementById("iconPackChips");
+  packChips.innerHTML = "";
+  for (const pair of B_VIBES) {
+    if (pair[0] === "any" || !VIBE_APPS[pair[0]]) continue;
+    const chip = document.createElement("button");
+    chip.textContent = pair[1];
+    chip.onclick = function () {
+      iconMakerApps = JSON.parse(JSON.stringify(VIBE_APPS[pair[0]]));
+      iconMakerStyle = VIBE_ICON_THEME[pair[0]] || "pastel";
+      renderIconMaker();
+      toast(pair[1] + " pack loaded — add or remove apps, then save the icons");
+    };
+    packChips.appendChild(chip);
+  }
   const styleChips = document.getElementById("iconStyleChips");
   styleChips.innerHTML = "";
   for (const id of ["real"].concat(Object.keys(ICON_THEMES))) {
@@ -6803,6 +6990,7 @@ document.getElementById("wizardCopyBtn").onclick = function () {
 setupLauncherControls();
 renderTemplates();
 renderIconMaker();
+applyEditorSubTab();
 renderShortcutGuide();
 renderLibrary();
 syncControls();
