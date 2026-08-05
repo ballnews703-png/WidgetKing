@@ -149,7 +149,13 @@
     background: rgba(139, 92, 246, .12); border-radius: 4px;
     z-index: 6; pointer-events: none; }
   .cel { position: absolute; transform: translate(-50%, -50%); cursor: grab;
-    white-space: nowrap; line-height: 1.1; touch-action: none; }
+    white-space: nowrap; line-height: 1.1; touch-action: none; -webkit-touch-callout: none; }
+  .ctx-menu { position: absolute; z-index: 30; display: flex; gap: 2px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 4px; box-shadow: 0 8px 24px var(--shadow); transform: translate(-50%, -110%);
+    white-space: nowrap; }
+  .ctx-menu button { font-size: 12px; padding: 6px 9px; min-height: 34px;
+    border: none; background: none; }
   .cel.selected { outline: 1.5px dashed rgba(255,255,255,.9); outline-offset: 3px; border-radius: 6px; }
   .cel.in-group { outline: 1.5px dashed rgba(255,255,255,.4); outline-offset: 3px; border-radius: 6px; }
   .cel-shape { pointer-events: auto; }
@@ -580,7 +586,12 @@
 
 <section id="iconMakerSection" class="pane pane-editor">
   <h2>🎨 App Icon Maker</h2>
-  <p class="hint">Restyle your real Home Screen app icons — pick a pack, add your apps, save the icons. Free, applied with Shortcuts (guide on the Install tab).</p>
+  <p class="hint">Restyle your real Home Screen app icons — pick a pack, add your apps, save the icons.
+  <b>Heads-up:</b> this tool (and its one-time Shortcuts step) is only for <b>standalone icons on your Home Screen</b>.
+  Apps inside a WidgetKing launcher <i>widget</i> already work — no Shortcuts needed there.</p>
+  <p class="hint">💡 Tap any icon below to swap in <b>your own image</b> (from Canva, Photos, anywhere). Uploads stay on your device.
+  Only use images you own or have permission to use — WidgetKing isn't responsible for third-party content.</p>
+  <input type="file" id="iconUploadInput" accept="image/*" style="display:none">
   <label style="font-size:12px;color:var(--muted)">Quick-start packs — one tap picks the style and starter apps</label>
   <div class="chips" id="iconPackChips"></div>
   <label style="font-size:12px;color:var(--muted);margin-top:6px;display:block">Icon style</label>
@@ -744,6 +755,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
+const WK_VERSION = 44;
 
 const THEMES = {
   midnight: ["#232526", "#414345"], royal: ["#5B2C98", "#8E44AD"],
@@ -1838,7 +1850,7 @@ if (config.runsInApp) {
   const prefs = loadPrefs();
   const labelsShown = prefs.iconLabels !== false;
   const menu = new Alert();
-  menu.title = "WidgetKing";
+  menu.title = "WidgetKing · script v" + WK_VERSION;
   menu.message = "Glass and Clear widgets show your wallpaper. One-time setup: long-press the Home Screen, swipe to the last empty page, screenshot it — then pick that screenshot here.";
   menu.addAction("Preview a widget");
   menu.addAction("Set wallpaper photo…");
@@ -3518,7 +3530,17 @@ function applyGroupScale(base, ratio) {
     }
   }
 }
+function cancelGesture() {
+  if (!gesture) return;
+  clearTimeout(gesture.longTimer);
+  gesture = null;
+  snapGuides = { x: false, y: false };
+  window.removeEventListener("pointermove", gestureMove);
+  window.removeEventListener("pointerup", gestureUp);
+  window.removeEventListener("pointercancel", gestureUp);
+}
 function startPinchPointer(event) {
+  clearTimeout(gesture.longTimer);
   gesture.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   if (gesture.pointers.size !== 2) return;
   const pts = Array.from(gesture.pointers.values());
@@ -3530,6 +3552,10 @@ function startPinchPointer(event) {
 function gestureMove(ev) {
   if (!gesture || !gesture.pointers.has(ev.pointerId)) return;
   gesture.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  if (!gesture.moved && Math.hypot(ev.clientX - gesture.startCX, ev.clientY - gesture.startCY) > 8) {
+    gesture.moved = true;
+    clearTimeout(gesture.longTimer);
+  }
   const el = gesture.el;
   if (gesture.mode === "pinch") {
     if (gesture.pointers.size < 2) return;
@@ -3558,6 +3584,7 @@ function gestureMove(ev) {
 }
 function gestureUp(ev) {
   if (!gesture) return;
+  clearTimeout(gesture.longTimer);
   gesture.pointers.delete(ev.pointerId);
   if (gesture.pointers.size > 0) return; // wait until every finger lifts
   const pinched = gesture.mode === "pinch";
@@ -3587,8 +3614,15 @@ function attachDrag(div, el) {
       grabX: (event.clientX - rect.left) / rect.width - el.x,
       grabY: (event.clientY - rect.top) / rect.height - el.y,
       startX: el.x, startY: el.y,
+      startCX: event.clientX, startCY: event.clientY, moved: false,
       members: groupMembersOf(el).map(function (m) { return { m: m, x: m.x, y: m.y }; })
     };
+    // Hold still half a second → the copy/cut menu, not a drag.
+    gesture.longTimer = setTimeout(function () {
+      if (!gesture || gesture.mode !== "drag" || gesture.moved) return;
+      cancelGesture();
+      showElementMenu(el, canvasNode, event.clientX, event.clientY);
+    }, 500);
     window.addEventListener("pointermove", gestureMove);
     window.addEventListener("pointerup", gestureUp);
     window.addEventListener("pointercancel", gestureUp);
@@ -3597,6 +3631,78 @@ function attachDrag(div, el) {
 function toggleMultiPick(id) {
   if (multiSelect.has(id)) multiSelect.delete(id); else multiSelect.add(id);
   refreshEditors();
+}
+// Long-press context menu (Canva-style): copy / cut / paste / duplicate / delete.
+let elClipboard = null;
+let ctxMenuNode = null;
+function closeCtxMenu() {
+  if (ctxMenuNode) { ctxMenuNode.remove(); ctxMenuNode = null; }
+}
+function openCtxMenu(canvasNode, clientX, clientY, items) {
+  closeCtxMenu();
+  const rect = canvasNode.getBoundingClientRect();
+  const menu = document.createElement("div");
+  menu.className = "ctx-menu";
+  for (const item of items) {
+    const b = document.createElement("button");
+    b.textContent = item[0];
+    b.onpointerdown = function (ev) { ev.stopPropagation(); };
+    b.onclick = function (ev) { ev.stopPropagation(); closeCtxMenu(); item[1](); };
+    menu.appendChild(b);
+  }
+  menu.style.left = Math.min(Math.max(clientX - rect.left, 60), Math.max(60, rect.width - 60)) + "px";
+  menu.style.top = Math.max(clientY - rect.top, 44) + "px";
+  canvasNode.appendChild(menu);
+  ctxMenuNode = menu;
+}
+window.addEventListener("pointerdown", function (ev) {
+  if (ctxMenuNode && !ctxMenuNode.contains(ev.target)) closeCtxMenu();
+}, true);
+function pasteClipboard(nx, ny) {
+  if (!elClipboard) return;
+  const copy = JSON.parse(JSON.stringify(elClipboard));
+  copy.id = uid();
+  delete copy.groupId;
+  copy.x = Math.min(Math.max(nx, 0.02), 0.98);
+  copy.y = Math.min(Math.max(ny, 0.02), 0.98);
+  current.canvasElements.push(copy);
+  selectedElId = copy.id;
+  refreshEditors();
+}
+function showElementMenu(el, canvasNode, clientX, clientY) {
+  selectedElId = el.id;
+  refreshEditors();
+  const items = [
+    ["📋 Copy", function () {
+      elClipboard = JSON.parse(JSON.stringify(el));
+      toast("Copied — long-press empty space (or another element) to paste");
+    }],
+    ["✂️ Cut", function () {
+      elClipboard = JSON.parse(JSON.stringify(el));
+      current.canvasElements = current.canvasElements.filter(function (e) { return e.id !== el.id; });
+      if (selectedElId === el.id) selectedElId = null;
+      refreshEditors();
+      toast("Cut — long-press to paste it somewhere");
+    }],
+    ["⧉", function () {
+      const copy = JSON.parse(JSON.stringify(el));
+      copy.id = uid();
+      copy.x = Math.min(copy.x + 0.05, 0.98);
+      copy.y = Math.min(copy.y + 0.05, 0.98);
+      current.canvasElements.push(copy);
+      selectedElId = copy.id;
+      refreshEditors();
+    }]
+  ];
+  if (elClipboard) {
+    items.push(["📌 Paste", function () { pasteClipboard(el.x + 0.08, el.y + 0.08); }]);
+  }
+  items.push(["🗑", function () {
+    current.canvasElements = current.canvasElements.filter(function (e) { return e.id !== el.id; });
+    if (selectedElId === el.id) selectedElId = null;
+    refreshEditors();
+  }]);
+  openCtxMenu(canvasNode, clientX, clientY, items);
 }
 // A second finger may land on empty canvas — fold it into the active gesture
 // before any background handler can steal it (capture phase).
@@ -4489,7 +4595,13 @@ function renderStudioUI() {
     const button = document.createElement("button");
     button.textContent = key === "small" ? "S" : key === "medium" ? "M" : "L";
     button.className = studioSize === key ? "active" : "";
-    button.onclick = function () { studioSize = key; renderStudioUI(); renderStudioCanvas(); };
+    button.onclick = function () {
+      refitElements(current, studioSize, key);
+      studioSize = key;
+      renderStudioUI();
+      renderStudioCanvas();
+      renderPreview();
+    };
     sizeRow.appendChild(button);
   }
   const layers = document.getElementById("studioLayers");
@@ -4642,10 +4754,25 @@ document.getElementById("studioCanvas").addEventListener("pointerdown", function
   let lastX = x0, lastY = y0, moved = false;
   const box = document.createElement("div");
   box.className = "marquee";
+  // Holding still on empty canvas with something on the clipboard → Paste.
+  // Ends the whole interaction so the release can't turn into a lasso.
+  const pasteTimer = elClipboard ? setTimeout(function () {
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", up);
+    window.removeEventListener("pointercancel", up);
+    box.remove();
+    openCtxMenu(canvas, x0, y0, [["📌 Paste here", function () {
+      pasteClipboard((x0 - rect.left) / rect.width, (y0 - rect.top) / rect.height);
+    }]]);
+  }, 500) : null;
   function move(ev) {
     if (ev.pointerId !== event.pointerId) return;
     lastX = ev.clientX; lastY = ev.clientY;
-    if (!moved && Math.hypot(lastX - x0, lastY - y0) > 8) { moved = true; canvas.appendChild(box); }
+    if (!moved && Math.hypot(lastX - x0, lastY - y0) > 8) {
+      moved = true;
+      clearTimeout(pasteTimer);
+      canvas.appendChild(box);
+    }
     if (!moved) return;
     box.style.left = (Math.min(x0, lastX) - rect.left) + "px";
     box.style.top = (Math.min(y0, lastY) - rect.top) + "px";
@@ -4654,6 +4781,7 @@ document.getElementById("studioCanvas").addEventListener("pointerdown", function
   }
   function up(ev) {
     if (ev.pointerId !== event.pointerId) return;
+    clearTimeout(pasteTimer);
     window.removeEventListener("pointermove", move);
     window.removeEventListener("pointerup", up);
     window.removeEventListener("pointercancel", up);
@@ -5111,28 +5239,69 @@ function renderTemplates() {
   }
   const row = document.getElementById("templateRow");
   row.innerHTML = "";
+  // Some designs are meant for wider/taller widgets — preview them at their
+  // intended size so nobody has to imagine the medium or large version.
+  const TPL_SIZES = { "Morning Brief": "medium", "Fantasy Command": "medium", "Game Slate": "medium",
+    "Social Hub": "medium", "Work Launcher": "medium", "Focus Brief": "medium", "Day Stack": "medium",
+    "Ghost Launcher": "medium", "Year Progress": "medium", "Game Day": "large", "Today Card": "large" };
   for (const template of buildTemplates()) {
     if (activePack !== "all" && template.pack !== activePack) continue;
     const card = document.createElement("div");
     card.className = "tpl-card";
+    const sizeKey = template.size || TPL_SIZES[template.design.name] || "small";
     const design = normalizeDesign(JSON.parse(JSON.stringify(template.design)));
-    card.appendChild(makeThumb(design, 0.55));
+    const dims = SIZES[sizeKey];
+    const scale = 87 / dims[1];
+    const thumbWrap = document.createElement("div");
+    thumbWrap.style.cssText = "width:" + Math.round(dims[0] * scale) + "px;height:87px;overflow:hidden;" +
+      "border-radius:" + Math.round(24 * scale) + "px;margin:0 auto";
+    const inner = renderDesignNode(design, sizeKey);
+    inner.style.transform = "scale(" + scale + ")";
+    inner.style.transformOrigin = "top left";
+    thumbWrap.appendChild(inner);
+    card.appendChild(thumbWrap);
     const name = document.createElement("div");
     name.className = "tpl-name";
     name.textContent = template.design.name;
     const cat = document.createElement("div");
     cat.className = "tpl-cat";
-    cat.textContent = template.category;
+    cat.textContent = template.category + (sizeKey !== "small" ? " · " + sizeKey : "");
     card.append(name, cat);
     card.onclick = function () {
       const copy = normalizeDesign(JSON.parse(JSON.stringify(template.design)));
       copy.id = uid();
+      previewSize = sizeKey;
       loadIntoEditor(copy);
       switchTab("editor");
       popCanvas();
       toast("Template loaded — make it yours ✨");
     };
     row.appendChild(card);
+  }
+}
+// Switching preview size used to just restretch fractional positions —
+// elements drifted apart or piled up. Instead, keep the composition's
+// ABSOLUTE layout centered in the new canvas (scaling down only when the
+// new size is smaller), so a small design drops into a medium untouched.
+function refitElements(design, fromKey, toKey) {
+  if (!design || design.kind !== "freestyle" || fromKey === toKey) return;
+  const f = SIZES[fromKey], t = SIZES[toKey];
+  if (!f || !t) return;
+  const k = Math.min(t[0] / f[0], t[1] / f[1], 1);
+  const minF = Math.min(f[0], f[1]), minT = Math.min(t[0], t[1]);
+  for (const el of design.canvasElements || []) {
+    const X = el.x * f[0], Y = el.y * f[1];
+    el.x = Math.min(Math.max((t[0] / 2 + (X - f[0] / 2) * k) / t[0], 0.02), 0.98);
+    el.y = Math.min(Math.max((t[1] / 2 + (Y - f[1] / 2) * k) / t[1], 0.02), 0.98);
+    if (k < 1 && typeof el.size === "number" && el.size > 0) {
+      el.size = Math.max(6, Math.round(el.size * k));
+    }
+    if (typeof el.w === "number" && el.w > 0) {
+      const relMin = el.kind === "ring" || el.kind === "month" ||
+        (el.kind === "photo" && el.shape === "circle") || (el.kind === "shape" && el.shape === "circle");
+      el.w = Math.min(relMin ? el.w * minF * k / minT : el.w * f[0] * k / t[0], 1);
+    }
+    if (typeof el.h === "number" && el.h > 0) el.h = Math.min(el.h * f[1] * k / t[1], 1);
   }
 }
 function popCanvas() {
@@ -5271,7 +5440,11 @@ function renderControls() {
     const button = document.createElement("button");
     button.textContent = size[0].toUpperCase() + size.slice(1);
     if (previewSize === size) button.className = "active";
-    button.onclick = function () { previewSize = size; renderAll(); };
+    button.onclick = function () {
+      refitElements(current, previewSize, size);
+      previewSize = size;
+      renderAll();
+    };
     sizeButtons.appendChild(button);
   }
 }
@@ -5766,26 +5939,33 @@ async function buildScript() {
   }
   return template.replace('"__DESIGNS__"', JSON.stringify(list, null, 2)).trim() + "\n";
 }
+// The version rides inside the script, so "did my paste take?" is checkable:
+// run the script in Scriptable — its menu title shows the same number.
+function scriptVersion() {
+  const m = document.getElementById("scriptableTemplate").textContent.match(/WK_VERSION = (\d+)/);
+  return m ? m[1] : "?";
+}
 document.getElementById("copyScriptBtn").onclick = async function () {
   const script = await buildScript();
   if (script.length > 3500000) {
     toast("⚠️ Script is very large — consider fewer/smaller photos");
   }
+  const done = "✅ Copied script v" + scriptVersion() + " — paste it over your WidgetKing script in Scriptable (run it there to see the same v" + scriptVersion() + ")";
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(script).then(
-      function () { toast("Script copied — paste it into Scriptable"); },
-      function () { fallbackCopy(script); }
+      function () { toast(done); },
+      function () { fallbackCopy(script, done); }
     );
-  } else { fallbackCopy(script); }
+  } else { fallbackCopy(script, done); }
 };
-function fallbackCopy(text) {
+function fallbackCopy(text, message) {
   const area = document.createElement("textarea");
   area.value = text;
   document.body.appendChild(area);
   area.select();
-  document.execCommand("copy");
+  const ok = document.execCommand("copy");
   area.remove();
-  toast("Script copied — paste it into Scriptable");
+  toast(ok ? (message || "✅ Copied") : "⚠️ Couldn't copy — use ⬇️ Download Script instead");
 }
 document.getElementById("downloadScriptBtn").onclick = async function () {
   download("WidgetKing.js", await buildScript(), "text/javascript");
@@ -6056,6 +6236,19 @@ function switchTab(name) {
 document.querySelectorAll("#tabbar button").forEach(function (b) {
   b.onclick = function () { switchTab(b.dataset.tab); };
 });
+// iOS keeps position:fixed elements pinned to the LAYOUT viewport, so with
+// the keyboard open the tab bar floats mid-screen. Hide it while typing.
+if (window.visualViewport) {
+  const bar = document.getElementById("tabbar");
+  const syncBar = function () {
+    const keyboardOpen = window.innerHeight - window.visualViewport.height > 120;
+    bar.style.opacity = keyboardOpen ? "0" : "";
+    bar.style.pointerEvents = keyboardOpen ? "none" : "";
+  };
+  window.visualViewport.addEventListener("resize", syncBar);
+  window.visualViewport.addEventListener("scroll", syncBar);
+  syncBar();
+}
 
 function applyAppearance(mode) {
   document.body.classList.toggle("light", mode === "light");
@@ -6746,12 +6939,46 @@ async function fetchMakerIcons() {
   iconFetchQueue = false;
   renderIconMaker();
 }
+// Two drawn styles beyond the emoji-tile themes: gradient monograms and
+// ring-framed letters — closer to the paid icon packs people buy.
+const MONO_GRADIENTS = [["#2A1A34", "#B0626A"], ["#1A2980", "#26D0CE"], ["#232526", "#5B2C98"],
+  ["#134E5E", "#71B280"], ["#3A1C71", "#D76D77"], ["#0F2027", "#2C5364"],
+  ["#42275A", "#734B6D"], ["#141E30", "#243B55"]];
 function drawHomeIcon(app, styleName, index) {
-  const theme = ICON_THEMES[styleName];
   const S = 1024;
   const c = document.createElement("canvas");
   c.width = S; c.height = S;
   const x = c.getContext("2d");
+  const letter = (app.label || "A").trim().charAt(0).toUpperCase();
+  if (styleName === "mono" || styleName === "ringmono") {
+    const pair = MONO_GRADIENTS[index % MONO_GRADIENTS.length];
+    if (styleName === "mono") {
+      const g = x.createLinearGradient(0, 0, S, S);
+      g.addColorStop(0, pair[0]);
+      g.addColorStop(1, pair[1]);
+      x.fillStyle = g;
+      x.fillRect(0, 0, S, S);
+      x.fillStyle = "rgba(255,255,255,.12)";
+      x.beginPath();
+      x.arc(S * 0.5, S * 0.5, S * 0.34, 0, Math.PI * 2);
+      x.fill();
+    } else {
+      x.fillStyle = "#17171C";
+      x.fillRect(0, 0, S, S);
+      x.strokeStyle = pair[1];
+      x.lineWidth = S * 0.022;
+      x.beginPath();
+      x.arc(S * 0.5, S * 0.5, S * 0.33, 0, Math.PI * 2);
+      x.stroke();
+    }
+    x.fillStyle = "#FFFFFF";
+    x.font = "600 " + Math.round(S * 0.4) + "px Didot, 'Times New Roman', serif";
+    x.textAlign = "center";
+    x.textBaseline = "middle";
+    x.fillText(letter, S / 2, S * 0.53);
+    return c.toDataURL("image/png");
+  }
+  const theme = ICON_THEMES[styleName];
   x.fillStyle = theme.colors[index % theme.colors.length];
   x.fillRect(0, 0, S, S);
   if (theme.line) {
@@ -6812,9 +7039,10 @@ function renderIconMaker() {
   }
   const styleChips = document.getElementById("iconStyleChips");
   styleChips.innerHTML = "";
-  for (const id of ["real"].concat(Object.keys(ICON_THEMES))) {
+  const styleNames = { real: "📱 Real icon", mono: "🅰️ Monogram", ringmono: "⭕ Ring letter" };
+  for (const id of ["real", "mono", "ringmono"].concat(Object.keys(ICON_THEMES))) {
     const chip = document.createElement("button");
-    chip.textContent = id === "real" ? "📱 Real icon" : ICON_THEMES[id].name;
+    chip.textContent = styleNames[id] || ICON_THEMES[id].name;
     chip.className = iconMakerStyle === id ? "sel" : "";
     chip.onclick = function () { iconMakerStyle = id; renderIconMaker(); };
     styleChips.appendChild(chip);
@@ -6834,7 +7062,9 @@ function renderIconMaker() {
     const cell = document.createElement("div");
     cell.className = "im-cell";
     const img = document.createElement("img");
-    if (iconMakerStyle === "real") {
+    if (app.customB64) {
+      img.src = app.customB64; // the user's own uploaded artwork wins
+    } else if (iconMakerStyle === "real") {
       if (app.iconUrl) {
         img.src = app.iconUrl;
       } else {
@@ -6846,9 +7076,20 @@ function renderIconMaker() {
       img.src = drawHomeIcon(app, iconMakerStyle, index);
     }
     img.alt = app.label + " icon";
+    img.style.cursor = "pointer";
+    img.title = "Tap to use your own image for " + app.label;
+    img.onclick = function () {
+      iconUploadTarget = index;
+      document.getElementById("iconUploadInput").click();
+    };
     const name = document.createElement("div");
     name.className = "im-name";
-    name.textContent = app.label;
+    name.textContent = app.label + (app.customB64 ? " ✕" : "");
+    if (app.customB64) {
+      name.style.cursor = "pointer";
+      name.title = "Remove your custom image";
+      name.onclick = function () { delete app.customB64; renderIconMaker(); };
+    }
     cell.append(img, name);
     grid.appendChild(cell);
   });
@@ -6863,6 +7104,32 @@ document.getElementById("iconAppAdd").onclick = function () {
   iconMakerApps.push({ label: name.slice(0, 20), emoji: presetKey ? APP_PRESETS[presetKey].emoji : "" });
   document.getElementById("iconAppSearch").value = "";
   renderIconMaker();
+};
+// Custom icon uploads (from Canva or anywhere): center-cropped square at
+// 1024px, stored only on this device.
+let iconUploadTarget = -1;
+document.getElementById("iconUploadInput").onchange = function (event) {
+  const file = event.target.files && event.target.files[0];
+  event.target.value = "";
+  const app = iconMakerApps[iconUploadTarget];
+  if (!file || !app) return;
+  const reader = new FileReader();
+  reader.onload = function () {
+    const img = new Image();
+    img.onload = function () {
+      const S = 1024;
+      const c = document.createElement("canvas");
+      c.width = S; c.height = S;
+      const x = c.getContext("2d");
+      const side = Math.min(img.width, img.height);
+      x.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, S, S);
+      app.customB64 = c.toDataURL("image/png");
+      renderIconMaker();
+      toast("Custom icon set for " + app.label + " ✓");
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
 };
 
 // ==================== Auto Shortcut Guide ====================

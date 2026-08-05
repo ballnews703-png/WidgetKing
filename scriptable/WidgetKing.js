@@ -29,6 +29,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
+const WK_VERSION = 44;
 
 const THEMES = {
   midnight: ["#232526", "#414345"], royal: ["#5B2C98", "#8E44AD"],
@@ -1123,7 +1124,7 @@ if (config.runsInApp) {
   const prefs = loadPrefs();
   const labelsShown = prefs.iconLabels !== false;
   const menu = new Alert();
-  menu.title = "WidgetKing";
+  menu.title = "WidgetKing · script v" + WK_VERSION;
   menu.message = "Glass and Clear widgets show your wallpaper. One-time setup: long-press the Home Screen, swipe to the last empty page, screenshot it — then pick that screenshot here.";
   menu.addAction("Preview a widget");
   menu.addAction("Set wallpaper photo…");
