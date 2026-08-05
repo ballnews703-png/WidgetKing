@@ -290,10 +290,13 @@
   ol li b { color: var(--text); }
   #editorSection { scroll-margin-top: 12px; }
   #toast {
-    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-    background: var(--accent); padding: 10px 18px; border-radius: 999px;
+    /* Above the tab bar — at bottom:20px/z-index:10 every toast rendered
+       BEHIND it, so "Saved"/"Copied" feedback was invisible. */
+    position: fixed; bottom: calc(88px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
+    background: var(--accent); color: var(--accent-text); padding: 10px 18px; border-radius: 999px;
     font-size: 14px; font-weight: 600; opacity: 0; transition: opacity .25s; pointer-events: none;
-    max-width: 90vw; text-align: center; z-index: 10;
+    max-width: 90vw; text-align: center; z-index: 70;
+    box-shadow: 0 6px 20px var(--shadow);
   }
 </style>
 </head>
@@ -762,7 +765,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 48;
+const WK_VERSION = 49;
 
 const THEMES = {
   midnight: ["#232526", "#414345"], royal: ["#5B2C98", "#8E44AD"],
@@ -2480,6 +2483,8 @@ function loadDesigns() {
 function persist() {
   try {
     localStorage.setItem("widgetking.designs", JSON.stringify(designs));
+    localStorage.setItem("widgetking.libstamp", String(Date.now()));
+    updateCopyButtons();
   } catch (e) {
     toast("⚠️ Storage is full — photos take space. Delete a design or use smaller photos.");
   }
@@ -6020,6 +6025,19 @@ setTimeout(async function () {
     document.body.appendChild(bar);
   } catch (e) {}
 }, 1500);
+// The Scriptable script is a snapshot — edits only reach the phone after a
+// fresh copy+paste. The copy button says when the library is newer.
+function updateCopyButtons() {
+  const btn = document.getElementById("copyScriptBtn");
+  if (!btn) return;
+  const dirty = Number(localStorage.getItem("widgetking.libstamp") || 0) >
+    Number(localStorage.getItem("widgetking.lastcopy") || 0);
+  btn.textContent = dirty ? "📋 Copy Scriptable Script — updates waiting" : "📋 Copy Scriptable Script";
+}
+function markCopied() {
+  localStorage.setItem("widgetking.lastcopy", String(Date.now()));
+  updateCopyButtons();
+}
 document.getElementById("copyScriptBtn").onclick = async function () {
   const script = await buildScript();
   if (script.length > 3500000) {
@@ -6028,10 +6046,10 @@ document.getElementById("copyScriptBtn").onclick = async function () {
   const done = "✅ Copied script v" + scriptVersion() + " — paste it over your WidgetKing script in Scriptable (run it there to see the same v" + scriptVersion() + ")";
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(script).then(
-      function () { toast(done); },
-      function () { fallbackCopy(script, done); }
+      function () { toast(done); markCopied(); },
+      function () { fallbackCopy(script, done); markCopied(); }
     );
-  } else { fallbackCopy(script, done); }
+  } else { fallbackCopy(script, done); markCopied(); }
 };
 function fallbackCopy(text, message) {
   const area = document.createElement("textarea");
@@ -6044,6 +6062,7 @@ function fallbackCopy(text, message) {
 }
 document.getElementById("downloadScriptBtn").onclick = async function () {
   download("WidgetKing.js", await buildScript(), "text/javascript");
+  markCopied();
 };
 document.getElementById("backupBtn").onclick = function () {
   const stamp = new Date().toISOString().slice(0, 10);
@@ -7363,6 +7382,7 @@ setupLauncherControls();
 renderTemplates();
 renderIconMaker();
 applyEditorSubTab();
+updateCopyButtons();
 renderShortcutGuide();
 renderLibrary();
 syncControls();
