@@ -5666,7 +5666,11 @@ document.getElementById("saveBtn").onclick = function () {
   if (index >= 0) designs[index] = copy; else designs.push(copy);
   persist();
   renderLibrary();
-  toast("Saved “" + current.name + "”");
+  // An edit only reaches the phone after a fresh copy+paste — say so every
+  // time an existing design changes, or edits look like they "didn't work".
+  toast(index >= 0
+    ? "Saved “" + current.name + "” ✓ — 📋 re-copy the script to update your phone"
+    : "Saved “" + current.name + "”");
 };
 document.getElementById("newBtn").onclick = function () { loadIntoEditor(newDesign()); };
 
