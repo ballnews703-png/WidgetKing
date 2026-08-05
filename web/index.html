@@ -505,6 +505,10 @@
           <input type="range" id="bgOpacity" min="10" max="100" style="flex:1">
           <span id="bgOpacityVal" style="font-size:12px;color:var(--muted);min-width:38px;text-align:right">100%</span>
         </div>
+        <div id="posField" style="display:none;margin-top:8px">
+          <label style="font-size:12px;color:var(--muted)">Where will this widget sit? (saves into the design — no need to type it in the Parameter)</label>
+          <div class="chips" id="posChips"></div>
+        </div>
         <p class="hint" id="bgHint" style="display:none;margin-top:6px"></p>
       </div>
       <div class="field" id="themeField">
@@ -757,7 +761,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 45;
+const WK_VERSION = 46;
 
 const THEMES = {
   midnight: ["#232526", "#414345"], royal: ["#5B2C98", "#8E44AD"],
@@ -2012,11 +2016,14 @@ if (config.runsInWidget || runPreview) {
   let design = DESIGNS.find(function (d) { return (d.name || "").toLowerCase() === parameter; });
   if (!design && parameter) {
     // Never fall back silently to another design — a wrong Parameter used to
-    // render DESIGNS[0], which looked like a broken/blank widget.
+    // render DESIGNS[0], which looked like a broken/blank widget. Listing what
+    // IS here also exposes a widget pointed at the wrong/old script copy.
+    const have = DESIGNS.slice(0, 6).map(function (d) { return d.name; }).join(", ");
     design = { name: "Not found", kind: "note", themeID: "midnight", fontStyle: "rounded",
       textColorHex: "#FFFFFF", background: "gradient", canvasElements: [], apps: [],
       primaryText: "No design called “" + (paramParts[0] || "").trim() +
-        "” in this script.\nRe-copy the script from the designer (it must contain this design), or fix this widget's Parameter." };
+        "” in this script (v" + WK_VERSION + ").\nIt has: " + have +
+        (DESIGNS.length > 6 ? "…" : "") + "\nFix the Parameter, or re-copy the script." };
   }
   if (!design) design = DESIGNS[0];
   if (!design) {
@@ -2024,7 +2031,8 @@ if (config.runsInWidget || runPreview) {
     w.addText("No designs yet — build one in the WidgetKing designer.");
     if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentSmall(); }
   } else {
-    const w = await buildWidget(design, widgetPosition);
+    // Position priority: typed in the Parameter > saved inside the design.
+    const w = await buildWidget(design, widgetPosition || design.position || "");
     if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentMedium(); }
   }
 }
@@ -2340,6 +2348,8 @@ function normalizeDesign(design) {
     design.customColors = null;
   }
   if (design.tapUrl == null) design.tapUrl = "";
+  const POSITIONS = ["top-left", "top-right", "middle-left", "middle-right", "bottom-left", "bottom-right", "top", "middle", "bottom"];
+  if (POSITIONS.indexOf(design.position) < 0) delete design.position;
   if (!design.gradientDir) design.gradientDir = "diagonal";
   if (!["gradient", "glass", "clear"].includes(design.background)) design.background = "gradient";
   if (design.glassTint !== "light") design.glassTint = "dark";
@@ -2977,6 +2987,10 @@ function specToDesign(spec) {
       out.w = Math.min(Math.max(rawW, 0), 1);
       out.align = ["left","center","right"].includes(el.align) ? el.align : "center";
       out.bold = el.bold !== false;
+      // Fit guard: a single line that would render wider than the widget gets
+      // forced into a wrapping box so the AI can't spill text past the edges.
+      const estWidth = (String(out.text).length * out.size * 0.55) / 158;
+      if ((out.w === 0 || out.w > 0.92) && estWidth > 0.95) out.w = 0.86;
     }
     if (kind === "app") {
       out.label = (el.label || el.text || "App").slice(0, 12);
@@ -5391,6 +5405,27 @@ function renderControls() {
   document.getElementById("bgOpacity").value = opPct;
   document.getElementById("bgOpacityVal").textContent = opPct + "%";
   const bgHint = document.getElementById("bgHint");
+  // Wallpaper-slicing backgrounds need to know the widget's Home Screen spot.
+  const needsPos = current.background === "glass" || current.background === "clear" ||
+    (current.background === "gradient" && bgOpacityOf(current) < 1);
+  document.getElementById("posField").style.display = needsPos ? "block" : "none";
+  if (needsPos) {
+    const posChips = document.getElementById("posChips");
+    posChips.innerHTML = "";
+    const options = previewSize === "small"
+      ? ["top-left", "top-right", "middle-left", "middle-right", "bottom-left", "bottom-right"]
+      : ["top", "middle", "bottom"];
+    for (const pos of options) {
+      const chip = document.createElement("button");
+      chip.textContent = pos.replace("-", " ");
+      chip.className = current.position === pos ? "sel" : "";
+      chip.onclick = function () {
+        current.position = current.position === pos ? "" : pos;
+        renderControls();
+      };
+      posChips.appendChild(chip);
+    }
+  }
   if (current.background === "gradient" && bgOpacityOf(current) < 1) {
     bgHint.style.display = "block";
     bgHint.innerHTML = "🎨 With opacity under 100%, your gradient blends over <b>your wallpaper</b> like tinted glass. Needs the same one-time wallpaper setup as Glass (run the script in Scriptable → <b>Set wallpaper photo…</b>); without it, the widget falls back to a solid gradient.";
@@ -5399,7 +5434,7 @@ function renderControls() {
     bgHint.innerHTML = "🧊 Glass = a frosted slice of <b>your wallpaper</b> (preview shows a stand-in). Opacity sets frost strength. Needs the one-time wallpaper setup — see the ✨ step in the Install wizard.";
   } else if (current.background === "clear") {
     bgHint.style.display = "block";
-    bgHint.innerHTML = "🫥 Clear = the exact wallpaper slice, fully transparent. Needs the one-time wallpaper setup (✨ step in the Install wizard) and the widget Parameter set to <b>Name | position</b>, e.g. <b>My Clock | top-left</b>.";
+    bgHint.innerHTML = "🫥 Clear = the exact wallpaper slice, fully transparent. Needs the one-time wallpaper setup (✨ step in the Install wizard). Pick the spot above once — the Parameter then only needs the design's name.";
   } else {
     bgHint.style.display = "none";
   }
@@ -6888,17 +6923,25 @@ document.getElementById("pageAIBtn").onclick = async function () {
     const layout = PAGE_LAYOUTS[chosenId];
     pageState.slots = {}; // a fresh page design replaces earlier picks
     let filled = 0;
+    const newDesigns = [];
     layout.slots.forEach(function (slot, i) {
       const slotSpec = (spec.slots || [])[i];
       if (!slotSpec) return;
       const design = specToDesign(slotSpec.design);
       design.name = dedupedName(design.name, null);
-      designs.push(JSON.parse(JSON.stringify(design)));
+      design.position = slot.pos;
+      const stored = JSON.parse(JSON.stringify(design));
+      designs.push(stored);
+      newDesigns.push(stored);
       pageState.slots[slotKey(slot)] = design.id;
       filled++;
     });
     persist();
     renderLibrary();
+    // Real App Store artwork for any app buttons the AI placed.
+    Promise.all(newDesigns.map(function (d) { return fetchIconsForApps(d); }))
+      .then(function () { persist(); renderPageFrame(); })
+      .catch(function () {});
     if (spec.pageName) pageState.name = String(spec.pageName).slice(0, 20);
     renderPageStudio();
     toast("🎨 " + filled + " widgets designed as one set — tap Save for the checklist");
@@ -6921,19 +6964,25 @@ document.getElementById("pageSaveBtn").onclick = function () {
     if (existing >= 0) pages[existing] = record; else pages.push(record);
     localStorage.setItem("widgetking.pages", JSON.stringify(pages));
   } catch (e) {}
+  // Stamp each design with its slot so the widget aligns from the name alone.
+  filled.forEach(function (slot) {
+    const design = designs.find(function (d) { return d.id === pageState.slots[slotKey(slot)]; });
+    if (design) design.position = slot.pos;
+  });
+  persist();
   const list = document.getElementById("pageChecklist");
   let html = '<h2 style="font-size:15px">📋 Placement checklist</h2>' +
-    '<p class="hint">Re-copy the script into Scriptable first (your designs ride inside it), then add each widget:</p>';
+    '<p class="hint">Re-copy the script into Scriptable first (your designs ride inside it — each now remembers its spot), then add each widget:</p>';
   filled.forEach(function (slot, index) {
     const design = designs.find(function (d) { return d.id === pageState.slots[slotKey(slot)]; });
-    const param = design.name + " | " + slot.pos;
+    const param = design.name;
     html += '<div class="row" style="justify-content:space-between;padding:8px 4px;border-bottom:1px solid var(--line)">' +
       '<span style="font-size:13px">' + (index + 1) + '. <b>' + slot.size.charAt(0).toUpperCase() + slot.size.slice(1) +
       '</b> widget, ' + slot.pos.replace("-", " ") + ' → Parameter:</span>' +
       '<button style="font-size:12px;padding:6px 10px;min-height:32px" onclick="navigator.clipboard&&navigator.clipboard.writeText(\'' +
       param.replace(/'/g, "\\'") + '\');toast(\'Parameter copied ✓\')">📋 ' + esc(param) + '</button></div>';
   });
-  html += '<p class="hint" style="margin-top:8px">Each widget: long-press Home Screen → Edit → Add Widget → Scriptable → size above → Edit Widget → Script <b>WidgetKing</b> → paste the Parameter. Clear/Glass designs align automatically thanks to the position in the Parameter.</p>';
+  html += '<p class="hint" style="margin-top:8px">Each widget: long-press Home Screen → Edit → Add Widget → Scriptable → size above → Edit Widget → Script <b>WidgetKing</b> → paste the Parameter (just the name — each design remembers its spot). Type <b>Name | position</b> only to override.</p>';
   list.innerHTML = html;
   toast("Page saved 💾 Checklist below");
 };

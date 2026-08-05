@@ -29,7 +29,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 45;
+const WK_VERSION = 46;
 
 const THEMES = {
   midnight: ["#232526", "#414345"], royal: ["#5B2C98", "#8E44AD"],
@@ -1284,11 +1284,14 @@ if (config.runsInWidget || runPreview) {
   let design = DESIGNS.find(function (d) { return (d.name || "").toLowerCase() === parameter; });
   if (!design && parameter) {
     // Never fall back silently to another design — a wrong Parameter used to
-    // render DESIGNS[0], which looked like a broken/blank widget.
+    // render DESIGNS[0], which looked like a broken/blank widget. Listing what
+    // IS here also exposes a widget pointed at the wrong/old script copy.
+    const have = DESIGNS.slice(0, 6).map(function (d) { return d.name; }).join(", ");
     design = { name: "Not found", kind: "note", themeID: "midnight", fontStyle: "rounded",
       textColorHex: "#FFFFFF", background: "gradient", canvasElements: [], apps: [],
       primaryText: "No design called “" + (paramParts[0] || "").trim() +
-        "” in this script.\nRe-copy the script from the designer (it must contain this design), or fix this widget's Parameter." };
+        "” in this script (v" + WK_VERSION + ").\nIt has: " + have +
+        (DESIGNS.length > 6 ? "…" : "") + "\nFix the Parameter, or re-copy the script." };
   }
   if (!design) design = DESIGNS[0];
   if (!design) {
@@ -1296,7 +1299,8 @@ if (config.runsInWidget || runPreview) {
     w.addText("No designs yet — build one in the WidgetKing designer.");
     if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentSmall(); }
   } else {
-    const w = await buildWidget(design, widgetPosition);
+    // Position priority: typed in the Parameter > saved inside the design.
+    const w = await buildWidget(design, widgetPosition || design.position || "");
     if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentMedium(); }
   }
 }
