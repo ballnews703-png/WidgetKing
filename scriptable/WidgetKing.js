@@ -29,7 +29,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 46;
+const WK_VERSION = 47;
 
 const THEMES = {
   midnight: ["#232526", "#414345"], royal: ["#5B2C98", "#8E44AD"],

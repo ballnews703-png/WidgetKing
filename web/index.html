@@ -305,6 +305,7 @@
     <path d="M15 12.5 V8.5 L21.5 11 L24 5.5 L26.5 11 L33 8.5 V12.5 Z" stroke="#F2B83B" stroke-width="2.4" stroke-linejoin="round" fill="none"/>
   </svg>
   <h1>WidgetKing</h1>
+  <span id="appVersion" style="font-size:11px;color:var(--muted);align-self:flex-end;padding-bottom:4px"></span>
   <div class="spacer"></div>
   <button id="modeToggle" title="Light / dark">🌓</button>
 </header>
@@ -761,7 +762,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 46;
+const WK_VERSION = 47;
 
 const THEMES = {
   midnight: ["#232526", "#414345"], royal: ["#5B2C98", "#8E44AD"],
@@ -5990,6 +5991,28 @@ function scriptVersion() {
   const m = document.getElementById("scriptableTemplate").textContent.match(/WK_VERSION = (\d+)/);
   return m ? m[1] : "?";
 }
+// The Home-Screen app can serve a stale cached page for days — show which
+// version THIS page is, and check the server for a newer one.
+document.getElementById("appVersion").textContent = "v" + scriptVersion();
+setTimeout(async function () {
+  try {
+    const res = await fetch(location.pathname + "?upd=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) return;
+    const m = (await res.text()).match(/WK_VERSION = (\d+)/);
+    if (!m || Number(m[1]) <= Number(scriptVersion())) return;
+    const bar = document.createElement("div");
+    bar.style.cssText = "position:fixed;top:env(safe-area-inset-top);left:0;right:0;z-index:80;" +
+      "background:var(--accent);color:var(--accent-text);padding:10px 14px;display:flex;" +
+      "align-items:center;justify-content:center;gap:10px;font-size:13px;font-weight:600";
+    bar.textContent = "✨ Update available (v" + m[1] + " — you're on v" + scriptVersion() + ")";
+    const btn = document.createElement("button");
+    btn.textContent = "Reload";
+    btn.style.cssText = "background:rgba(0,0,0,.25);border:none;color:inherit;border-radius:9px;padding:6px 12px;font-weight:700";
+    btn.onclick = function () { location.href = location.pathname + "?v=" + m[1]; };
+    bar.appendChild(btn);
+    document.body.appendChild(bar);
+  } catch (e) {}
+}, 1500);
 document.getElementById("copyScriptBtn").onclick = async function () {
   const script = await buildScript();
   if (script.length > 3500000) {
