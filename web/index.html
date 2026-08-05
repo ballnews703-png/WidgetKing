@@ -1344,6 +1344,10 @@ function drawFreestyle(design, family, bgImg, live) {
           const wPx = el.artW * scale, hPx = (el.artH || el.artW) * scale;
           ctx.drawImageInRect(img, new Rect(px - wPx / 2, py - hPx / 2, wPx, hPx));
         } catch (e) {}
+      } else {
+        ctx.setFont(Font.mediumSystemFont(9));
+        ctx.setTextColor(new Color("#FFFFFF", 0.55));
+        ctx.drawTextInRect("art missing - re-copy the script", new Rect(px - 70, py - 6, 140, 14));
       }
       continue;
     }
@@ -1961,6 +1965,14 @@ if (config.runsInApp) {
 
 if (config.runsInWidget || runPreview) {
   let design = DESIGNS.find(function (d) { return (d.name || "").toLowerCase() === parameter; });
+  if (!design && parameter) {
+    // Never fall back silently to another design — a wrong Parameter used to
+    // render DESIGNS[0], which looked like a broken/blank widget.
+    design = { name: "Not found", kind: "note", themeID: "midnight", fontStyle: "rounded",
+      textColorHex: "#FFFFFF", background: "gradient", canvasElements: [], apps: [],
+      primaryText: "No design called “" + (paramParts[0] || "").trim() +
+        "” in this script.\nRe-copy the script from the designer (it must contain this design), or fix this widget's Parameter." };
+  }
   if (!design) design = DESIGNS[0];
   if (!design) {
     const w = new ListWidget();
@@ -2769,8 +2781,8 @@ function aiSystemPrompt() {
     "7 Photo Feature: photo placeholder + translucent caption card (pill opacity .25) overlapping its lower edge.\n" +
     "8 Matchup Card (fantasy sports): sleeper score element as hero (size 22-28, shadow duplicate behind) at y .42, microlabel 'YOU  ·  OPP' 8-9pt above it, a second sleeper element mode omitted (defaults to score) — use ONE score + one record line 9-10pt, divider, plus a day ring or countdown in a side column. kind=sleeper shows the user's LIVE fantasy matchup (they link their league afterward — leave its config fields empty). Also available: mode myteam/opponent on sleeper = the TEAM NAMES, and kind=sleeperlogo (mode myteam/opponent) = circular team LOGOS 30-38pt — flank the score with both logos and put the names 8-9pt beneath them for a broadcast-style matchup card. Use these whenever fantasy football/Sleeper is mentioned.\n" +
     "CRAFT TRICKS the renderer supports:\n" +
-    "- Shadow: duplicate the SAME element first in near-black (#141018, opacity .4-.5) offset +.01 x, +.012 y, then the real one on top. Use on hero type.\n" +
-    "- Glow: duplicate first in the accent color, opacity .2-.3, size +6, then the real element. Neon moods.\n" +
+    "- Shadow: duplicate the SAME element first in near-black (#141018, opacity .3-.35) offset +.02 x, +.025 y, then the real one on top. ONLY on the one hero element, NEVER on text under 20pt — small/tight shadow offsets read as blurry double-vision, not depth.\n" +
+    "- Glow: duplicate first in the accent color, opacity .2-.25, size +8, then the real element. Neon moods only; skip it everywhere else — crisp beats glowy.\n" +
     "- Dividers: skinny rect shapes (h .005-.008) at opacity .25-.35 to separate rows.\n" +
     "- Layered cards: two shapes slightly offset with opacities .12 and .22 for depth.\n" +
     "- Shapes support radius (rect corner pt, 0 = sharp), border (stroke pt) + borderHex; opacity 0 + border = outline-only frame.\n" +
@@ -5571,10 +5583,12 @@ async function buildScript() {
       }
       if (el.kind === "art") {
         try {
-          const canvas = renderArtCanvas(el, 3, design.fontStyle);
+          // 4x: device widgets draw at ~3.1x the 158pt preview, so baking at 3x
+          // meant a slight upscale (soft edges). 4x keeps it a downscale.
+          const canvas = renderArtCanvas(el, 4, design.fontStyle);
           el.b64 = canvas.toDataURL("image/png").split(",")[1] || "";
-          el.artW = canvas.width / 3;
-          el.artH = canvas.height / 3;
+          el.artW = canvas.width / 4;
+          el.artH = canvas.height / 4;
         } catch (e) { el.b64 = ""; }
       }
     }
