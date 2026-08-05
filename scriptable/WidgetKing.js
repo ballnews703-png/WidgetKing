@@ -766,6 +766,11 @@ function drawFreestyle(design, family, bgImg, live) {
     else if (el.kind === "calendar") { text = calendarText(el, live ? live.events : null); }
     else if (el.kind === "sleeper") { text = sleeperText(el, live && live.sleeper ? live.sleeper[el.leagueID] : null); }
     else { text = el.text || "Text"; }
+    // multi:"day" — a text element holding several lines shows one per day.
+    if (el.kind === "text" && el.multi === "day" && text.indexOf("\n") >= 0) {
+      const qlines = text.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+      if (qlines.length) text = qlines[dayOfYear(new Date()) % qlines.length];
+    }
     const isBold = el.kind !== "text" || el.bold !== false;
     ctx.setFont(fontFor(el.font || design.fontStyle, fs, isBold));
     ctx.setTextColor(new Color(el.colorHex || "#FFFFFF", el.kind === "emoji" ? 1 : op));

@@ -1472,6 +1472,11 @@ function drawFreestyle(design, family, bgImg, live) {
     else if (el.kind === "calendar") { text = calendarText(el, live ? live.events : null); }
     else if (el.kind === "sleeper") { text = sleeperText(el, live && live.sleeper ? live.sleeper[el.leagueID] : null); }
     else { text = el.text || "Text"; }
+    // multi:"day" — a text element holding several lines shows one per day.
+    if (el.kind === "text" && el.multi === "day" && text.indexOf("\n") >= 0) {
+      const qlines = text.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+      if (qlines.length) text = qlines[dayOfYear(new Date()) % qlines.length];
+    }
     const isBold = el.kind !== "text" || el.bold !== false;
     ctx.setFont(fontFor(el.font || design.fontStyle, fs, isBold));
     ctx.setTextColor(new Color(el.colorHex || "#FFFFFF", el.kind === "emoji" ? 1 : op));
@@ -3305,7 +3310,14 @@ function renderFreestyleInto(node, design, w, h, interactive) {
       }
       else if (el.kind === "sleeper") div.textContent = el.mode === "record" ? "7-2 · #3"
         : el.mode === "myteam" ? "Birds of Prey" : el.mode === "opponent" ? "Waiver Wire FC" : "112.4 – 98.7";
-      else div.textContent = el.text || "Text";
+      else {
+        let shown = el.text || "Text";
+        if (el.kind === "text" && el.multi === "day" && shown.indexOf("\n") >= 0) {
+          const qlines = shown.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+          if (qlines.length) shown = qlines[dayOfYear(now) % qlines.length];
+        }
+        div.textContent = shown;
+      }
     }
     if (interactive) attachDrag(div, el);
     node.appendChild(div);
@@ -5999,6 +6011,38 @@ const builder = { use: null, vibe: null, size: null, bg: null };
 let builderDesign = null;
 
 function bPick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+// A finishing touch per build, in the vibe's voice — frames, corner glyphs,
+// or sparkles — so offline builds feel designed rather than assembled.
+const VIBE_GLYPHS = {
+  cute: ["♥", "✿", "☾"], minimal: ["·"], zen: ["❀", "☾"], sports: ["★", "⚡"],
+  work: ["▸"], neon: ["⚡", "✦"], sunset: ["☀", "✦"], ocean: ["☾", "✦"],
+  retro: ["▲", "■"], noir: ["✦"], cozy: ["❀", "☕"], glam: ["✦", "★"]
+};
+function decorateDesign(design, vibe, accent) {
+  const roll = bPick(["frame", "corners", "sparkles", "corners", "none"]);
+  if (roll === "none") return;
+  const glyphs = VIBE_GLYPHS[vibe] || ["✦"];
+  function dec(extra) {
+    return Object.assign({ id: uid(), kind: "icon", text: "✦", symbolName: "star.fill",
+      x: 0.5, y: 0.5, size: 12, colorHex: accent, opacity: 0.85 }, extra);
+  }
+  if (roll === "frame") {
+    design.canvasElements.unshift({ id: uid(), kind: "shape", shape: "rect", x: 0.5, y: 0.5,
+      w: 0.92, h: 0.9, size: 0, colorHex: accent, opacity: 0, border: 1.5, borderHex: accent,
+      radius: 14, text: "", symbolName: "star.fill" });
+  } else if (roll === "corners") {
+    const g = bPick(glyphs);
+    design.canvasElements.push(
+      dec({ text: g, x: 0.12, y: 0.12 }),
+      dec({ text: g, x: 0.88, y: 0.88, opacity: 0.5 })
+    );
+  } else {
+    design.canvasElements.push(
+      dec({ text: "✦", x: 0.15, y: 0.2, size: 11 }),
+      dec({ text: "✦", x: 0.85, y: 0.13, size: 8, opacity: 0.6 })
+    );
+  }
+}
 function buildBuilderChips(containerId, options, key) {
   const container = document.getElementById(containerId);
   container.innerHTML = "";
@@ -6092,8 +6136,21 @@ function composeFromBuilder() {
     ];
   } else if (use === "quote") {
     design.name = bPick(["Daily Boost", "Words", "Motivation", "Mantra"]);
-    design.kind = "quote";
-    design.primaryText = VIBE_QUOTES[vibe];
+    design.kind = "freestyle";
+    const qFont = bPick(VIBE_FONTS[vibe]);
+    const card = bg === "gradient" && bPick([true, false]);
+    design.canvasElements = [];
+    if (card) {
+      design.canvasElements.push(el({ kind: "shape", shape: "rect", w: 0.88, h: 0.8, size: 0,
+        colorHex: "#FFFFFF", opacity: 0.13, radius: 16 }));
+    }
+    design.canvasElements.push(
+      el({ kind: "icon", text: "❝", x: card ? 0.2 : 0.5, y: 0.19, size: 20, colorHex: accent, opacity: 0.9 }),
+      el({ kind: "text", text: VIBE_QUOTES[vibe], multi: "day", y: 0.5, w: 0.78, size: 16,
+        bold: true, align: "center", font: qFont }),
+      el({ kind: "shape", shape: "rect", w: 0.26, h: 0.008, y: 0.71, size: 0, colorHex: accent, opacity: 0.55 }),
+      el({ kind: "text", text: "today's words", y: 0.81, size: 9, opacity: 0.7, bold: false, w: 0, align: "center" })
+    );
   } else if (use === "day") {
     design.name = bPick(["My Day", "Today", "The Brief", "Glance"]);
     design.kind = "freestyle";
@@ -6145,9 +6202,17 @@ function composeFromBuilder() {
     ];
   } else if (use === "note") {
     design.name = bPick(["Sticky Note", "Reminder", "Note to Self", "Don't Forget"]);
-    design.kind = "note";
-    design.primaryText = bPick(["Drink water 💧", "One thing at a time", "Call Mom", "You're doing great"]);
+    design.kind = "freestyle";
+    design.canvasElements = [
+      el({ kind: "shape", shape: "rect", w: 0.84, h: 0.72, y: 0.54, size: 0,
+        colorHex: bPick(["#FFE68A", "#FFD9E8", "#CDEBFF"]), opacity: 0.95, radius: 8 }),
+      el({ kind: "emoji", text: bPick(["📌", "📎", "🖇"]), y: 0.17, size: 16 }),
+      el({ kind: "text", text: bPick(["Drink water 💧", "One thing at a time", "Call Mom", "You're doing great"]),
+        y: 0.55, w: 0.68, size: 14, colorHex: "#4A3B12", bold: true, align: "center",
+        font: bPick(["marker", "noteworthy", "chalkboard"]) })
+    ];
   }
+  if (design.kind === "freestyle") decorateDesign(design, vibe, accent);
   return normalizeDesign(design);
 }
 function showBuilderResult() {
