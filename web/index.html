@@ -175,8 +175,23 @@
     border-bottom: 1px solid var(--line); flex-wrap: wrap; }
   #studioHead .title { font-weight: 700; font-size: 15px; margin-right: auto; }
   #studioStage { flex: 1; min-height: 120px; display: flex; align-items: center; justify-content: center;
-    padding: 14px; overflow: hidden;
+    padding: 14px; overflow: hidden; position: relative;
     background: repeating-conic-gradient(var(--stage-a) 0% 25%, var(--stage-b) 0% 50%) 0 0 / 22px 22px; }
+  #studioTools { display: flex; gap: 6px; margin-bottom: 10px; position: sticky; top: 0;
+    background: var(--bg); padding: 4px 0; z-index: 3; }
+  #studioTools button { flex: 1; border-radius: 12px; font-weight: 600; min-height: 40px; }
+  #studioTools button.active { background: var(--accent); color: var(--accent-text); border-color: transparent; }
+  .pal-head { font-size: 11px; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--muted); margin: 10px 2px 6px; }
+  .pal-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .pal-grid button { display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 10px 4px; border-radius: 14px; min-height: 58px; }
+  .pal-ico { font-size: 20px; line-height: 1; }
+  .pal-name { font-size: 10px; color: var(--muted); line-height: 1.15; text-align: center; }
+  #studioQuickbar { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 2px; background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 4px; box-shadow: 0 8px 24px var(--shadow); z-index: 6; }
+  #studioQuickbar button { min-width: 44px; min-height: 40px; border: none; background: none; font-size: 16px; }
   #studioCanvas { border-radius: 22px; overflow: hidden; position: relative;
     touch-action: none; box-shadow: 0 12px 36px rgba(0,0,0,.55); flex-shrink: 0;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -327,6 +342,7 @@
   <h2>What are we making today?</h2>
   <button class="primary" id="builderBtn" style="width:100%;font-size:16px;padding:15px">✨ Build it for me — 3 quick questions</button>
   <div class="method-cards">
+    <button id="exploreTabBtn">🧭 Explore gallery<br><span style="font-size:11px;color:var(--muted)">widgets &amp; icon styles</span></button>
     <button id="newWidgetBtn">➕ Create new widget<br><span style="font-size:11px;color:var(--muted)">start from scratch</span></button>
     <button id="cloneBtn" style="display:none">📷 Clone a widget<br><span style="font-size:11px;color:var(--muted)">from any photo</span></button>
     <button id="pageStudioBtn">📱 Design a page<br><span style="font-size:11px;color:var(--muted)">whole Home Screen</span></button>
@@ -334,18 +350,23 @@
   <input type="file" id="cloneInput" accept="image/*" style="display:none">
 </section>
 
-<section id="exploreSection" class="pane pane-create">
-  <h2>🧭 Explore icon styles</h2>
+<section id="exploreGalleryIntro" class="pane pane-explore">
+  <h2>🧭 Explore</h2>
+  <p class="hint" style="margin-top:2px">Ready-made widgets and icon styles — tap anything to make it yours. Your uploaded packs show here too, and publishing your own creations for everyone is coming with accounts.</p>
+</section>
+
+<section id="templatesSection" class="pane pane-explore">
+  <h2>🧩 Widgets</h2>
+  <div class="chips" id="packChips"></div>
+  <div class="tpl-row" id="templateRow"></div>
+</section>
+
+<section id="exploreSection" class="pane pane-explore">
+  <h2>📱 Icon styles</h2>
   <input type="text" id="exploreSearch" placeholder="Search styles… try dark, cute, minimal, words">
   <div class="chips" id="exploreTags" style="margin-top:8px"></div>
   <div id="exploreList" style="margin-top:10px"></div>
   <p class="hint">Tap a sheet to use it for your app icons (works in launchers too). Packs you upload appear here as well — and publishing your own styles for everyone is coming with accounts.</p>
-</section>
-
-<section id="templatesSection" class="pane pane-create">
-  <h2>Start with a template…</h2>
-  <div class="chips" id="packChips"></div>
-  <div class="tpl-row" id="templateRow"></div>
 </section>
 
 <section id="magicSection" class="pane pane-create">
@@ -405,12 +426,22 @@
     <button id="studioSaveBtn" class="primary">💾 Save</button>
     <button id="studioCloseBtn">✕ Done</button>
   </div>
-  <div id="studioStage"><div id="studioCanvas"></div></div>
+  <div id="studioStage"><div id="studioCanvas"></div><div id="studioQuickbar" style="display:none"></div></div>
   <div id="studioPanel">
-    <div class="chips" id="studioPalette"></div>
-    <div id="studioLayers"></div>
-    <div id="studioInspector" style="display:none"></div>
-    <p class="hint" id="studioHint">Add elements above, drag them on the canvas (they snap to center lines), tap one to fine-tune it. Hold an item and pinch with a second finger to resize it. Drag across empty canvas to lasso several at once, then ✓ Group — grouped items move and resize as one. Layers run left → right, back → front.</p>
+    <div id="studioTools">
+      <button data-tool="add" class="active">➕ Add</button>
+      <button data-tool="edit">🎚 Edit</button>
+      <button data-tool="layers">📚 Layers</button>
+    </div>
+    <div id="studioAddPane"><div id="studioPalette"></div></div>
+    <div id="studioEditPane" style="display:none">
+      <div id="studioInspector" style="display:none"></div>
+      <p class="hint" id="studioEditHint">Tap any element on the canvas to edit it — or drag it to move, pinch to resize.</p>
+    </div>
+    <div id="studioLayersPane" style="display:none">
+      <div id="studioLayers"></div>
+      <p class="hint" id="studioHint">Layers run left → right, back → front — drag on the canvas to move things, pinch to resize. Sweep across empty canvas to lasso several, then ✓ Group.</p>
+    </div>
   </div>
 </div>
 
@@ -657,6 +688,10 @@
   </div>
   <div class="chips" id="iconAppChips"></div>
   <div id="iconGrid"></div>
+  <div class="row" id="iconUseRow" style="margin-top:10px;display:none;flex-wrap:wrap;gap:8px">
+    <button class="primary" id="iconsToWidgetBtn" style="flex:2;min-width:200px">🧩 Put these in a widget<br><span style="font-size:11px;opacity:.85">recommended — works instantly, no setup</span></button>
+    <button id="iconsToHomeBtn" style="flex:1;min-width:150px">📲 Replace real app icons<br><span style="font-size:11px;color:var(--muted)">needs a one-time Shortcut each</span></button>
+  </div>
   <p class="hint" id="iconSaveHint" style="display:none"><b>Long-press each icon → “Add to Photos”.</b> Then follow the guide:</p>
   <details id="iconHowTo" style="display:none">
     <summary>📖 How to put these on your Home Screen (one-time per app)</summary>
@@ -797,6 +832,7 @@
 
 <nav id="tabbar">
   <button data-tab="create" class="active"><span class="tab-ico">✨</span>Create</button>
+  <button data-tab="explore"><span class="tab-ico">🧭</span>Explore</button>
   <button data-tab="editor"><span class="tab-ico">🎨</span>Editor</button>
   <button data-tab="widgets"><span class="tab-ico">👑</span>My Widgets</button>
   <button data-tab="install"><span class="tab-ico">🚀</span>Install</button>
@@ -809,7 +845,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 63;
+const WK_VERSION = 64;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -5800,13 +5836,34 @@ function labelForElement(el) {
   return el.kind;
 }
 
+// Canva-style categorized grid: big tappable tiles instead of a chip soup.
+const PALETTE_GROUPS = [
+  ["Basics", ["text", "photo", "shape", "icon", "emoji", "art", "app"]],
+  ["Live info", ["clock", "date", "greeting", "weather", "calendar", "month", "week",
+    "reminders", "worldclock", "stock", "astro", "battery", "countdown", "progress", "ring"]],
+  ["Sports", ["sleeper", "sleeperlogo"]]
+];
 function buildPalette(container) {
   container.innerHTML = "";
-  for (const pair of ELEMENT_PALETTE) {
-    const button = document.createElement("button");
-    button.textContent = "+ " + pair[1];
-    button.onclick = function () { addElement(pair[0]); };
-    container.appendChild(button);
+  const byKey = {};
+  ELEMENT_PALETTE.forEach(function (p) { byKey[p[0]] = p[1]; });
+  for (const [title, keys] of PALETTE_GROUPS) {
+    const head = document.createElement("div");
+    head.className = "pal-head";
+    head.textContent = title;
+    container.appendChild(head);
+    const grid = document.createElement("div");
+    grid.className = "pal-grid";
+    for (const key of keys) {
+      if (!byKey[key]) continue;
+      const parts = byKey[key].split(" ");
+      const ico = /^[A-Za-z]/.test(parts[0]) ? "🅃" : parts.shift();
+      const button = document.createElement("button");
+      button.innerHTML = '<span class="pal-ico">' + ico + '</span><span class="pal-name">' + parts.join(" ") + "</span>";
+      button.onclick = function () { addElement(key); };
+      grid.appendChild(button);
+    }
+    container.appendChild(grid);
   }
 }
 
@@ -6734,8 +6791,68 @@ function renderStudioCanvas() {
   applyDesignBackground(canvas, current);
   renderFreestyleInto(canvas, current, w, h, true);
 }
+let studioTool = "add";
+let studioLastSel = null;
+function setStudioTool(name) {
+  studioTool = name;
+  document.querySelectorAll("#studioTools button").forEach(function (b) {
+    b.classList.toggle("active", b.dataset.tool === name);
+  });
+  document.getElementById("studioAddPane").style.display = name === "add" ? "block" : "none";
+  document.getElementById("studioEditPane").style.display = name === "edit" ? "block" : "none";
+  document.getElementById("studioLayersPane").style.display = name === "layers" ? "block" : "none";
+}
+document.querySelectorAll("#studioTools button").forEach(function (b) {
+  b.onclick = function () { setStudioTool(b.dataset.tool); };
+});
+// Floating toolbar over the canvas — the design-app basics one thumb away.
+function renderStudioQuickbar() {
+  const bar = document.getElementById("studioQuickbar");
+  const el = current && current.canvasElements ? current.canvasElements.find(function (e) { return e.id === selectedElId; }) : null;
+  if (!studioOpen || !el || multiSelect) { bar.style.display = "none"; return; }
+  bar.style.display = "flex";
+  bar.innerHTML = "";
+  const arr = current.canvasElements;
+  const mk = function (label, title, fn) {
+    const b = document.createElement("button");
+    b.textContent = label;
+    b.title = title;
+    b.onclick = fn;
+    bar.appendChild(b);
+  };
+  mk("⬇︎", "Send backward", function () {
+    const i = arr.indexOf(el);
+    if (i > 0) { arr.splice(i, 1); arr.splice(i - 1, 0, el); refreshEditors(); }
+  });
+  mk("⬆︎", "Bring forward", function () {
+    const i = arr.indexOf(el);
+    if (i < arr.length - 1) { arr.splice(i, 1); arr.splice(i + 1, 0, el); refreshEditors(); }
+  });
+  mk("⧉", "Duplicate", function () {
+    const copy = JSON.parse(JSON.stringify(el));
+    copy.id = uid();
+    delete copy.groupId;
+    copy.x = Math.min(0.95, copy.x + 0.05);
+    copy.y = Math.min(0.95, copy.y + 0.05);
+    arr.push(copy);
+    selectedElId = copy.id;
+    refreshEditors();
+  });
+  mk("🎚", "Edit details", function () { setStudioTool("edit"); });
+  mk("🗑", "Delete", function () {
+    arr.splice(arr.indexOf(el), 1);
+    selectedElId = null;
+    refreshEditors();
+  });
+}
 function renderStudioUI() {
   buildPalette(document.getElementById("studioPalette"));
+  // Selecting something jumps you to its controls; deselecting returns to Add.
+  if (selectedElId && selectedElId !== studioLastSel) setStudioTool("edit");
+  else if (!selectedElId && studioTool === "edit") setStudioTool("add");
+  studioLastSel = selectedElId;
+  renderStudioQuickbar();
+  document.getElementById("studioEditHint").style.display = selectedElId ? "none" : "block";
   const sizeRow = document.getElementById("studioSizeButtons");
   sizeRow.innerHTML = "";
   for (const key of ["small", "medium", "large"]) {
@@ -8328,6 +8445,7 @@ document.getElementById("mfNote").onclick = function () {
   deliverMagicDesign(parseIdea(document.getElementById("magicInput").value.trim()), "Saved as a note — tweak away.");
 };
 // 📷 Clone a widget: screenshot in, editable design out (vision, needs a key).
+document.getElementById("exploreTabBtn").onclick = function () { switchTab("explore"); };
 document.getElementById("newWidgetBtn").onclick = function () {
   const design = newDesign();
   design.name = dedupedName("My Widget", null);
@@ -9048,7 +9166,7 @@ setInterval(function () {
 
 // ==================== App shell: tabs + appearance ====================
 function switchTab(name) {
-  if (!["create", "editor", "widgets", "install"].includes(name)) name = "create";
+  if (!["create", "explore", "editor", "widgets", "install"].includes(name)) name = "create";
   localStorage.setItem("widgetking.tab", name);
   document.querySelectorAll(".pane").forEach(function (pane) {
     pane.classList.toggle("active", pane.classList.contains("pane-" + name));
@@ -9981,8 +10099,12 @@ function renderIconMaker() {
     grid.appendChild(cell);
   });
   const has = iconMakerApps.length > 0;
-  document.getElementById("iconSaveHint").style.display = has ? "block" : "none";
-  document.getElementById("iconHowTo").style.display = has ? "block" : "none";
+  // Widget-first: the Shortcut walkthrough stays hidden until someone
+  // explicitly chooses to replace their real Home Screen icons.
+  document.getElementById("iconUseRow").style.display = has ? "flex" : "none";
+  const homeFlow = iconHomeFlowOpen && has;
+  document.getElementById("iconSaveHint").style.display = homeFlow ? "block" : "none";
+  document.getElementById("iconHowTo").style.display = homeFlow ? "block" : "none";
 }
 document.getElementById("iconAppAdd").onclick = function () {
   const name = document.getElementById("iconAppSearch").value.trim();
@@ -10017,6 +10139,74 @@ document.getElementById("iconUploadInput").onchange = function (event) {
     img.src = reader.result;
   };
   reader.readAsDataURL(file);
+};
+
+// Widget-first icon flow: the maker's apps + style become a launcher widget
+// in one tap — icons live INSIDE the widget, so there is zero Shortcut setup.
+let iconHomeFlowOpen = false;
+function downscaleDataUrl(dataUrl, px) {
+  return new Promise(function (resolve) {
+    const img = new Image();
+    img.onload = function () {
+      const c = document.createElement("canvas");
+      c.width = px; c.height = px;
+      c.getContext("2d").drawImage(img, 0, 0, px, px);
+      resolve(c.toDataURL("image/png"));
+    };
+    img.onerror = function () { resolve(dataUrl); };
+    img.src = dataUrl;
+  });
+}
+document.getElementById("iconsToWidgetBtn").onclick = async function () {
+  const design = newDesign();
+  design.name = dedupedName("My Launcher", null);
+  design.kind = "launcher";
+  design.apps = iconMakerApps.map(function (app) {
+    return {
+      emoji: app.emoji || "📱",
+      label: app.label,
+      url: (app.url || "").trim() || schemeForName(app.label) ||
+        ("shortcuts://run-shortcut?name=" + encodeURIComponent("Open " + app.label)),
+      iconUrl: app.iconUrl || ""
+    };
+  });
+  design.launcherStyle = { iconSize: 44, shape: "rounded", labels: false, columns: 0, iconTheme: "real" };
+  const hasCustom = iconMakerApps.some(function (a) { return a.customB64; });
+  if (hasCustom || iconMakerStyle === "mono" || iconMakerStyle === "ringmono") {
+    // Styles that only exist in the maker travel as a generated pack.
+    const icons = [];
+    for (let i = 0; i < iconMakerApps.length; i++) {
+      const app = iconMakerApps[i];
+      const src = app.customB64 || drawHomeIcon(app, iconMakerStyle === "real" ? "mono" : iconMakerStyle, i);
+      icons.push(await downscaleDataUrl(src, 160));
+    }
+    const pack = { id: uid(), name: "Icon set " + (iconPacks.length + 1), icons: icons };
+    iconPacks.push(pack);
+    if (iconPacks.length > 6) iconPacks = iconPacks.slice(-6);
+    saveIconPacks();
+    renderMyIconPacks();
+    design.launcherStyle.iconTheme = "pack:" + pack.id;
+  } else if (iconMakerStyle === "real") {
+    design.launcherStyle.realStyle = iconMakerRealStyle || "original";
+    design.launcherStyle.tintHex = iconMakerTint;
+  } else if (ICON_THEMES[iconMakerStyle]) {
+    design.launcherStyle.iconTheme = iconMakerStyle;
+  }
+  loadIntoEditor(design);
+  editorSubTab = "widget";
+  localStorage.setItem("widgetking.editorsub", "widget");
+  applyEditorSubTab();
+  switchTab("editor");
+  toast("🧩 Launcher built — save it, then 🔁 Update phone. No Shortcuts needed ✓");
+};
+document.getElementById("iconsToHomeBtn").onclick = function () {
+  iconHomeFlowOpen = !iconHomeFlowOpen;
+  renderIconMaker();
+  if (iconHomeFlowOpen) {
+    document.getElementById("iconHowTo").open = true;
+    document.getElementById("iconSaveHint").scrollIntoView({ behavior: "smooth", block: "center" });
+    toast("📲 This path swaps your REAL app icons — one quick Shortcut per app, guide below");
+  }
 };
 
 // Bulk icon packs: many images at once become a named, reusable icon set.
