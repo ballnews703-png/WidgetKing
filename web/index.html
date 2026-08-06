@@ -558,11 +558,20 @@
       </div></details>
       <details class="dcard"><summary>⚡ Extras</summary><div class="dbody">
       <div class="field" id="fTap">
-        <label>Tap action — open an app when the widget is tapped (optional)</label>
+        <label>Tap to open — which app should launch when this widget is tapped?</label>
         <div class="row">
-          <select id="tapPreset" style="flex:1"><option value="">None</option></select>
-          <input type="text" id="tapUrlInput" placeholder="or custom URL / scheme" style="flex:1.4">
+          <input type="text" id="tapSearch" placeholder="Search the App Store… (e.g. Chess.com)" style="flex:1">
+          <button id="tapSearchBtn">🔍</button>
         </div>
+        <div class="chips" id="tapResults"></div>
+        <p class="hint" id="tapStatus"></p>
+        <details style="margin-top:4px"><summary style="font-size:12px;color:var(--muted)">Advanced — presets, custom links &amp; test</summary>
+          <div class="row" style="margin-top:6px">
+            <select id="tapPreset" style="flex:1"><option value="">None</option></select>
+            <input type="text" id="tapUrlInput" placeholder="custom URL / scheme" style="flex:1.4">
+            <button id="tapTestBtn" title="Try this link right now (works on iPhone)">🧪</button>
+          </div>
+        </details>
       </div>
       <div class="row" id="remixRow" style="margin-top:10px;display:none">
         <input type="text" id="remixInput" placeholder="✨ Remix with AI: make it warmer, add stars…" style="flex:1">
@@ -790,7 +799,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 56;
+const WK_VERSION = 57;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -2874,8 +2883,60 @@ const EXTRA_SCHEMES = {
   "facetime": "facetime://", "files": "shareddocuments://", "find my": "findmy://",
   "wallet": "shoebox://", "weather": "weather://", "stocks": "stocks://",
   "books": "ibooks://", "app store": "itms-apps://", "news": "applenews://",
-  "reminders": "x-apple-reminderkit://", "health": "x-apple-health://"
+  "reminders": "x-apple-reminderkit://", "health": "x-apple-health://",
+  "chess.com": "fb2427617054://", "lichess": "lichess://",
+  "espn": "sportscenter://", "thescore": "thescore://", "sleeper": "sleeper://",
+  "steam": "steammobile://", "roblox": "roblox://", "minecraft": "minecraft://",
+  "pokemon go": "pokemongo://", "pokémon go": "pokemongo://",
+  "nfl": "nfl://", "mlb": "atbat://"
 };
+// App Store results include a bundleId — matching on it beats fuzzy name
+// matching (e.g. "Chess - Play & Learn" says nothing, com.chess.chess does).
+const BUNDLE_SCHEMES = {
+  "com.chess.chess": "fb2427617054://",
+  "org.lichess.mobileV2": "lichess://", "org.lichess.mobile": "lichess://",
+  "com.burbn.instagram": "instagram://", "com.spotify.client": "spotify://",
+  "com.google.ios.youtube": "youtube://", "com.zhiliaoapp.musically": "tiktok://",
+  "com.toyopagroup.picaboo": "snapchat://", "net.whatsapp.WhatsApp": "whatsapp://",
+  "com.atebits.Tweetie2": "twitter://", "com.facebook.Facebook": "fb://",
+  "com.facebook.Messenger": "fb-messenger://", "com.reddit.Reddit": "reddit://",
+  "com.netflix.Netflix": "nflx://", "com.google.Gmail": "googlegmail://",
+  "com.google.chrome.ios": "googlechrome://", "com.google.Maps": "comgooglemaps://",
+  "com.google.Drive": "googledrive://", "com.google.photos": "googlephotos://",
+  "ph.telegra.Telegraph": "tg://", "com.hammerandchisel.discord": "discord://",
+  "org.whispersystems.signal": "sgnl://", "com.linkedin.LinkedIn": "linkedin://",
+  "pinterest": "pinterest://", "tv.twitch": "twitch://", "com.tumblr.tumblr": "tumblr://",
+  "com.pandora": "pandora://", "com.soundcloud.TouchApp": "soundcloud://",
+  "com.audible.iphone": "audible://", "com.amazon.Amazon": "com.amazon.mobile.shopping://",
+  "com.ebay.iphone": "ebay://", "com.etsy.etsyforios": "etsy://",
+  "com.walmart.electronics": "walmart://", "com.target.Target": "target://",
+  "doordash.DoorDashConsumer": "doordash://", "com.ubercab.UberClient": "uber://",
+  "com.ubercab.UberEats": "ubereats://", "com.zimride.instant": "lyft://",
+  "com.waze.iphone": "waze://", "com.starbucks.mystarbucks": "starbucks://",
+  "com.venmo.TouchFree": "venmo://", "com.squareup.cash": "squarecash://",
+  "com.yourcompany.PPClient": "paypal://", "com.robinhood.release.Robinhood": "robinhood://",
+  "com.vilcsak.bitcoin2": "coinbase://",
+  "com.microsoft.Office.Outlook": "ms-outlook://", "com.microsoft.skype.teams": "msteams://",
+  "com.tinyspeck.chatlyio": "slack://", "us.zoom.videomeetings": "zoomus://",
+  "notion.id": "notion://", "com.todoist.ios": "todoist://",
+  "com.fogcreek.trello": "trello://", "com.github.stormbreaker.prod": "github://",
+  "com.getdropbox.Dropbox": "dropbox://", "com.duolingo.DuolingoMobile": "duolingo://",
+  "com.amazon.Lassen": "kindle://", "com.goodreads.Goodreads": "goodreads://",
+  "com.strava.stravaride": "strava://", "com.roblox.robloxmobile": "roblox://",
+  "com.nianticlabs.pokemongo": "pokemongo://", "com.openai.chat": "chatgpt://",
+  "com.anthropic.claude": "claude://", "com.airbnb.app": "airbnb://",
+  "com.hulu.plus": "hulu://", "com.disney.disneyplus": "disneyplus://",
+  "com.wbd.stream": "hbomax://", "com.peacocktv.peacock": "peacocktv://",
+  "com.amazon.aiv.AIVApp": "aiv://", "com.valvesoftware.Steam": "steammobile://",
+  "com.mojang.minecraftpe": "minecraft://",
+  "com.espn.ScoreCenter": "sportscenter://", "com.fivemobile.thescore": "thescore://",
+  "com.blitzstudios.sleeperbot": "sleeper://", "com.nfl.gamecenter": "nfl://",
+  "com.mlb.AtBat": "atbat://"
+};
+function schemeForResult(result) {
+  if (result && result.bundleId && BUNDLE_SCHEMES[result.bundleId]) return BUNDLE_SCHEMES[result.bundleId];
+  return schemeForName((result && result.trackName) || "");
+}
 
 const DECOR_EMOJI = {
   moon: "🌙", star: "⭐", stars: "✨", sparkle: "✨", sparkles: "✨",
@@ -3650,7 +3711,7 @@ function specToDesign(spec) {
     }
     if (kind === "app") {
       out.label = (el.label || el.text || "App").slice(0, 12);
-      out.url = (el.url || "").trim() ||
+      out.url = (el.url || "").trim() || schemeForName(out.label) ||
         ("shortcuts://run-shortcut?name=" + encodeURIComponent("Open " + out.label));
       out.iconUrl = ""; out.emoji = "📲";
       out.size = Math.min(Math.max(Number(el.size) || 40, 16), 96);
@@ -4899,13 +4960,16 @@ function buildInspectorContent(inspector) {
           img.style.cssText = "width:22px;height:22px;border-radius:6px";
           const label = (result.trackName || "App").split(/[–—:|-]/)[0].trim().slice(0, 14);
           pick.append(img, document.createTextNode(" " + label));
+          const direct = schemeForResult(result);
+          if (direct) pick.appendChild(document.createTextNode(" ⚡"));
           pick.onclick = function () {
             el.label = label;
             el.iconUrl = result.artworkUrl512 || result.artworkUrl100 || "";
-            el.url = schemeForName(result.trackName || "") ||
+            el.url = direct ||
               ("shortcuts://run-shortcut?name=" + encodeURIComponent("Open " + label));
             refreshEditors();
-            toast(label + " linked ✓");
+            toast(direct ? (label + " linked — opens directly ✓")
+              : (label + " linked via Shortcut — many apps open directly, this one can't"));
           };
           results.appendChild(pick);
         }
@@ -5960,9 +6024,15 @@ async function searchAppStore() {
       const label = (result.trackName || "App").split(/[–—:|-]/)[0].trim().slice(0, 14);
       button.appendChild(img);
       button.appendChild(document.createTextNode(label));
+      const direct = schemeForResult(result);
+      if (direct) {
+        const badge = document.createElement("span");
+        badge.textContent = " ⚡";
+        badge.title = "Opens directly — no Shortcut needed";
+        button.appendChild(badge);
+      }
       button.onclick = function () {
-        const scheme = schemeForName(result.trackName || "");
-        const url = scheme || ("shortcuts://run-shortcut?name=" + encodeURIComponent("Open " + label));
+        const url = direct || ("shortcuts://run-shortcut?name=" + encodeURIComponent("Open " + label));
         current.apps = current.apps || [];
         current.apps.push({
           emoji: "📱", label: label, url: url,
@@ -5970,7 +6040,8 @@ async function searchAppStore() {
         });
         renderLauncherUI();
         renderPreview();
-        toast(scheme ? ("Added " + label) : ("Added " + label + " via Shortcut — see the ⚡ note"));
+        toast(direct ? ("Added " + label + " — opens directly, no Shortcut ✓")
+          : ("Added " + label + " — this one needs a one-time Shortcut (see the ⚡ note)"));
       };
       resultsDiv.appendChild(button);
     }
@@ -6537,6 +6608,29 @@ function loadIntoEditor(design) {
   if (SIZES[current.fitSize]) previewSize = current.fitSize;
   else current.fitSize = previewSize;
   resetSizeMemory(current, previewSize);
+  // Older designs used Shortcut bounces for apps we now know direct links
+  // for — silently upgrade them (direct always beats the Shortcut hop).
+  let upgradedLinks = 0;
+  const upgradeLink = function (item) {
+    const u = item.url || "";
+    if (u.indexOf("shortcuts://run-shortcut") !== 0) return;
+    let label = item.label || "";
+    const m = u.match(/name=([^&]+)/);
+    try { if (m) label = decodeURIComponent(m[1]).replace(/^Open /, ""); } catch (e) {}
+    const scheme = schemeForName(label);
+    if (scheme) { item.url = scheme; upgradedLinks++; }
+  };
+  (current.apps || []).forEach(upgradeLink);
+  (current.canvasElements || []).filter(function (e) { return e.kind === "app"; }).forEach(upgradeLink);
+  if ((current.tapUrl || "").indexOf("shortcuts://run-shortcut") === 0) {
+    let tapLabel = current.name || "";
+    const tm = current.tapUrl.match(/name=([^&]+)/);
+    try { if (tm) tapLabel = decodeURIComponent(tm[1]).replace(/^Open /, ""); } catch (e) {}
+    const tapScheme = schemeForName(tapLabel);
+    if (tapScheme) { current.tapUrl = tapScheme; upgradedLinks++; }
+  }
+  if (upgradedLinks) toast("🔗 " + upgradedLinks + " app link" + (upgradedLinks > 1 ? "s" : "") +
+    " upgraded — now opens directly, no Shortcut needed");
   selectedElId = null;
   multiSelect = null;
   if (editorSubTab !== "widget") {
@@ -6557,6 +6651,7 @@ function syncControls() {
   document.getElementById("quoteAuthor").value = current.secondaryText || "";
   document.getElementById("noteText").value = current.kind === "note" ? current.primaryText : "";
   document.getElementById("tapUrlInput").value = current.tapUrl || "";
+  if (typeof updateTapStatus === "function") updateTapStatus();
   document.getElementById("tapPreset").value = "";
 }
 function renderControls() {
@@ -7063,6 +7158,65 @@ const tapPreset = document.getElementById("tapPreset");
 tapPreset.onchange = function () {
   current.tapUrl = tapPreset.value;
   document.getElementById("tapUrlInput").value = tapPreset.value;
+  updateTapStatus();
+};
+// Friendly tap-action picker: search the App Store, tap a result, done.
+// The status line always says in plain words what a tap will do.
+function updateTapStatus() {
+  const status = document.getElementById("tapStatus");
+  const url = (current && current.tapUrl) || "";
+  if (!url) { status.textContent = "Nothing set — tapping just opens the widget's script."; return; }
+  if (url.indexOf("shortcuts://run-shortcut") === 0) {
+    let name = "";
+    const m = url.match(/name=([^&]+)/);
+    try { if (m) name = decodeURIComponent(m[1]); } catch (e) {}
+    status.textContent = "⚡ Opens via the Shortcut “" + (name || "Open App") +
+      "” — create it once (guide on the Install tab). Tip: search above first; most big apps open directly with no Shortcut.";
+    return;
+  }
+  if (url.indexOf("http") === 0) { status.textContent = "🌐 Opens a website: " + url.slice(0, 48); return; }
+  status.textContent = "✓ Opens the app directly — no Shortcut needed.";
+}
+async function runTapSearch() {
+  const term = document.getElementById("tapSearch").value.trim();
+  if (!term) return;
+  const box = document.getElementById("tapResults");
+  box.innerHTML = '<span class="hint">Searching…</span>';
+  try {
+    const data = await jsonp("https://itunes.apple.com/search?media=software&entity=software&limit=6&term=" + encodeURIComponent(term));
+    box.innerHTML = "";
+    if (!data.results || !data.results.length) {
+      box.innerHTML = '<span class="hint">No apps found.</span>';
+      return;
+    }
+    for (const result of data.results) {
+      const pick = document.createElement("button");
+      const img = document.createElement("img");
+      img.src = result.artworkUrl100 || result.artworkUrl60 || "";
+      img.style.cssText = "width:22px;height:22px;border-radius:6px";
+      const label = (result.trackName || "App").split(/[–—:|-]/)[0].trim().slice(0, 14);
+      const direct = schemeForResult(result);
+      pick.append(img, document.createTextNode(" " + label + (direct ? " ⚡" : "")));
+      pick.onclick = function () {
+        current.tapUrl = direct ||
+          ("shortcuts://run-shortcut?name=" + encodeURIComponent("Open " + label));
+        document.getElementById("tapUrlInput").value = current.tapUrl;
+        updateTapStatus();
+        toast(direct ? ("Tapping now opens " + label + " directly ✓")
+          : ("Tapping opens " + label + " via a one-time Shortcut (guide on the Install tab)"));
+      };
+      box.appendChild(pick);
+    }
+  } catch (e) { box.innerHTML = '<span class="hint">Search failed — check your connection.</span>'; }
+}
+document.getElementById("tapSearchBtn").onclick = runTapSearch;
+document.getElementById("tapSearch").addEventListener("keydown", function (event) {
+  if (event.key === "Enter") { event.preventDefault(); runTapSearch(); }
+});
+document.getElementById("tapTestBtn").onclick = function () {
+  const url = (document.getElementById("tapUrlInput").value || current.tapUrl || "").trim();
+  if (!url) { toast("Set a link first, then 🧪 tests it"); return; }
+  location.href = url;
 };
 document.getElementById("glassTint").onchange = function (e) {
   current.glassTint = e.target.value;
@@ -7091,7 +7245,7 @@ document.getElementById("bgOpacity").oninput = function (e) {
   refreshCanvases();
   if (showHint) renderControls();
 };
-document.getElementById("tapUrlInput").oninput = function (e) { current.tapUrl = e.target.value.trim(); };
+document.getElementById("tapUrlInput").oninput = function (e) { current.tapUrl = e.target.value.trim(); updateTapStatus(); };
 
 const magicChips = document.getElementById("magicChips");
 for (const example of EXAMPLES) {
@@ -7429,6 +7583,19 @@ async function buildScript() {
         } catch (e) { el.b64 = ""; }
       }
     }
+    // Same direct-link upgrade as the editor, so exports benefit even for
+    // designs that were never re-opened.
+    const exportUpgrade = function (item) {
+      const u = item.url || "";
+      if (u.indexOf("shortcuts://run-shortcut") !== 0) return;
+      let label = item.label || "";
+      const m = u.match(/name=([^&]+)/);
+      try { if (m) label = decodeURIComponent(m[1]).replace(/^Open /, ""); } catch (e) {}
+      const scheme = schemeForName(label);
+      if (scheme) item.url = scheme;
+    };
+    (design.apps || []).forEach(exportUpgrade);
+    (design.canvasElements || []).filter(function (e) { return e.kind === "app"; }).forEach(exportUpgrade);
     // Custom icon packs live only in this browser — bake their images into
     // the script so the widget can render them anywhere.
     const lsTheme = String((design.launcherStyle || {}).iconTheme || "");
