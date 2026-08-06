@@ -29,7 +29,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 51;
+const WK_VERSION = 52;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -1241,8 +1241,46 @@ const paramParts = rawParameter.split("|");
 const parameter = (paramParts[0] || "").trim().toLowerCase();
 const widgetPosition = (paramParts[1] || "").trim().toLowerCase();
 
+// One-push update: the designer copies the fresh script to the clipboard and
+// launches scriptable:///run/WidgetKing?wkupdate=1 — this run installs it.
+async function applyClipboardUpdate() {
+  function say(t, m) {
+    const a = new Alert();
+    a.title = t;
+    a.message = m;
+    a.addAction("OK");
+    return a.presentAlert();
+  }
+  let text = "";
+  try { text = Pasteboard.paste() || ""; } catch (e) {}
+  const m = text.match(/WK_VERSION = (\d+)/);
+  const looksRight = m && text.indexOf("WidgetKing") >= 0 &&
+    text.indexOf("const DESIGNS = ") >= 0 && text.indexOf("Script.complete()") > 0;
+  if (!looksRight) {
+    await say("Nothing to install", "Use the 🔁 Update phone button in the WidgetKing designer — it loads the update and opens this screen for you.");
+    return;
+  }
+  let fm = FileManager.local();
+  if (!fm.fileExists(module.filename)) {
+    try {
+      const icloud = FileManager.iCloud();
+      if (icloud.fileExists(module.filename)) fm = icloud;
+    } catch (e) {}
+  }
+  if (!fm.fileExists(module.filename)) {
+    await say("Update failed", "Couldn't locate this script's file.");
+    return;
+  }
+  fm.writeString(module.filename, text);
+  try { Pasteboard.copyString(""); } catch (e) {}
+  await say("Updated to v" + m[1] + " ✓", "Your latest designs are included. Widgets pick it up within a few minutes.");
+}
+
 let runPreview = true;
-if (config.runsInApp) {
+if (config.runsInApp && args.queryParameters && args.queryParameters.wkupdate === "1") {
+  runPreview = false;
+  await applyClipboardUpdate();
+} else if (config.runsInApp) {
   const prefs = loadPrefs();
   const labelsShown = prefs.iconLabels !== false;
   const menu = new Alert();

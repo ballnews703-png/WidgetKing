@@ -566,8 +566,9 @@
   <div class="row" id="libSortRow" style="margin-bottom:8px"></div>
   <div id="library"></div>
   <div class="row" style="margin-top:12px">
-    <button class="primary" id="copyScriptBtn">📋 Copy Scriptable Script</button>
-    <button id="installScriptBtn">⚡ Install in Scriptable (one tap)</button>
+    <button class="primary" id="pushUpdateBtn">🔁 Update phone (one tap)</button>
+    <button id="copyScriptBtn">📋 Copy Scriptable Script</button>
+    <button id="installScriptBtn">⚡ Install in Scriptable (first time)</button>
     <button id="downloadScriptBtn">⬇️ Download Script</button>
     <button id="backupBtn">💾 Back up all designs</button>
     <button id="importJsonBtn">📂 Restore / Import</button>
@@ -766,7 +767,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 51;
+const WK_VERSION = 52;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -1978,8 +1979,46 @@ const paramParts = rawParameter.split("|");
 const parameter = (paramParts[0] || "").trim().toLowerCase();
 const widgetPosition = (paramParts[1] || "").trim().toLowerCase();
 
+// One-push update: the designer copies the fresh script to the clipboard and
+// launches scriptable:///run/WidgetKing?wkupdate=1 — this run installs it.
+async function applyClipboardUpdate() {
+  function say(t, m) {
+    const a = new Alert();
+    a.title = t;
+    a.message = m;
+    a.addAction("OK");
+    return a.presentAlert();
+  }
+  let text = "";
+  try { text = Pasteboard.paste() || ""; } catch (e) {}
+  const m = text.match(/WK_VERSION = (\d+)/);
+  const looksRight = m && text.indexOf("WidgetKing") >= 0 &&
+    text.indexOf("const DESIGNS = ") >= 0 && text.indexOf("Script.complete()") > 0;
+  if (!looksRight) {
+    await say("Nothing to install", "Use the 🔁 Update phone button in the WidgetKing designer — it loads the update and opens this screen for you.");
+    return;
+  }
+  let fm = FileManager.local();
+  if (!fm.fileExists(module.filename)) {
+    try {
+      const icloud = FileManager.iCloud();
+      if (icloud.fileExists(module.filename)) fm = icloud;
+    } catch (e) {}
+  }
+  if (!fm.fileExists(module.filename)) {
+    await say("Update failed", "Couldn't locate this script's file.");
+    return;
+  }
+  fm.writeString(module.filename, text);
+  try { Pasteboard.copyString(""); } catch (e) {}
+  await say("Updated to v" + m[1] + " ✓", "Your latest designs are included. Widgets pick it up within a few minutes.");
+}
+
 let runPreview = true;
-if (config.runsInApp) {
+if (config.runsInApp && args.queryParameters && args.queryParameters.wkupdate === "1") {
+  runPreview = false;
+  await applyClipboardUpdate();
+} else if (config.runsInApp) {
   const prefs = loadPrefs();
   const labelsShown = prefs.iconLabels !== false;
   const menu = new Alert();
@@ -6133,7 +6172,25 @@ async function buildInstallFile() {
 document.getElementById("installScriptBtn").onclick = async function () {
   download("WidgetKing.scriptable", await buildInstallFile(), "application/json");
   markCopied();
-  toast("⬇️ Open the file and share it to Scriptable — one tap installs it. (Best for FIRST installs; for updates use 📋 Copy, or delete any duplicate the import creates.)");
+  toast("⬇️ Open the file and share it to Scriptable — one tap installs it. (First installs only; afterwards 🔁 Update phone handles everything.)");
+};
+// One-push update: load the fresh script onto the clipboard, then hand off to
+// Scriptable, where the script installs it over itself (wkupdate=1 run).
+document.getElementById("pushUpdateBtn").onclick = async function () {
+  const script = await buildScript();
+  const handoff = function () { location.href = "scriptable:///run/WidgetKing?wkupdate=1"; };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(script);
+      markCopied();
+      toast("Opening Scriptable to install the update…");
+      setTimeout(handoff, 400);
+      return;
+    } catch (e) { /* fall through to the textarea path */ }
+  }
+  fallbackCopy(script, "✅ Update loaded");
+  markCopied();
+  setTimeout(handoff, 400);
 };
 // The version rides inside the script, so "did my paste take?" is checkable:
 // run the script in Scriptable — its menu title shows the same number.
