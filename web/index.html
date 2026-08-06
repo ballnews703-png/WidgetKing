@@ -340,7 +340,6 @@
 
 <section id="builderSection" class="pane pane-create">
   <h2>What are we making today?</h2>
-  <button class="primary" id="builderBtn" style="width:100%;font-size:16px;padding:15px">✨ Build it for me — 3 quick questions</button>
   <div class="method-cards">
     <button id="exploreTabBtn">🧭 Explore gallery<br><span style="font-size:11px;color:var(--muted)">widgets &amp; icon styles</span></button>
     <button id="newWidgetBtn">➕ Create new widget<br><span style="font-size:11px;color:var(--muted)">start from scratch</span></button>
@@ -370,24 +369,27 @@
 </section>
 
 <section id="magicSection" class="pane pane-create">
-  <h2>…or ✨ describe it</h2>
+  <h2>🪄 Have WidgetKing make it for you</h2>
+  <button class="primary" id="builderBtn" style="width:100%;font-size:16px;padding:15px">✨ Build it for me — 3 quick questions</button>
+  <h3 style="margin:14px 0 4px">…or ✨ describe it</h3>
   <p class="hint" id="magicHint"></p>
   <textarea id="magicInput" placeholder="A launcher with Spotify, Instagram and YouTube"></textarea>
   <div class="chips" id="magicChips"></div>
   <button class="primary" id="magicBtn">Build it ✨</button>
   <div id="magicFallback" style="display:none;margin-top:10px">
-    <p class="hint">🤔 That idea is too detailed for the free built-in parser — it would just become a text note. Better options:</p>
+    <p class="hint">🤔 That idea needs WidgetKing's full designer, which isn't set up on this device yet. Options:</p>
     <div class="row">
       <button id="mfBuilder">🪄 Answer 3 quick questions</button>
-      <button id="mfAI">✨ Set up the AI designer</button>
+      <button id="mfAI">⚙️ Finish designer setup</button>
       <button id="mfNote">📝 Keep it as a note</button>
     </div>
   </div>
   <details>
-    <summary>🤖 Optional: AI designer for smarter results</summary>
+    <summary>⚙️ Designer setup — unlock the full designer</summary>
     <p class="hint" style="margin-top:8px">
-      Paste an Anthropic API key and WidgetKing’s AI designer builds whole widgets from your
-      words (and clones them from photos). <b>The only paid thing in
+      Simple ideas build instantly with no setup. For open-ended ideas, paste an
+      Anthropic API key and WidgetKing designs whole widgets from your words
+      (and clones them from photos). <b>The only paid thing in
       WidgetKing</b> — a few cents per widget, key stored only in this browser.
       Sharing with family: use <b>📲 Send all to my other device</b> and include
       the key — their device gets designs + AI with zero setup, and your prepaid
@@ -845,7 +847,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 64;
+const WK_VERSION = 65;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -8201,9 +8203,8 @@ function renderAll() {
   updateMagicHint();
 }
 function updateMagicHint() {
-  document.getElementById("magicHint").textContent = getApiKey()
-    ? "AI is on — describe anything and WidgetKing designs the whole widget. (A few cents per request.)"
-    : "Built instantly in your browser — free, offline, no AI. It understands launchers, countdowns, quotes, clocks, battery, decorations, and “says …” phrases. For open-ended ideas, add an API key below.";
+  document.getElementById("magicHint").textContent =
+    "Tell WidgetKing what you want — a launcher with your top apps, a countdown, a weather clock, a quote — and it designs the widget for you.";
   document.getElementById("cloneBtn").style.display = getApiKey() ? "block" : "none";
 }
 
