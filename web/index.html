@@ -334,6 +334,14 @@
   <input type="file" id="cloneInput" accept="image/*" style="display:none">
 </section>
 
+<section id="exploreSection" class="pane pane-create">
+  <h2>🧭 Explore icon styles</h2>
+  <input type="text" id="exploreSearch" placeholder="Search styles… try dark, cute, minimal, words">
+  <div class="chips" id="exploreTags" style="margin-top:8px"></div>
+  <div id="exploreList" style="margin-top:10px"></div>
+  <p class="hint">Tap a sheet to use it for your app icons (works in launchers too). Packs you upload appear here as well — and publishing your own styles for everyone is coming with accounts.</p>
+</section>
+
 <section id="templatesSection" class="pane pane-create">
   <h2>Start with a template…</h2>
   <div class="chips" id="packChips"></div>
@@ -799,7 +807,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 57;
+const WK_VERSION = 58;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -2039,8 +2047,149 @@ const ICON_THEMES = {
   retro:  { colors: ["#1B1B2E"], glyph: "#FF6B6B", lineCycle: true,
             glyphCycle: ["#FF6B6B", "#FFD93D", "#6BCB77", "#4D96FF"] },
   candy:  { colors: ["#FF9A9E", "#A18CD1", "#7FD8BE", "#F6C90E", "#8FD3F4"], glyph: "#FFFFFF", radius: 0.3 },
-  basic:  { colors: ["#3A3A44"], glyph: "#FFFFFF", emojiTile: true }
+  basic:  { colors: ["#3A3A44"], glyph: "#FFFFFF", emojiTile: true },
+  onyx:   { colors: ["#1C1C22"], glyph: "#F4F4F6", glyphStyle: "line", radius: 0.28 },
+  doodle: { colors: ["#241038"], glyph: "#FF2E92", glyphStyle: "line",
+            gradStroke: ["#FF2E92", "#27C4F5"], dots: true, radius: 0.22 },
+  treats: { colors: ["#C2D6C4", "#7C9791", "#F8CBB0", "#F1E8DC"],
+            glyph: "#2E2B28", wordColors: ["#2E2B28", "#F1E8DC", "#5A4232", "#8A5A3B"],
+            wordTile: true, wordStyle: "baskerville", radius: 0.24 },
+  creams: { colors: ["#FBEFE6", "#FDE5D8"], glyph: "#B96F2D",
+            wordTile: true, wordStyle: "script", radius: 0.24 }
 };
+// Vector line glyphs (mirrors the designer's VGLYPHS — normalized strokes;
+// ["c",cx,cy,r] circles and ["a",cx,cy,r,a0,a1] arcs expand to segments).
+const VGLYPHS = {
+  phone: [[["a",0.317,0.223,0.52,0.25,1.69]], [["a",0.351,0.273,0.26,0.05,1.89]],
+    [[0.821,0.352],[0.611,0.286]], [[0.255,0.739],[0.270,0.520]]],
+  mail: [[[0.2,0.32],[0.8,0.32],[0.8,0.68],[0.2,0.68],[0.2,0.32]],
+    [[0.2,0.34],[0.5,0.55],[0.8,0.34]]],
+  calendar: [[[0.22,0.3],[0.78,0.3],[0.78,0.76],[0.22,0.76],[0.22,0.3]],
+    [[0.22,0.43],[0.78,0.43]], [[0.36,0.22],[0.36,0.34]], [[0.64,0.22],[0.64,0.34]],
+    [["c",0.37,0.55,0.02]], [["c",0.5,0.55,0.02]], [["c",0.63,0.55,0.02]],
+    [["c",0.37,0.66,0.02]], [["c",0.5,0.66,0.02]]],
+  camera: [[[0.2,0.36],[0.36,0.36],[0.41,0.28],[0.59,0.28],[0.64,0.36],[0.8,0.36],[0.8,0.74],[0.2,0.74],[0.2,0.36]],
+    [["c",0.5,0.55,0.115]]],
+  photo: [[[0.21,0.27],[0.79,0.27],[0.79,0.73],[0.21,0.73],[0.21,0.27]],
+    [[0.25,0.67],[0.42,0.5],[0.54,0.61],[0.64,0.51],[0.75,0.62]],
+    [["c",0.36,0.4,0.045]]],
+  chat: [[[0.3,0.28],[0.7,0.28],[0.78,0.36],[0.78,0.54],[0.7,0.62],[0.46,0.62],[0.32,0.74],[0.34,0.62],[0.3,0.62],[0.22,0.54],[0.22,0.36],[0.3,0.28]]],
+  clock: [[["c",0.5,0.5,0.3]], [[0.5,0.5],[0.5,0.33]], [[0.5,0.5],[0.63,0.58]]],
+  map: [[["a",0.5,0.42,0.17,3.32,6.1]],
+    [[0.663,0.475],[0.5,0.78]], [[0.337,0.475],[0.5,0.78]],
+    [["c",0.5,0.42,0.06]]],
+  music: [[[0.4,0.66],[0.4,0.3],[0.7,0.24],[0.7,0.6]],
+    [["c",0.335,0.68,0.07]], [["c",0.635,0.62,0.07]]],
+  settings: [[[0.32,0.24],[0.32,0.76]], [[0.5,0.24],[0.5,0.76]], [[0.68,0.24],[0.68,0.76]],
+    [["c",0.32,0.38,0.05]], [["c",0.5,0.62,0.05]], [["c",0.68,0.34,0.05]]],
+  notes: [[[0.28,0.24],[0.72,0.24],[0.72,0.78],[0.28,0.78],[0.28,0.24]],
+    [[0.36,0.38],[0.64,0.38]], [[0.36,0.5],[0.64,0.5]], [[0.36,0.62],[0.56,0.62]]],
+  cloud: [[["a",0.4,0.56,0.13,3.14,6.28]], [["a",0.6,0.52,0.15,3.5,6.28]],
+    [[0.27,0.68],[0.74,0.68]]],
+  heart: [[["a",0.38,0.42,0.135,3.14,6.0]], [["a",0.62,0.42,0.135,3.42,6.28]],
+    [[0.255,0.48],[0.5,0.75]], [[0.745,0.48],[0.5,0.75]]],
+  star: [[[0.5,0.22],[0.58,0.42],[0.79,0.42],[0.62,0.55],[0.69,0.76],[0.5,0.63],[0.31,0.76],[0.38,0.55],[0.21,0.42],[0.42,0.42],[0.5,0.22]]],
+  cart: [[[0.2,0.28],[0.3,0.28],[0.38,0.6],[0.72,0.6],[0.78,0.36],[0.34,0.36]],
+    [["c",0.42,0.71,0.045]], [["c",0.66,0.71,0.045]]],
+  plane: [[[0.24,0.6],[0.78,0.28],[0.52,0.74],[0.45,0.58],[0.24,0.6]],
+    [[0.45,0.58],[0.78,0.28]]],
+  coffee: [[[0.26,0.36],[0.66,0.36],[0.66,0.66],[0.6,0.74],[0.32,0.74],[0.26,0.66],[0.26,0.36]],
+    [["a",0.66,0.47,0.1,4.9,7.55]],
+    [[0.38,0.22],[0.38,0.29]], [[0.5,0.2],[0.5,0.29]]],
+  sun: [[["c",0.5,0.5,0.15]],
+    [[0.5,0.22],[0.5,0.29]], [[0.5,0.71],[0.5,0.78]], [[0.22,0.5],[0.29,0.5]], [[0.71,0.5],[0.78,0.5]],
+    [[0.31,0.31],[0.36,0.36]], [[0.69,0.31],[0.64,0.36]], [[0.31,0.69],[0.36,0.64]], [[0.69,0.69],[0.64,0.64]]],
+  moon: [[["a",0.5,0.5,0.28,1.2,4.6]], [["a",0.62,0.42,0.28,1.9,4.0]]],
+  game: [[[0.3,0.34],[0.7,0.34],[0.8,0.44],[0.8,0.6],[0.72,0.68],[0.62,0.6],[0.38,0.6],[0.28,0.68],[0.2,0.6],[0.2,0.44],[0.3,0.34]],
+    [[0.34,0.42],[0.34,0.54]], [[0.28,0.48],[0.4,0.48]],
+    [["c",0.62,0.44,0.025]], [["c",0.68,0.52,0.025]]],
+  pawn: [[["c",0.5,0.34,0.1]],
+    [[0.42,0.46],[0.58,0.46]], [[0.45,0.46],[0.39,0.68]], [[0.55,0.46],[0.61,0.68]],
+    [[0.33,0.74],[0.67,0.74]]],
+  book: [[[0.5,0.3],[0.5,0.72]],
+    [[0.5,0.3],[0.4,0.25],[0.24,0.27],[0.24,0.7],[0.4,0.68],[0.5,0.72]],
+    [[0.5,0.3],[0.6,0.25],[0.76,0.27],[0.76,0.7],[0.6,0.68],[0.5,0.72]]],
+  home: [[[0.22,0.5],[0.5,0.24],[0.78,0.5]],
+    [[0.3,0.46],[0.3,0.74],[0.7,0.74],[0.7,0.46]],
+    [[0.44,0.74],[0.44,0.58],[0.56,0.58],[0.56,0.74]]],
+  globe: [[["c",0.5,0.5,0.28]], [[0.22,0.5],[0.78,0.5]],
+    [["a",0.5,0.5,0.28,0,3.14]], [[0.5,0.22],[0.5,0.78]]],
+  play: [[[0.4,0.32],[0.72,0.5],[0.4,0.68],[0.4,0.32]]],
+  dollar: [[[0.62,0.34],[0.44,0.3],[0.36,0.38],[0.44,0.48],[0.58,0.52],[0.64,0.62],[0.54,0.7],[0.36,0.66]],
+    [[0.5,0.22],[0.5,0.78]]]
+};
+const VGLYPH_FOR = [
+  ["phone", "phone"], ["call", "phone"],
+  ["mail", "mail"], ["gmail", "mail"], ["outlook", "mail"],
+  ["calendar", "calendar"],
+  ["camera", "camera"], ["instagram", "camera"],
+  ["photo", "photo"],
+  ["message", "chat"], ["whatsapp", "chat"], ["messenger", "chat"], ["chat", "chat"],
+  ["discord", "chat"], ["telegram", "chat"], ["slack", "chat"], ["text", "chat"], ["snap", "chat"],
+  ["clock", "clock"], ["time", "clock"],
+  ["map", "map"], ["waze", "map"], ["uber", "map"], ["lyft", "map"],
+  ["music", "music"], ["spotify", "music"], ["pandora", "music"], ["soundcloud", "music"], ["tiktok", "music"], ["podcast", "music"],
+  ["setting", "settings"],
+  ["note", "notes"], ["notion", "notes"], ["reminder", "notes"], ["todo", "notes"],
+  ["cloud", "cloud"], ["drive", "cloud"], ["dropbox", "cloud"], ["weather", "cloud"],
+  ["health", "heart"], ["fit", "heart"], ["strava", "heart"], ["heart", "heart"], ["love", "heart"],
+  ["star", "star"], ["review", "star"],
+  ["shop", "cart"], ["amazon", "cart"], ["cart", "cart"], ["etsy", "cart"], ["ebay", "cart"],
+  ["target", "cart"], ["walmart", "cart"], ["store", "cart"],
+  ["plane", "plane"], ["travel", "plane"], ["airbnb", "plane"], ["flight", "plane"], ["fly", "plane"],
+  ["coffee", "coffee"], ["starbucks", "coffee"], ["dunkin", "coffee"],
+  ["sun", "sun"],
+  ["moon", "moon"], ["sleep", "moon"],
+  ["chess", "pawn"],
+  ["game", "game"], ["roblox", "game"], ["steam", "game"], ["minecraft", "game"], ["play station", "game"], ["xbox", "game"],
+  ["book", "book"], ["kindle", "book"], ["goodread", "book"], ["read", "book"],
+  ["home", "home"], ["house", "home"], ["zillow", "home"],
+  ["safari", "globe"], ["chrome", "globe"], ["browser", "globe"], ["web", "globe"], ["internet", "globe"],
+  ["youtube", "play"], ["netflix", "play"], ["hulu", "play"], ["video", "play"], ["tv", "play"], ["twitch", "play"], ["disney", "play"],
+  ["bank", "dollar"], ["venmo", "dollar"], ["cash", "dollar"], ["pay", "dollar"], ["robinhood", "dollar"], ["money", "dollar"], ["stock", "dollar"]
+];
+function vglyphFor(label) {
+  const lower = String(label || "").toLowerCase();
+  for (const pair of VGLYPH_FOR) {
+    if (lower.indexOf(pair[0]) >= 0) return VGLYPHS[pair[1]];
+  }
+  return null;
+}
+function vglyphPoints(stroke) {
+  const first = stroke[0];
+  if (Array.isArray(first) && (first[0] === "c" || first[0] === "a")) {
+    const cx = first[1], cy = first[2], r = first[3];
+    const a0 = first[0] === "c" ? 0 : first[4];
+    const a1 = first[0] === "c" ? Math.PI * 2 : first[5];
+    const n = Math.max(10, Math.round(20 * Math.abs(a1 - a0) / Math.PI));
+    const pts = [];
+    for (let i = 0; i <= n; i++) {
+      const a = a0 + (a1 - a0) * (i / n);
+      pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+    return pts;
+  }
+  return stroke;
+}
+function vlerpHex(a, b, t) {
+  const pa = hexToRgb(a), pb = hexToRgb(b);
+  return rgbToHex([0, 1, 2].map(function (i) { return pa[i] + (pb[i] - pa[i]) * t; }));
+}
+function strokeVGlyph(ctx, strokes, cx, cy, sizePx, lineW, colorA, colorB) {
+  ctx.setLineWidth(lineW);
+  for (const stroke of strokes) {
+    const pts = vglyphPoints(stroke);
+    for (let i = 0; i < pts.length - 1; i++) {
+      const t = (pts[i][0] + pts[i][1] + pts[i + 1][0] + pts[i + 1][1]) / 4;
+      ctx.setStrokeColor(new Color(colorB ? vlerpHex(colorA, colorB, Math.min(1, Math.max(0, t))) : colorA));
+      const p = new Path();
+      p.move(new Point(cx + (pts[i][0] - 0.5) * sizePx, cy + (pts[i][1] - 0.5) * sizePx));
+      p.addLine(new Point(cx + (pts[i + 1][0] - 0.5) * sizePx, cy + (pts[i + 1][1] - 0.5) * sizePx));
+      ctx.addPath(p);
+      ctx.strokePath();
+    }
+  }
+}
 // Themed tiles use clean letter monograms; only the Basic theme (and the
 // untinted fallback) keeps the app's emoji.
 function iconGlyph(app, themeName) {
@@ -2081,6 +2230,38 @@ function themedIconTile(app, themeName, index, pt) {
     ctx.setStrokeColor(new Color(strokeColor, theme.frost ? 0.5 : 1));
     ctx.setLineWidth(Math.max(2, Math.round(S * 0.03)));
     ctx.strokePath();
+  }
+  if (theme.dots) {
+    const spots = [[0.2, 0.2], [0.82, 0.24], [0.16, 0.7], [0.8, 0.78], [0.3, 0.86]];
+    for (let d = 0; d < spots.length; d++) {
+      ctx.setFillColor(new Color((d + index) % 2 ? "#27C4F5" : "#FF2E92"));
+      const dr = Math.max(1.5, S * 0.02);
+      ctx.fillEllipse(new Rect(spots[d][0] * S - dr, spots[d][1] * S - dr, dr * 2, dr * 2));
+    }
+  }
+  if (theme.wordTile) {
+    const word = String(app.label || "App").trim() || "App";
+    const fs = Math.min(S * 0.3, (S * 0.8) / (word.length * 0.48));
+    const wc = theme.wordColors ? theme.wordColors[index % theme.wordColors.length] : theme.glyph;
+    ctx.setTextColor(new Color(wc));
+    ctx.setFont(fontFor(theme.wordStyle || "serif", Math.round(fs), false));
+    ctx.setTextAlignedCenter();
+    ctx.drawTextInRect(word, new Rect(0, S * 0.5 - fs * 0.72, S, fs * 1.5));
+    return ctx.getImage();
+  }
+  if (theme.glyphStyle === "line") {
+    const strokes = vglyphFor(app.label);
+    const gA = theme.gradStroke ? theme.gradStroke[0] : glyphColor;
+    const gB = theme.gradStroke ? theme.gradStroke[1] : null;
+    if (strokes) {
+      strokeVGlyph(ctx, strokes, S / 2, S / 2, S * 0.92, Math.max(2, S * 0.045), gA, gB);
+    } else {
+      ctx.setTextColor(new Color(gA));
+      ctx.setFont(fontFor("serif", Math.round(S * 0.46), false));
+      ctx.setTextAlignedCenter();
+      ctx.drawTextInRect((app.label || "A").trim().charAt(0).toLowerCase(), new Rect(0, S * 0.2, S, S * 0.64));
+    }
+    return ctx.getImage();
   }
   const glyph = iconGlyph(app, themeName);
   ctx.setTextColor(new Color(glyphColor));
@@ -2763,6 +2944,157 @@ function renderArtCanvas(el, res, designFont) {
 }
 // Themed launcher-icon styles — must match ICON_THEMES in the Scriptable
 // template so preview and widget agree.
+// ==================== Vector glyph library ====================
+// Minimal line glyphs drawn from normalized strokes (0..1 box). A stroke is
+// a polyline of [x,y] points, or ["c",cx,cy,r] circle / ["a",cx,cy,r,a0,a1]
+// arc, expanded to segments at draw time. Segment-based strokes mean both
+// renderers can paint them — including true gradient strokes (each segment
+// gets its own interpolated color).
+const VGLYPHS = {
+  phone: [[["a",0.317,0.223,0.52,0.25,1.69]], [["a",0.351,0.273,0.26,0.05,1.89]],
+    [[0.821,0.352],[0.611,0.286]], [[0.255,0.739],[0.270,0.520]]],
+  mail: [[[0.2,0.32],[0.8,0.32],[0.8,0.68],[0.2,0.68],[0.2,0.32]],
+    [[0.2,0.34],[0.5,0.55],[0.8,0.34]]],
+  calendar: [[[0.22,0.3],[0.78,0.3],[0.78,0.76],[0.22,0.76],[0.22,0.3]],
+    [[0.22,0.43],[0.78,0.43]], [[0.36,0.22],[0.36,0.34]], [[0.64,0.22],[0.64,0.34]],
+    [["c",0.37,0.55,0.02]], [["c",0.5,0.55,0.02]], [["c",0.63,0.55,0.02]],
+    [["c",0.37,0.66,0.02]], [["c",0.5,0.66,0.02]]],
+  camera: [[[0.2,0.36],[0.36,0.36],[0.41,0.28],[0.59,0.28],[0.64,0.36],[0.8,0.36],[0.8,0.74],[0.2,0.74],[0.2,0.36]],
+    [["c",0.5,0.55,0.115]]],
+  photo: [[[0.21,0.27],[0.79,0.27],[0.79,0.73],[0.21,0.73],[0.21,0.27]],
+    [[0.25,0.67],[0.42,0.5],[0.54,0.61],[0.64,0.51],[0.75,0.62]],
+    [["c",0.36,0.4,0.045]]],
+  chat: [[[0.3,0.28],[0.7,0.28],[0.78,0.36],[0.78,0.54],[0.7,0.62],[0.46,0.62],[0.32,0.74],[0.34,0.62],[0.3,0.62],[0.22,0.54],[0.22,0.36],[0.3,0.28]]],
+  clock: [[["c",0.5,0.5,0.3]], [[0.5,0.5],[0.5,0.33]], [[0.5,0.5],[0.63,0.58]]],
+  map: [[["a",0.5,0.42,0.17,3.32,6.1]],
+    [[0.663,0.475],[0.5,0.78]], [[0.337,0.475],[0.5,0.78]],
+    [["c",0.5,0.42,0.06]]],
+  music: [[[0.4,0.66],[0.4,0.3],[0.7,0.24],[0.7,0.6]],
+    [["c",0.335,0.68,0.07]], [["c",0.635,0.62,0.07]]],
+  settings: [[[0.32,0.24],[0.32,0.76]], [[0.5,0.24],[0.5,0.76]], [[0.68,0.24],[0.68,0.76]],
+    [["c",0.32,0.38,0.05]], [["c",0.5,0.62,0.05]], [["c",0.68,0.34,0.05]]],
+  notes: [[[0.28,0.24],[0.72,0.24],[0.72,0.78],[0.28,0.78],[0.28,0.24]],
+    [[0.36,0.38],[0.64,0.38]], [[0.36,0.5],[0.64,0.5]], [[0.36,0.62],[0.56,0.62]]],
+  cloud: [[["a",0.4,0.56,0.13,3.14,6.28]], [["a",0.6,0.52,0.15,3.5,6.28]],
+    [[0.27,0.68],[0.74,0.68]]],
+  heart: [[["a",0.38,0.42,0.135,3.14,6.0]], [["a",0.62,0.42,0.135,3.42,6.28]],
+    [[0.255,0.48],[0.5,0.75]], [[0.745,0.48],[0.5,0.75]]],
+  star: [[[0.5,0.22],[0.58,0.42],[0.79,0.42],[0.62,0.55],[0.69,0.76],[0.5,0.63],[0.31,0.76],[0.38,0.55],[0.21,0.42],[0.42,0.42],[0.5,0.22]]],
+  cart: [[[0.2,0.28],[0.3,0.28],[0.38,0.6],[0.72,0.6],[0.78,0.36],[0.34,0.36]],
+    [["c",0.42,0.71,0.045]], [["c",0.66,0.71,0.045]]],
+  plane: [[[0.24,0.6],[0.78,0.28],[0.52,0.74],[0.45,0.58],[0.24,0.6]],
+    [[0.45,0.58],[0.78,0.28]]],
+  coffee: [[[0.26,0.36],[0.66,0.36],[0.66,0.66],[0.6,0.74],[0.32,0.74],[0.26,0.66],[0.26,0.36]],
+    [["a",0.66,0.47,0.1,4.9,7.55]],
+    [[0.38,0.22],[0.38,0.29]], [[0.5,0.2],[0.5,0.29]]],
+  sun: [[["c",0.5,0.5,0.15]],
+    [[0.5,0.22],[0.5,0.29]], [[0.5,0.71],[0.5,0.78]], [[0.22,0.5],[0.29,0.5]], [[0.71,0.5],[0.78,0.5]],
+    [[0.31,0.31],[0.36,0.36]], [[0.69,0.31],[0.64,0.36]], [[0.31,0.69],[0.36,0.64]], [[0.69,0.69],[0.64,0.64]]],
+  moon: [[["a",0.5,0.5,0.28,1.2,4.6]], [["a",0.62,0.42,0.28,1.9,4.0]]],
+  game: [[[0.3,0.34],[0.7,0.34],[0.8,0.44],[0.8,0.6],[0.72,0.68],[0.62,0.6],[0.38,0.6],[0.28,0.68],[0.2,0.6],[0.2,0.44],[0.3,0.34]],
+    [[0.34,0.42],[0.34,0.54]], [[0.28,0.48],[0.4,0.48]],
+    [["c",0.62,0.44,0.025]], [["c",0.68,0.52,0.025]]],
+  pawn: [[["c",0.5,0.34,0.1]],
+    [[0.42,0.46],[0.58,0.46]], [[0.45,0.46],[0.39,0.68]], [[0.55,0.46],[0.61,0.68]],
+    [[0.33,0.74],[0.67,0.74]]],
+  book: [[[0.5,0.3],[0.5,0.72]],
+    [[0.5,0.3],[0.4,0.25],[0.24,0.27],[0.24,0.7],[0.4,0.68],[0.5,0.72]],
+    [[0.5,0.3],[0.6,0.25],[0.76,0.27],[0.76,0.7],[0.6,0.68],[0.5,0.72]]],
+  home: [[[0.22,0.5],[0.5,0.24],[0.78,0.5]],
+    [[0.3,0.46],[0.3,0.74],[0.7,0.74],[0.7,0.46]],
+    [[0.44,0.74],[0.44,0.58],[0.56,0.58],[0.56,0.74]]],
+  globe: [[["c",0.5,0.5,0.28]], [[0.22,0.5],[0.78,0.5]],
+    [["a",0.5,0.5,0.28,0,3.14]], [[0.5,0.22],[0.5,0.78]]],
+  play: [[[0.4,0.32],[0.72,0.5],[0.4,0.68],[0.4,0.32]]],
+  dollar: [[[0.62,0.34],[0.44,0.3],[0.36,0.38],[0.44,0.48],[0.58,0.52],[0.64,0.62],[0.54,0.7],[0.36,0.66]],
+    [[0.5,0.22],[0.5,0.78]]]
+};
+// Which glyph fits an app, by label keywords. Falls back to a letter tile.
+const VGLYPH_FOR = [
+  ["phone", "phone"], ["call", "phone"],
+  ["mail", "mail"], ["gmail", "mail"], ["outlook", "mail"],
+  ["calendar", "calendar"],
+  ["camera", "camera"], ["instagram", "camera"],
+  ["photo", "photo"],
+  ["message", "chat"], ["whatsapp", "chat"], ["messenger", "chat"], ["chat", "chat"],
+  ["discord", "chat"], ["telegram", "chat"], ["slack", "chat"], ["text", "chat"], ["snap", "chat"],
+  ["clock", "clock"], ["time", "clock"],
+  ["map", "map"], ["waze", "map"], ["uber", "map"], ["lyft", "map"],
+  ["music", "music"], ["spotify", "music"], ["pandora", "music"], ["soundcloud", "music"], ["tiktok", "music"], ["podcast", "music"],
+  ["setting", "settings"],
+  ["note", "notes"], ["notion", "notes"], ["reminder", "notes"], ["todo", "notes"],
+  ["cloud", "cloud"], ["drive", "cloud"], ["dropbox", "cloud"], ["weather", "cloud"],
+  ["health", "heart"], ["fit", "heart"], ["strava", "heart"], ["heart", "heart"], ["love", "heart"],
+  ["star", "star"], ["review", "star"],
+  ["shop", "cart"], ["amazon", "cart"], ["cart", "cart"], ["etsy", "cart"], ["ebay", "cart"],
+  ["target", "cart"], ["walmart", "cart"], ["store", "cart"],
+  ["plane", "plane"], ["travel", "plane"], ["airbnb", "plane"], ["flight", "plane"], ["fly", "plane"],
+  ["coffee", "coffee"], ["starbucks", "coffee"], ["dunkin", "coffee"],
+  ["sun", "sun"],
+  ["moon", "moon"], ["sleep", "moon"],
+  ["chess", "pawn"],
+  ["game", "game"], ["roblox", "game"], ["steam", "game"], ["minecraft", "game"], ["play station", "game"], ["xbox", "game"],
+  ["book", "book"], ["kindle", "book"], ["goodread", "book"], ["read", "book"],
+  ["home", "home"], ["house", "home"], ["zillow", "home"],
+  ["safari", "globe"], ["chrome", "globe"], ["browser", "globe"], ["web", "globe"], ["internet", "globe"],
+  ["youtube", "play"], ["netflix", "play"], ["hulu", "play"], ["video", "play"], ["tv", "play"], ["twitch", "play"], ["disney", "play"],
+  ["bank", "dollar"], ["venmo", "dollar"], ["cash", "dollar"], ["pay", "dollar"], ["robinhood", "dollar"], ["money", "dollar"], ["stock", "dollar"]
+];
+function vglyphFor(label) {
+  const lower = String(label || "").toLowerCase();
+  for (const pair of VGLYPH_FOR) {
+    if (lower.includes(pair[0])) return VGLYPHS[pair[1]];
+  }
+  return null;
+}
+function vglyphPoints(stroke) {
+  if (stroke.length && Array.isArray(stroke[0]) === false && stroke[0] === "c") stroke = [stroke];
+  const first = stroke[0];
+  if (Array.isArray(first) && (first[0] === "c" || first[0] === "a")) {
+    const [kind, cx, cy, r] = first;
+    const a0 = kind === "c" ? 0 : first[4];
+    const a1 = kind === "c" ? Math.PI * 2 : first[5];
+    const n = Math.max(10, Math.round(20 * Math.abs(a1 - a0) / Math.PI));
+    const pts = [];
+    for (let i = 0; i <= n; i++) {
+      const a = a0 + (a1 - a0) * (i / n);
+      pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+    return pts;
+  }
+  return stroke;
+}
+// Draw a glyph on a 2D canvas context, segment by segment.
+function drawVGlyph(x, strokes, cx, cy, sizePx, lineW, colorA, colorB) {
+  x.lineCap = "round";
+  x.lineJoin = "round";
+  x.lineWidth = lineW;
+  for (const stroke of strokes) {
+    const pts = vglyphPoints(stroke);
+    for (let i = 0; i < pts.length - 1; i++) {
+      const t = (pts[i][0] + pts[i][1] + pts[i + 1][0] + pts[i + 1][1]) / 4;
+      x.strokeStyle = colorB ? lerpHex(colorA, colorB, Math.min(1, Math.max(0, t))) : colorA;
+      x.beginPath();
+      x.moveTo(cx + (pts[i][0] - 0.5) * sizePx, cy + (pts[i][1] - 0.5) * sizePx);
+      x.lineTo(cx + (pts[i + 1][0] - 0.5) * sizePx, cy + (pts[i + 1][1] - 0.5) * sizePx);
+      x.stroke();
+    }
+  }
+}
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgbToHex(rgb) {
+  return "#" + rgb.map(function (v) {
+    return Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, "0");
+  }).join("");
+}
+function lerpHex(a, b, t) {
+  const pa = hexToRgb(a), pb = hexToRgb(b);
+  return rgbToHex([0, 1, 2].map(function (i) { return pa[i] + (pb[i] - pa[i]) * t; }));
+}
+
 const ICON_THEMES = {
   pastel: { name: "🌸 Pastel", colors: ["#FADCE4", "#DCEBFA", "#E8DFF5", "#FDEFD8", "#DFF5E8"], glyph: "#6B5B7A", line: false },
   line:   { name: "▫️ Line", colors: ["#FBFAF7"], glyph: "#33303B", line: true },
@@ -2775,7 +3107,30 @@ const ICON_THEMES = {
   retro:  { name: "🕹 Retro", colors: ["#1B1B2E"], glyph: "#FF6B6B", lineCycle: true,
             glyphCycle: ["#FF6B6B", "#FFD93D", "#6BCB77", "#4D96FF"] },
   candy:  { name: "🍬 Candy", colors: ["#FF9A9E", "#A18CD1", "#7FD8BE", "#F6C90E", "#8FD3F4"], glyph: "#FFFFFF", radius: 0.3 },
-  basic:  { name: "😀 Basic (emoji)", colors: ["#3A3A44"], glyph: "#FFFFFF", emojiTile: true }
+  basic:  { name: "😀 Basic (emoji)", colors: ["#3A3A44"], glyph: "#FFFFFF", emojiTile: true },
+  onyx:   { name: "⬛ Onyx Outline", colors: ["#1C1C22"], glyph: "#F4F4F6", glyphStyle: "line", neu: true, radius: 0.28 },
+  doodle: { name: "🪄 Neon Doodle", colors: ["#241038"], glyph: "#FF2E92", glyphStyle: "line",
+            gradStroke: ["#FF2E92", "#27C4F5"], dots: true, radius: 0.22 },
+  treats: { name: "🧁 Patisserie", colors: ["#C2D6C4", "#7C9791", "#F8CBB0", "#F1E8DC"],
+            glyph: "#2E2B28", wordColors: ["#2E2B28", "#F1E8DC", "#5A4232", "#8A5A3B"],
+            wordTile: true, wordFont: "Baskerville, Georgia, serif", radius: 0.24 },
+  creams: { name: "🍦 Cream Script", colors: ["#FBEFE6", "#FDE5D8"], glyph: "#B96F2D",
+            wordTile: true, script: true, wordStyle: "script",
+            wordFont: "'Snell Roundhand', 'Brush Script MT', cursive", radius: 0.24 }
+};
+ICON_THEMES.treats.wordStyle = "baskerville";
+// Search tags for the Explore page (every style gets a vibe vocabulary).
+const ICON_TAGS = {
+  pastel: ["cute", "soft", "pastel", "light"], line: ["minimal", "light", "line", "clean"],
+  noir: ["dark", "minimal", "clean"], zen: ["zen", "natural", "soft", "pastel"],
+  neon: ["neon", "dark", "bold"], duo: ["bold", "colorful", "gradient", "dark"],
+  frost: ["glass", "minimal", "clean"], retro: ["retro", "dark", "bold", "colorful"],
+  candy: ["cute", "colorful", "bold", "pastel"], basic: ["simple", "emoji"],
+  onyx: ["dark", "minimal", "line", "clean", "aesthetic"],
+  doodle: ["neon", "cute", "dark", "gradient", "doodle", "aesthetic"],
+  treats: ["pastel", "cute", "aesthetic", "words", "soft", "cottage"],
+  creams: ["boho", "words", "minimal", "script", "aesthetic", "light", "cream"],
+  mono: ["gradient", "minimal", "bold", "monogram"], ringmono: ["dark", "minimal", "monogram"]
 };
 // Themed tiles use clean letter monograms; only Basic keeps the emoji.
 function iconGlyph(app, themeName) {
@@ -2795,6 +3150,104 @@ function packIconFor(themeName, index) {
   const pack = iconPacks.find(function (p) { return "pack:" + p.id === themeName; });
   if (!pack || !pack.icons.length) return null;
   return pack.icons[index % pack.icons.length];
+}
+// Canvas tile painter — one code path for every theme at every size: the
+// Explore sheets, glyph/word theme previews, and (at 1024px, full bleed)
+// the App Icon Maker.
+function paintThemeTile(x, S, app, themeName, index, fullBleed) {
+  const theme = ICON_THEMES[themeName];
+  const bg = theme.colors[index % theme.colors.length];
+  const r = fullBleed ? 0 : S * (theme.radius || 0.24);
+  x.save();
+  x.beginPath();
+  if (r > 0 && x.roundRect) x.roundRect(0, 0, S, S, r); else x.rect(0, 0, S, S);
+  x.clip();
+  x.fillStyle = theme.frost ? "rgba(255,255,255,.25)" : bg;
+  x.fillRect(0, 0, S, S);
+  if (theme.neu) {
+    // Soft top-light bevel — reads as the puffy neumorphic tile.
+    const g = x.createLinearGradient(0, 0, 0, S);
+    g.addColorStop(0, "rgba(255,255,255,.10)");
+    g.addColorStop(0.25, "rgba(255,255,255,.02)");
+    g.addColorStop(1, "rgba(0,0,0,.28)");
+    x.fillStyle = g;
+    x.fillRect(0, 0, S, S);
+  }
+  if (theme.duo) {
+    const b = theme.duo[index % theme.duo.length];
+    const rg = x.createRadialGradient(S * 0.65, S * 0.65, 0, S * 0.65, S * 0.65, S * 0.42);
+    rg.addColorStop(0, b);
+    rg.addColorStop(1, hexToRgba(b, 0));
+    x.fillStyle = rg;
+    x.fillRect(0, 0, S, S);
+  }
+  const glyphColor = theme.glyphCycle ? theme.glyphCycle[index % theme.glyphCycle.length] : theme.glyph;
+  if (theme.line || theme.lineCycle || theme.frost) {
+    const inset = S * 0.05;
+    x.strokeStyle = theme.lineCycle ? glyphColor : (theme.frost ? "rgba(255,255,255,.5)" : theme.glyph);
+    x.lineWidth = Math.max(1, S * 0.03);
+    x.beginPath();
+    if (x.roundRect) x.roundRect(inset, inset, S - 2 * inset, S - 2 * inset, Math.max(0, (r || S * 0.16) - inset));
+    else x.rect(inset, inset, S - 2 * inset, S - 2 * inset);
+    x.stroke();
+  }
+  if (theme.dots) {
+    const spots = [[0.18, 0.2], [0.84, 0.22], [0.14, 0.72], [0.84, 0.8], [0.3, 0.88]];
+    spots.forEach(function (spot, i) {
+      x.fillStyle = (i + index) % 2 ? "#27C4F5" : "#FF2E92";
+      x.beginPath();
+      x.arc(spot[0] * S, spot[1] * S, Math.max(1.2, S * 0.02), 0, Math.PI * 2);
+      x.fill();
+    });
+  }
+  if (theme.wordTile) {
+    const word = String(app.label || "App").trim() || "App";
+    const fs = Math.min(S * 0.3, (S * 0.8) / (word.length * 0.48));
+    x.fillStyle = theme.wordColors ? theme.wordColors[index % theme.wordColors.length] : theme.glyph;
+    x.font = (theme.script ? "400 " : "500 ") + Math.round(fs) + "px " + theme.wordFont;
+    x.textAlign = "center";
+    x.textBaseline = "middle";
+    x.fillText(word, S / 2, S * 0.53);
+  } else if (theme.glyphStyle === "line") {
+    const strokes = vglyphFor(app.label);
+    const gA = theme.gradStroke ? theme.gradStroke[0] : glyphColor;
+    const gB = theme.gradStroke ? theme.gradStroke[1] : null;
+    if (strokes) {
+      drawVGlyph(x, strokes, S / 2, S / 2, S * 0.92, Math.max(1.4, S * 0.045), gA, gB);
+    } else {
+      const letter = (app.label || "A").trim().charAt(0).toLowerCase();
+      x.fillStyle = gA;
+      x.font = "300 " + Math.round(S * 0.48) + "px Georgia, 'Times New Roman', serif";
+      x.textAlign = "center";
+      x.textBaseline = "middle";
+      x.fillText(letter, S / 2, S * 0.52);
+    }
+  } else {
+    const glyph = iconGlyph(app, themeName);
+    x.fillStyle = glyphColor;
+    x.font = (theme.emojiTile ? "400 " : "700 ") + Math.round(S * (theme.emojiTile ? 0.5 : 0.42)) +
+      "px -apple-system, 'Segoe UI Emoji', sans-serif";
+    x.textAlign = "center";
+    x.textBaseline = "middle";
+    x.fillText(glyph, S / 2, S * 0.54);
+  }
+  x.restore();
+}
+const tileCache = {};
+function themeTilePng(app, themeName, index, px) {
+  const key = themeName + "|" + (app.label || "") + "|" + (index % 8) + "|" + px;
+  if (tileCache[key]) return tileCache[key];
+  const c = document.createElement("canvas");
+  c.width = px; c.height = px;
+  paintThemeTile(c.getContext("2d"), px, app, themeName, index, false);
+  const url = c.toDataURL("image/png");
+  tileCache[key] = url;
+  return url;
+}
+// Themes whose look needs real drawing (CSS letter tiles can't show them).
+function themeNeedsCanvas(themeName) {
+  const theme = ICON_THEMES[themeName];
+  return !!(theme && (theme.glyphStyle || theme.wordTile || theme.neu || theme.dots));
 }
 // HTML tile for a themed launcher icon (mirrors themedIconTile in the template).
 function themedIconCss(themeName, index, sizePx) {
@@ -3888,6 +4341,9 @@ function designPreviewHTML(design, sizeKey) {
         const packIcon = packIconFor(style.iconTheme, j);
         if (packIcon) {
           cellIcon = '<div class="launch-icon" style="' + iconCss + '"><img src="' + packIcon + '" alt=""></div>';
+        } else if (style.iconTheme !== "real" && themeNeedsCanvas(style.iconTheme)) {
+          cellIcon = '<img src="' + themeTilePng(app, style.iconTheme, j, Math.round(style.iconSize * 2)) +
+            '" style="width:' + style.iconSize + 'px;height:' + style.iconSize + 'px;display:block" alt="">';
         } else if (style.iconTheme !== "real" && ICON_THEMES[style.iconTheme]) {
           cellIcon = '<div style="' + themedIconCss(style.iconTheme, j, style.iconSize) + '">' + esc(iconGlyph(app, style.iconTheme)) + '</div>';
         } else {
@@ -4079,6 +4535,12 @@ function renderFreestyleInto(node, design, w, h, interactive) {
         img.src = packIcon;
         img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block";
         iconBox.appendChild(img);
+      } else if (el.iconTheme && themeNeedsCanvas(el.iconTheme)) {
+        iconBox.style.cssText = "width:" + pt + "px;height:" + pt + "px;margin:0 auto;pointer-events:none";
+        const tileImg = document.createElement("img");
+        tileImg.src = themeTilePng(el, el.iconTheme, Math.max(0, appIdx), Math.round(pt * 2));
+        tileImg.style.cssText = "width:100%;height:100%;display:block";
+        iconBox.appendChild(tileImg);
       } else if (el.iconTheme && ICON_THEMES[el.iconTheme]) {
         iconBox.style.cssText = themedIconCss(el.iconTheme, Math.max(0, appIdx), pt) + ";margin:0 auto;pointer-events:none";
         iconBox.textContent = iconGlyph(el, el.iconTheme);
@@ -8812,25 +9274,9 @@ function drawHomeIcon(app, styleName, index) {
     x.fillText(letter, S / 2, S * 0.53);
     return c.toDataURL("image/png");
   }
-  const theme = ICON_THEMES[styleName];
-  x.fillStyle = theme.colors[index % theme.colors.length];
-  x.fillRect(0, 0, S, S);
-  if (theme.line) {
-    x.strokeStyle = theme.glyph;
-    x.lineWidth = S * 0.028;
-    const inset = S * 0.09, r = S * 0.16;
-    x.beginPath();
-    if (x.roundRect) x.roundRect(inset, inset, S - 2 * inset, S - 2 * inset, r);
-    else x.rect(inset, inset, S - 2 * inset, S - 2 * inset);
-    x.stroke();
-  }
-  const glyph = iconGlyph(app);
-  const glyphColor = theme.glyphCycle ? theme.glyphCycle[index % theme.glyphCycle.length] : theme.glyph;
-  x.fillStyle = glyphColor;
-  x.font = "700 " + Math.round(S * 0.42) + "px -apple-system, 'Segoe UI Emoji', sans-serif";
-  x.textAlign = "center";
-  x.textBaseline = "middle";
-  x.fillText(glyph, S / 2, S * 0.54);
+  // Every ICON_THEMES style renders through the shared tile painter,
+  // full-bleed (iOS rounds Home Screen icons itself).
+  paintThemeTile(x, S, app, styleName, index, true);
   return c.toDataURL("image/png");
 }
 // Editor sub-tabs: the widget editor and the App Icon Maker share the tab.
@@ -9005,7 +9451,8 @@ document.getElementById("bulkIconInput").onchange = async function (event) {
   saveIconPacks();
   renderMyIconPacks();
   renderAll();
-  toast("📁 “" + name + "” saved (" + icons.length + " icons) — it's now in every icon style picker");
+  if (typeof renderExplore === "function") renderExplore();
+  toast("📁 “" + name + "” saved (" + icons.length + " icons) — it's now in every icon style picker and on Explore");
 };
 function renderMyIconPacks() {
   const box = document.getElementById("myIconPacks");
@@ -9034,6 +9481,99 @@ function renderMyIconPacks() {
   });
 }
 renderMyIconPacks();
+
+// ==================== Explore: icon style gallery ====================
+// Every style rendered as a real sample sheet (like the packs people browse
+// on Etsy/Pinterest), searchable by name and vibe tags.
+const EXPLORE_SAMPLES = [
+  { label: "Phone" }, { label: "Camera" }, { label: "Messages" }, { label: "Music" },
+  { label: "Calendar" }, { label: "Maps" }, { label: "Mail" }, { label: "Clock" }
+];
+let exploreTag = "all";
+const EXPLORE_TAG_CHIPS = [["all", "✨ All"], ["dark", "🌑 Dark"], ["minimal", "▫️ Minimal"],
+  ["cute", "🎀 Cute"], ["pastel", "🌸 Pastel"], ["neon", "⚡ Neon"], ["bold", "🔥 Bold"],
+  ["words", "🔤 Words"], ["aesthetic", "🖼 Aesthetic"], ["retro", "🕹 Retro"]];
+function exploreEntries() {
+  const entries = [];
+  const names = { mono: "🅰️ Monogram", ringmono: "⭕ Ring letter" };
+  for (const id of Object.keys(ICON_THEMES).concat(["mono", "ringmono"])) {
+    entries.push({ id: id, name: names[id] || ICON_THEMES[id].name, tags: ICON_TAGS[id] || [] });
+  }
+  for (const pack of iconPacks) {
+    entries.push({ id: "pack:" + pack.id, name: "📁 " + pack.name, tags: ["custom", "mine"], pack: pack });
+  }
+  return entries;
+}
+function renderExplore() {
+  const tagRow = document.getElementById("exploreTags");
+  tagRow.innerHTML = "";
+  for (const [value, label] of EXPLORE_TAG_CHIPS) {
+    const chip = document.createElement("button");
+    chip.textContent = label;
+    chip.className = exploreTag === value ? "sel" : "";
+    chip.onclick = function () { exploreTag = value; renderExplore(); };
+    tagRow.appendChild(chip);
+  }
+  const list = document.getElementById("exploreList");
+  list.innerHTML = "";
+  const query = document.getElementById("exploreSearch").value.trim().toLowerCase();
+  const shown = exploreEntries().filter(function (entry) {
+    if (exploreTag !== "all" && entry.tags.indexOf(exploreTag) < 0) return false;
+    if (!query) return true;
+    return (entry.name + " " + entry.tags.join(" ")).toLowerCase().includes(query);
+  });
+  if (!shown.length) {
+    list.innerHTML = '<p class="hint">No styles match — try another word, or upload your own pack in Editor → App icons.</p>';
+    return;
+  }
+  for (const entry of shown) {
+    const card = document.createElement("div");
+    card.style.cssText = "background:var(--card2);border-radius:16px;padding:12px;margin-bottom:10px;cursor:pointer";
+    const head = document.createElement("div");
+    head.style.cssText = "display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px";
+    const title = document.createElement("div");
+    title.textContent = entry.name;
+    title.style.cssText = "font-weight:700;font-size:14px";
+    const tags = document.createElement("div");
+    tags.style.cssText = "font-size:10px;color:var(--muted);text-align:right";
+    tags.textContent = entry.tags.slice(0, 4).join(" · ");
+    head.append(title, tags);
+    card.appendChild(head);
+    const sheet = document.createElement("div");
+    sheet.style.cssText = "display:grid;grid-template-columns:repeat(4,1fr);gap:8px";
+    EXPLORE_SAMPLES.forEach(function (app, index) {
+      const img = document.createElement("img");
+      if (entry.pack) {
+        img.src = entry.pack.icons[index % entry.pack.icons.length];
+      } else if (entry.id === "mono" || entry.id === "ringmono") {
+        img.src = drawHomeIcon(app, entry.id, index);
+      } else {
+        img.src = themeTilePng(app, entry.id, index, 112);
+      }
+      img.style.cssText = "width:100%;aspect-ratio:1;border-radius:14px;display:block";
+      img.loading = "lazy";
+      sheet.appendChild(img);
+    });
+    card.appendChild(sheet);
+    card.onclick = function () {
+      if (entry.pack) {
+        iconMakerApps.forEach(function (app, i) { if (entry.pack.icons[i]) app.customB64 = entry.pack.icons[i]; });
+      } else {
+        iconMakerStyle = entry.id;
+        iconMakerApps.forEach(function (app) { delete app.customB64; });
+      }
+      editorSubTab = "icons";
+      localStorage.setItem("widgetking.editorsub", "icons");
+      switchTab("editor");
+      applyEditorSubTab();
+      renderIconMaker();
+      toast("🎨 " + entry.name + " applied — your apps, this style. Long-press icons to save them.");
+    };
+    list.appendChild(card);
+  }
+}
+document.getElementById("exploreSearch").oninput = renderExplore;
+renderExplore();
 
 // ==================== Auto Shortcut Guide ====================
 // Reads every saved widget and lists what each app button does on tap, plus

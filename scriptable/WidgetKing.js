@@ -29,7 +29,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 57;
+const WK_VERSION = 58;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -1269,8 +1269,149 @@ const ICON_THEMES = {
   retro:  { colors: ["#1B1B2E"], glyph: "#FF6B6B", lineCycle: true,
             glyphCycle: ["#FF6B6B", "#FFD93D", "#6BCB77", "#4D96FF"] },
   candy:  { colors: ["#FF9A9E", "#A18CD1", "#7FD8BE", "#F6C90E", "#8FD3F4"], glyph: "#FFFFFF", radius: 0.3 },
-  basic:  { colors: ["#3A3A44"], glyph: "#FFFFFF", emojiTile: true }
+  basic:  { colors: ["#3A3A44"], glyph: "#FFFFFF", emojiTile: true },
+  onyx:   { colors: ["#1C1C22"], glyph: "#F4F4F6", glyphStyle: "line", radius: 0.28 },
+  doodle: { colors: ["#241038"], glyph: "#FF2E92", glyphStyle: "line",
+            gradStroke: ["#FF2E92", "#27C4F5"], dots: true, radius: 0.22 },
+  treats: { colors: ["#C2D6C4", "#7C9791", "#F8CBB0", "#F1E8DC"],
+            glyph: "#2E2B28", wordColors: ["#2E2B28", "#F1E8DC", "#5A4232", "#8A5A3B"],
+            wordTile: true, wordStyle: "baskerville", radius: 0.24 },
+  creams: { colors: ["#FBEFE6", "#FDE5D8"], glyph: "#B96F2D",
+            wordTile: true, wordStyle: "script", radius: 0.24 }
 };
+// Vector line glyphs (mirrors the designer's VGLYPHS — normalized strokes;
+// ["c",cx,cy,r] circles and ["a",cx,cy,r,a0,a1] arcs expand to segments).
+const VGLYPHS = {
+  phone: [[["a",0.317,0.223,0.52,0.25,1.69]], [["a",0.351,0.273,0.26,0.05,1.89]],
+    [[0.821,0.352],[0.611,0.286]], [[0.255,0.739],[0.270,0.520]]],
+  mail: [[[0.2,0.32],[0.8,0.32],[0.8,0.68],[0.2,0.68],[0.2,0.32]],
+    [[0.2,0.34],[0.5,0.55],[0.8,0.34]]],
+  calendar: [[[0.22,0.3],[0.78,0.3],[0.78,0.76],[0.22,0.76],[0.22,0.3]],
+    [[0.22,0.43],[0.78,0.43]], [[0.36,0.22],[0.36,0.34]], [[0.64,0.22],[0.64,0.34]],
+    [["c",0.37,0.55,0.02]], [["c",0.5,0.55,0.02]], [["c",0.63,0.55,0.02]],
+    [["c",0.37,0.66,0.02]], [["c",0.5,0.66,0.02]]],
+  camera: [[[0.2,0.36],[0.36,0.36],[0.41,0.28],[0.59,0.28],[0.64,0.36],[0.8,0.36],[0.8,0.74],[0.2,0.74],[0.2,0.36]],
+    [["c",0.5,0.55,0.115]]],
+  photo: [[[0.21,0.27],[0.79,0.27],[0.79,0.73],[0.21,0.73],[0.21,0.27]],
+    [[0.25,0.67],[0.42,0.5],[0.54,0.61],[0.64,0.51],[0.75,0.62]],
+    [["c",0.36,0.4,0.045]]],
+  chat: [[[0.3,0.28],[0.7,0.28],[0.78,0.36],[0.78,0.54],[0.7,0.62],[0.46,0.62],[0.32,0.74],[0.34,0.62],[0.3,0.62],[0.22,0.54],[0.22,0.36],[0.3,0.28]]],
+  clock: [[["c",0.5,0.5,0.3]], [[0.5,0.5],[0.5,0.33]], [[0.5,0.5],[0.63,0.58]]],
+  map: [[["a",0.5,0.42,0.17,3.32,6.1]],
+    [[0.663,0.475],[0.5,0.78]], [[0.337,0.475],[0.5,0.78]],
+    [["c",0.5,0.42,0.06]]],
+  music: [[[0.4,0.66],[0.4,0.3],[0.7,0.24],[0.7,0.6]],
+    [["c",0.335,0.68,0.07]], [["c",0.635,0.62,0.07]]],
+  settings: [[[0.32,0.24],[0.32,0.76]], [[0.5,0.24],[0.5,0.76]], [[0.68,0.24],[0.68,0.76]],
+    [["c",0.32,0.38,0.05]], [["c",0.5,0.62,0.05]], [["c",0.68,0.34,0.05]]],
+  notes: [[[0.28,0.24],[0.72,0.24],[0.72,0.78],[0.28,0.78],[0.28,0.24]],
+    [[0.36,0.38],[0.64,0.38]], [[0.36,0.5],[0.64,0.5]], [[0.36,0.62],[0.56,0.62]]],
+  cloud: [[["a",0.4,0.56,0.13,3.14,6.28]], [["a",0.6,0.52,0.15,3.5,6.28]],
+    [[0.27,0.68],[0.74,0.68]]],
+  heart: [[["a",0.38,0.42,0.135,3.14,6.0]], [["a",0.62,0.42,0.135,3.42,6.28]],
+    [[0.255,0.48],[0.5,0.75]], [[0.745,0.48],[0.5,0.75]]],
+  star: [[[0.5,0.22],[0.58,0.42],[0.79,0.42],[0.62,0.55],[0.69,0.76],[0.5,0.63],[0.31,0.76],[0.38,0.55],[0.21,0.42],[0.42,0.42],[0.5,0.22]]],
+  cart: [[[0.2,0.28],[0.3,0.28],[0.38,0.6],[0.72,0.6],[0.78,0.36],[0.34,0.36]],
+    [["c",0.42,0.71,0.045]], [["c",0.66,0.71,0.045]]],
+  plane: [[[0.24,0.6],[0.78,0.28],[0.52,0.74],[0.45,0.58],[0.24,0.6]],
+    [[0.45,0.58],[0.78,0.28]]],
+  coffee: [[[0.26,0.36],[0.66,0.36],[0.66,0.66],[0.6,0.74],[0.32,0.74],[0.26,0.66],[0.26,0.36]],
+    [["a",0.66,0.47,0.1,4.9,7.55]],
+    [[0.38,0.22],[0.38,0.29]], [[0.5,0.2],[0.5,0.29]]],
+  sun: [[["c",0.5,0.5,0.15]],
+    [[0.5,0.22],[0.5,0.29]], [[0.5,0.71],[0.5,0.78]], [[0.22,0.5],[0.29,0.5]], [[0.71,0.5],[0.78,0.5]],
+    [[0.31,0.31],[0.36,0.36]], [[0.69,0.31],[0.64,0.36]], [[0.31,0.69],[0.36,0.64]], [[0.69,0.69],[0.64,0.64]]],
+  moon: [[["a",0.5,0.5,0.28,1.2,4.6]], [["a",0.62,0.42,0.28,1.9,4.0]]],
+  game: [[[0.3,0.34],[0.7,0.34],[0.8,0.44],[0.8,0.6],[0.72,0.68],[0.62,0.6],[0.38,0.6],[0.28,0.68],[0.2,0.6],[0.2,0.44],[0.3,0.34]],
+    [[0.34,0.42],[0.34,0.54]], [[0.28,0.48],[0.4,0.48]],
+    [["c",0.62,0.44,0.025]], [["c",0.68,0.52,0.025]]],
+  pawn: [[["c",0.5,0.34,0.1]],
+    [[0.42,0.46],[0.58,0.46]], [[0.45,0.46],[0.39,0.68]], [[0.55,0.46],[0.61,0.68]],
+    [[0.33,0.74],[0.67,0.74]]],
+  book: [[[0.5,0.3],[0.5,0.72]],
+    [[0.5,0.3],[0.4,0.25],[0.24,0.27],[0.24,0.7],[0.4,0.68],[0.5,0.72]],
+    [[0.5,0.3],[0.6,0.25],[0.76,0.27],[0.76,0.7],[0.6,0.68],[0.5,0.72]]],
+  home: [[[0.22,0.5],[0.5,0.24],[0.78,0.5]],
+    [[0.3,0.46],[0.3,0.74],[0.7,0.74],[0.7,0.46]],
+    [[0.44,0.74],[0.44,0.58],[0.56,0.58],[0.56,0.74]]],
+  globe: [[["c",0.5,0.5,0.28]], [[0.22,0.5],[0.78,0.5]],
+    [["a",0.5,0.5,0.28,0,3.14]], [[0.5,0.22],[0.5,0.78]]],
+  play: [[[0.4,0.32],[0.72,0.5],[0.4,0.68],[0.4,0.32]]],
+  dollar: [[[0.62,0.34],[0.44,0.3],[0.36,0.38],[0.44,0.48],[0.58,0.52],[0.64,0.62],[0.54,0.7],[0.36,0.66]],
+    [[0.5,0.22],[0.5,0.78]]]
+};
+const VGLYPH_FOR = [
+  ["phone", "phone"], ["call", "phone"],
+  ["mail", "mail"], ["gmail", "mail"], ["outlook", "mail"],
+  ["calendar", "calendar"],
+  ["camera", "camera"], ["instagram", "camera"],
+  ["photo", "photo"],
+  ["message", "chat"], ["whatsapp", "chat"], ["messenger", "chat"], ["chat", "chat"],
+  ["discord", "chat"], ["telegram", "chat"], ["slack", "chat"], ["text", "chat"], ["snap", "chat"],
+  ["clock", "clock"], ["time", "clock"],
+  ["map", "map"], ["waze", "map"], ["uber", "map"], ["lyft", "map"],
+  ["music", "music"], ["spotify", "music"], ["pandora", "music"], ["soundcloud", "music"], ["tiktok", "music"], ["podcast", "music"],
+  ["setting", "settings"],
+  ["note", "notes"], ["notion", "notes"], ["reminder", "notes"], ["todo", "notes"],
+  ["cloud", "cloud"], ["drive", "cloud"], ["dropbox", "cloud"], ["weather", "cloud"],
+  ["health", "heart"], ["fit", "heart"], ["strava", "heart"], ["heart", "heart"], ["love", "heart"],
+  ["star", "star"], ["review", "star"],
+  ["shop", "cart"], ["amazon", "cart"], ["cart", "cart"], ["etsy", "cart"], ["ebay", "cart"],
+  ["target", "cart"], ["walmart", "cart"], ["store", "cart"],
+  ["plane", "plane"], ["travel", "plane"], ["airbnb", "plane"], ["flight", "plane"], ["fly", "plane"],
+  ["coffee", "coffee"], ["starbucks", "coffee"], ["dunkin", "coffee"],
+  ["sun", "sun"],
+  ["moon", "moon"], ["sleep", "moon"],
+  ["chess", "pawn"],
+  ["game", "game"], ["roblox", "game"], ["steam", "game"], ["minecraft", "game"], ["play station", "game"], ["xbox", "game"],
+  ["book", "book"], ["kindle", "book"], ["goodread", "book"], ["read", "book"],
+  ["home", "home"], ["house", "home"], ["zillow", "home"],
+  ["safari", "globe"], ["chrome", "globe"], ["browser", "globe"], ["web", "globe"], ["internet", "globe"],
+  ["youtube", "play"], ["netflix", "play"], ["hulu", "play"], ["video", "play"], ["tv", "play"], ["twitch", "play"], ["disney", "play"],
+  ["bank", "dollar"], ["venmo", "dollar"], ["cash", "dollar"], ["pay", "dollar"], ["robinhood", "dollar"], ["money", "dollar"], ["stock", "dollar"]
+];
+function vglyphFor(label) {
+  const lower = String(label || "").toLowerCase();
+  for (const pair of VGLYPH_FOR) {
+    if (lower.indexOf(pair[0]) >= 0) return VGLYPHS[pair[1]];
+  }
+  return null;
+}
+function vglyphPoints(stroke) {
+  const first = stroke[0];
+  if (Array.isArray(first) && (first[0] === "c" || first[0] === "a")) {
+    const cx = first[1], cy = first[2], r = first[3];
+    const a0 = first[0] === "c" ? 0 : first[4];
+    const a1 = first[0] === "c" ? Math.PI * 2 : first[5];
+    const n = Math.max(10, Math.round(20 * Math.abs(a1 - a0) / Math.PI));
+    const pts = [];
+    for (let i = 0; i <= n; i++) {
+      const a = a0 + (a1 - a0) * (i / n);
+      pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+    return pts;
+  }
+  return stroke;
+}
+function vlerpHex(a, b, t) {
+  const pa = hexToRgb(a), pb = hexToRgb(b);
+  return rgbToHex([0, 1, 2].map(function (i) { return pa[i] + (pb[i] - pa[i]) * t; }));
+}
+function strokeVGlyph(ctx, strokes, cx, cy, sizePx, lineW, colorA, colorB) {
+  ctx.setLineWidth(lineW);
+  for (const stroke of strokes) {
+    const pts = vglyphPoints(stroke);
+    for (let i = 0; i < pts.length - 1; i++) {
+      const t = (pts[i][0] + pts[i][1] + pts[i + 1][0] + pts[i + 1][1]) / 4;
+      ctx.setStrokeColor(new Color(colorB ? vlerpHex(colorA, colorB, Math.min(1, Math.max(0, t))) : colorA));
+      const p = new Path();
+      p.move(new Point(cx + (pts[i][0] - 0.5) * sizePx, cy + (pts[i][1] - 0.5) * sizePx));
+      p.addLine(new Point(cx + (pts[i + 1][0] - 0.5) * sizePx, cy + (pts[i + 1][1] - 0.5) * sizePx));
+      ctx.addPath(p);
+      ctx.strokePath();
+    }
+  }
+}
 // Themed tiles use clean letter monograms; only the Basic theme (and the
 // untinted fallback) keeps the app's emoji.
 function iconGlyph(app, themeName) {
@@ -1311,6 +1452,38 @@ function themedIconTile(app, themeName, index, pt) {
     ctx.setStrokeColor(new Color(strokeColor, theme.frost ? 0.5 : 1));
     ctx.setLineWidth(Math.max(2, Math.round(S * 0.03)));
     ctx.strokePath();
+  }
+  if (theme.dots) {
+    const spots = [[0.2, 0.2], [0.82, 0.24], [0.16, 0.7], [0.8, 0.78], [0.3, 0.86]];
+    for (let d = 0; d < spots.length; d++) {
+      ctx.setFillColor(new Color((d + index) % 2 ? "#27C4F5" : "#FF2E92"));
+      const dr = Math.max(1.5, S * 0.02);
+      ctx.fillEllipse(new Rect(spots[d][0] * S - dr, spots[d][1] * S - dr, dr * 2, dr * 2));
+    }
+  }
+  if (theme.wordTile) {
+    const word = String(app.label || "App").trim() || "App";
+    const fs = Math.min(S * 0.3, (S * 0.8) / (word.length * 0.48));
+    const wc = theme.wordColors ? theme.wordColors[index % theme.wordColors.length] : theme.glyph;
+    ctx.setTextColor(new Color(wc));
+    ctx.setFont(fontFor(theme.wordStyle || "serif", Math.round(fs), false));
+    ctx.setTextAlignedCenter();
+    ctx.drawTextInRect(word, new Rect(0, S * 0.5 - fs * 0.72, S, fs * 1.5));
+    return ctx.getImage();
+  }
+  if (theme.glyphStyle === "line") {
+    const strokes = vglyphFor(app.label);
+    const gA = theme.gradStroke ? theme.gradStroke[0] : glyphColor;
+    const gB = theme.gradStroke ? theme.gradStroke[1] : null;
+    if (strokes) {
+      strokeVGlyph(ctx, strokes, S / 2, S / 2, S * 0.92, Math.max(2, S * 0.045), gA, gB);
+    } else {
+      ctx.setTextColor(new Color(gA));
+      ctx.setFont(fontFor("serif", Math.round(S * 0.46), false));
+      ctx.setTextAlignedCenter();
+      ctx.drawTextInRect((app.label || "A").trim().charAt(0).toLowerCase(), new Rect(0, S * 0.2, S, S * 0.64));
+    }
+    return ctx.getImage();
   }
   const glyph = iconGlyph(app, themeName);
   ctx.setTextColor(new Color(glyphColor));
