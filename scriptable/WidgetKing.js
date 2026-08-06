@@ -29,7 +29,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 58;
+const WK_VERSION = 59;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -1277,7 +1277,15 @@ const ICON_THEMES = {
             glyph: "#2E2B28", wordColors: ["#2E2B28", "#F1E8DC", "#5A4232", "#8A5A3B"],
             wordTile: true, wordStyle: "baskerville", radius: 0.24 },
   creams: { colors: ["#FBEFE6", "#FDE5D8"], glyph: "#B96F2D",
-            wordTile: true, wordStyle: "script", radius: 0.24 }
+            wordTile: true, wordStyle: "script", radius: 0.24 },
+  arcade: { colors: ["#221452"], glyphStyle: "line",
+            glyph: "#FF3EA5", glyphCycle: ["#FF3EA5", "#FFD60A", "#29D9F5", "#4DE94C", "#FF7A00"], radius: 0.22 },
+  neonsign: { colors: ["#0B0B0D"], glyphStyle: "line", glow: true,
+            glyph: "#FFE83D", glyphCycle: ["#FFE83D", "#FF3EA5", "#29F5E3", "#C77DFF"], radius: 0.24 },
+  latte: { colors: ["#D9C7A9", "#D3BF9E"], glyph: "#FFFFFF",
+            glyphStyle: "line", thick: true, radius: 0.3 },
+  inkring: { colors: ["#0B0B0B"], glyph: "#FFFFFF",
+            glyphStyle: "line", ring: true, radius: 0.24 }
 };
 // Vector line glyphs (mirrors the designer's VGLYPHS — normalized strokes;
 // ["c",cx,cy,r] circles and ["a",cx,cy,r,a0,a1] arcs expand to segments).
@@ -1302,8 +1310,21 @@ const VGLYPHS = {
     [["c",0.5,0.42,0.06]]],
   music: [[[0.4,0.66],[0.4,0.3],[0.7,0.24],[0.7,0.6]],
     [["c",0.335,0.68,0.07]], [["c",0.635,0.62,0.07]]],
-  settings: [[[0.32,0.24],[0.32,0.76]], [[0.5,0.24],[0.5,0.76]], [[0.68,0.24],[0.68,0.76]],
+  sliders: [[[0.32,0.24],[0.32,0.76]], [[0.5,0.24],[0.5,0.76]], [[0.68,0.24],[0.68,0.76]],
     [["c",0.32,0.38,0.05]], [["c",0.5,0.62,0.05]], [["c",0.68,0.34,0.05]]],
+  gear: [[["c",0.5,0.5,0.13]], [["c",0.5,0.5,0.24]],
+    [[0.5,0.2],[0.5,0.27]], [[0.5,0.73],[0.5,0.8]], [[0.2,0.5],[0.27,0.5]], [[0.73,0.5],[0.8,0.5]],
+    [[0.29,0.29],[0.34,0.34]], [[0.71,0.29],[0.66,0.34]], [[0.29,0.71],[0.34,0.66]], [[0.71,0.71],[0.66,0.66]]],
+  headphones: [[["a",0.5,0.54,0.28,3.14,6.28]],
+    [[0.22,0.54],[0.3,0.54],[0.3,0.72],[0.22,0.72],[0.22,0.54]],
+    [[0.78,0.54],[0.7,0.54],[0.7,0.72],[0.78,0.72],[0.78,0.54]]],
+  diamond: [[[0.3,0.38],[0.42,0.26],[0.58,0.26],[0.7,0.38],[0.5,0.74],[0.3,0.38]],
+    [[0.3,0.38],[0.7,0.38]], [[0.42,0.26],[0.45,0.38],[0.5,0.74]], [[0.58,0.26],[0.55,0.38]]],
+  gift: [[[0.24,0.42],[0.76,0.42],[0.76,0.74],[0.24,0.74],[0.24,0.42]],
+    [[0.5,0.42],[0.5,0.74]], [[0.2,0.32],[0.8,0.32],[0.8,0.42],[0.2,0.42],[0.2,0.32]],
+    [["a",0.41,0.26,0.075,0.8,4.0]], [["a",0.59,0.26,0.075,5.6,8.6]]],
+  smiley: [[["c",0.5,0.5,0.28]], [["a",0.5,0.47,0.16,0.6,2.54]],
+    [["c",0.41,0.42,0.022]], [["c",0.59,0.42,0.022]]],
   notes: [[[0.28,0.24],[0.72,0.24],[0.72,0.78],[0.28,0.78],[0.28,0.24]],
     [[0.36,0.38],[0.64,0.38]], [[0.36,0.5],[0.64,0.5]], [[0.36,0.62],[0.56,0.62]]],
   cloud: [[["a",0.4,0.56,0.13,3.14,6.28]], [["a",0.6,0.52,0.15,3.5,6.28]],
@@ -1341,6 +1362,11 @@ const VGLYPHS = {
     [[0.5,0.22],[0.5,0.78]]]
 };
 const VGLYPH_FOR = [
+  ["headphone", "headphones"], ["audible", "headphones"], ["podcast", "headphones"],
+  ["diamond", "diamond"], ["vip", "diamond"], ["jewel", "diamond"],
+  ["gift", "gift"], ["present", "gift"], ["wishlist", "gift"],
+  ["smile", "smiley"], ["hello", "smiley"], ["fun", "smiley"],
+  ["slider", "sliders"], ["filter", "sliders"],
   ["phone", "phone"], ["call", "phone"],
   ["mail", "mail"], ["gmail", "mail"], ["outlook", "mail"],
   ["calendar", "calendar"],
@@ -1351,7 +1377,7 @@ const VGLYPH_FOR = [
   ["clock", "clock"], ["time", "clock"],
   ["map", "map"], ["waze", "map"], ["uber", "map"], ["lyft", "map"],
   ["music", "music"], ["spotify", "music"], ["pandora", "music"], ["soundcloud", "music"], ["tiktok", "music"], ["podcast", "music"],
-  ["setting", "settings"],
+  ["setting", "gear"],
   ["note", "notes"], ["notion", "notes"], ["reminder", "notes"], ["todo", "notes"],
   ["cloud", "cloud"], ["drive", "cloud"], ["dropbox", "cloud"], ["weather", "cloud"],
   ["health", "heart"], ["fit", "heart"], ["strava", "heart"], ["heart", "heart"], ["love", "heart"],
@@ -1397,13 +1423,14 @@ function vlerpHex(a, b, t) {
   const pa = hexToRgb(a), pb = hexToRgb(b);
   return rgbToHex([0, 1, 2].map(function (i) { return pa[i] + (pb[i] - pa[i]) * t; }));
 }
-function strokeVGlyph(ctx, strokes, cx, cy, sizePx, lineW, colorA, colorB) {
+function strokeVGlyph(ctx, strokes, cx, cy, sizePx, lineW, colorA, colorB, alpha) {
   ctx.setLineWidth(lineW);
+  const op = typeof alpha === "number" ? alpha : 1;
   for (const stroke of strokes) {
     const pts = vglyphPoints(stroke);
     for (let i = 0; i < pts.length - 1; i++) {
       const t = (pts[i][0] + pts[i][1] + pts[i + 1][0] + pts[i + 1][1]) / 4;
-      ctx.setStrokeColor(new Color(colorB ? vlerpHex(colorA, colorB, Math.min(1, Math.max(0, t))) : colorA));
+      ctx.setStrokeColor(new Color(colorB ? vlerpHex(colorA, colorB, Math.min(1, Math.max(0, t))) : colorA, op));
       const p = new Path();
       p.move(new Point(cx + (pts[i][0] - 0.5) * sizePx, cy + (pts[i][1] - 0.5) * sizePx));
       p.addLine(new Point(cx + (pts[i + 1][0] - 0.5) * sizePx, cy + (pts[i + 1][1] - 0.5) * sizePx));
@@ -1472,16 +1499,33 @@ function themedIconTile(app, themeName, index, pt) {
     return ctx.getImage();
   }
   if (theme.glyphStyle === "line") {
-    const strokes = vglyphFor(app.label);
+    let strokes = vglyphFor(app.label);
+    if (strokes && (theme.thick || theme.glow)) {
+      strokes = strokes.filter(function (st) {
+        return !(Array.isArray(st[0]) && st[0][0] === "c" && st[0][3] < 0.035);
+      });
+    }
     const gA = theme.gradStroke ? theme.gradStroke[0] : glyphColor;
     const gB = theme.gradStroke ? theme.gradStroke[1] : null;
+    const lineW = Math.max(2, S * (theme.thick ? 0.085 : 0.045));
+    const gScale = theme.ring ? S * 0.5 : S * 0.92;
+    if (theme.ring) {
+      ctx.setStrokeColor(new Color(gA));
+      ctx.setLineWidth(Math.max(2, S * 0.035));
+      ctx.strokeEllipse(new Rect(S * 0.14, S * 0.14, S * 0.72, S * 0.72));
+    }
     if (strokes) {
-      strokeVGlyph(ctx, strokes, S / 2, S / 2, S * 0.92, Math.max(2, S * 0.045), gA, gB);
+      if (theme.glow) {
+        // No blur in DrawContext — layered wide strokes fake the neon halo.
+        strokeVGlyph(ctx, strokes, S / 2, S / 2, gScale, lineW * 3.2, gA, gB, 0.16);
+        strokeVGlyph(ctx, strokes, S / 2, S / 2, gScale, lineW * 1.9, gA, gB, 0.35);
+      }
+      strokeVGlyph(ctx, strokes, S / 2, S / 2, gScale, lineW, gA, gB, 1);
     } else {
       ctx.setTextColor(new Color(gA));
-      ctx.setFont(fontFor("serif", Math.round(S * 0.46), false));
+      ctx.setFont(fontFor("serif", Math.round(S * (theme.ring ? 0.32 : 0.46)), theme.thick === true));
       ctx.setTextAlignedCenter();
-      ctx.drawTextInRect((app.label || "A").trim().charAt(0).toLowerCase(), new Rect(0, S * 0.2, S, S * 0.64));
+      ctx.drawTextInRect((app.label || "A").trim().charAt(0).toLowerCase(), new Rect(0, S * (theme.ring ? 0.32 : 0.2), S, S * 0.64));
     }
     return ctx.getImage();
   }
