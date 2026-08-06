@@ -29,7 +29,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 54;
+const WK_VERSION = 55;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -158,11 +158,12 @@ function weatherEmoji(code) {
   if (code >= 95) return "⛈";
   return "🌡";
 }
-// Free weather from Open-Meteo (no API key). Location and result are cached
-// so widget refreshes stay fast and work offline with the last reading.
+// Free weather from Open-Meteo (no API key). One fetch grabs the full
+// picture — current, today's high/low, rain odds, tomorrow, and the next
+// hours — cached so widget refreshes stay fast and work offline.
 async function fetchWeather() {
   const fm = FileManager.local();
-  const cachePath = fm.joinPath(fm.documentsDirectory(), "widgetking-weather.json");
+  const cachePath = fm.joinPath(fm.documentsDirectory(), "widgetking-weather2.json");
   try {
     if (fm.fileExists(cachePath)) {
       const cached = JSON.parse(fm.readString(cachePath));
@@ -180,9 +181,34 @@ async function fetchWeather() {
       savePrefs(prefs);
     }
     const url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon +
-      "&current=temperature_2m,weather_code&temperature_unit=fahrenheit";
+      "&current=temperature_2m,weather_code" +
+      "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code" +
+      "&hourly=temperature_2m,weather_code&forecast_days=2&timezone=auto&temperature_unit=fahrenheit";
     const data = await new Request(url).loadJSON();
     const out = { at: Date.now(), tempF: Math.round(data.current.temperature_2m), code: data.current.weather_code };
+    try {
+      const d = data.daily;
+      out.hiF = Math.round(d.temperature_2m_max[0]);
+      out.loF = Math.round(d.temperature_2m_min[0]);
+      out.rainPct = Math.round(d.precipitation_probability_max[0] || 0);
+      out.tmHiF = Math.round(d.temperature_2m_max[1]);
+      out.tmLoF = Math.round(d.temperature_2m_min[1]);
+      out.tmCode = d.weather_code[1];
+    } catch (e) {}
+    try {
+      // Next hours at 2-hour steps, starting from the current hour.
+      const nowH = new Date().getHours();
+      out.hours = [];
+      for (let k = 1; k <= 3; k++) {
+        const idx = nowH + k * 2;
+        if (idx > 47) break;
+        out.hours.push({
+          h: idx % 24,
+          tempF: Math.round(data.hourly.temperature_2m[idx]),
+          code: data.hourly.weather_code[idx]
+        });
+      }
+    } catch (e) {}
     fm.writeString(cachePath, JSON.stringify(out));
     return out;
   } catch (e) {
@@ -190,11 +216,60 @@ async function fetchWeather() {
     return null;
   }
 }
+function weatherWord(code) {
+  if (code === 0) return "Clear";
+  if (code <= 2) return "Partly cloudy";
+  if (code === 3) return "Overcast";
+  if (code === 45 || code === 48) return "Foggy";
+  if (code >= 51 && code <= 57) return "Drizzle";
+  if (code >= 61 && code <= 67) return "Rain";
+  if (code >= 71 && code <= 77) return "Snow";
+  if (code >= 80 && code <= 82) return "Showers";
+  if (code >= 85 && code <= 86) return "Snow showers";
+  if (code >= 95) return "Thunderstorms";
+  return "Weather";
+}
+function degFor(el, f) {
+  if (typeof f !== "number" || !isFinite(f)) return "--";
+  return String(el.unit === "c" ? Math.round((f - 32) * 5 / 9) : Math.round(f));
+}
+function hourLabel(h) {
+  const ap = h >= 12 ? "P" : "A";
+  let x = h % 12; if (x === 0) x = 12;
+  return x + ap;
+}
 function weatherText(el, wx) {
-  if (!wx) return "--°";
-  let temp = wx.tempF;
-  if (el.unit === "c") temp = Math.round((wx.tempF - 32) * 5 / 9);
-  return weatherEmoji(wx.code) + " " + temp + "°";
+  const mode = el.wmode || "now";
+  if (!wx) return mode === "rain" ? "☔ --%" : "--°";
+  const now = weatherEmoji(wx.code) + " " + degFor(el, wx.tempF) + "°";
+  if (mode === "hilo") return "H " + degFor(el, wx.hiF) + "° · L " + degFor(el, wx.loF) + "°";
+  if (mode === "full") return now + "  H" + degFor(el, wx.hiF) + " L" + degFor(el, wx.loF);
+  if (mode === "cond") return weatherWord(wx.code) + " " + degFor(el, wx.tempF) + "°";
+  if (mode === "rain") return "☔ " + (typeof wx.rainPct === "number" ? wx.rainPct : "--") + "%";
+  if (mode === "tomorrow") return "Tmrw " + weatherEmoji(wx.tmCode) + " " + degFor(el, wx.tmHiF) + "°/" + degFor(el, wx.tmLoF) + "°";
+  if (mode === "hourly") {
+    if (!Array.isArray(wx.hours) || !wx.hours.length) return now;
+    return wx.hours.map(function (hh) {
+      return hourLabel(hh.h) + " " + weatherEmoji(hh.code) + degFor(el, hh.tempF) + "°";
+    }).join("  ");
+  }
+  return now;
+}
+// Time-of-day greeting — the little touch that makes a dashboard feel personal.
+function greetingText(el) {
+  const hr = new Date().getHours();
+  const base = hr < 5 ? "Good night" : hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : "Good evening";
+  const emo = el.emoji === false ? "" : (hr < 5 ? " 🌙" : hr < 12 ? " ☀️" : hr < 17 ? " 👋" : " 🌆");
+  const name = String(el.name || "").trim();
+  return base + (name ? ", " + name : "") + emo;
+}
+function weekNumber(d) {
+  // ISO-8601 week number (Monday start, week 1 holds the year's first Thursday).
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return Math.ceil(((t - yearStart) / 86400000 + 1) / 7);
 }
 // Moon phase is pure math (synodic month from a known new moon) — no network.
 function moonInfo(d) {
@@ -1010,6 +1085,8 @@ function drawFreestyle(design, family, bgImg, live) {
     }
     else if (el.kind === "worldclock") { text = worldClockText(el, new Date()); }
     else if (el.kind === "reminders") { text = remindersText(el, live ? live.reminders : null); }
+    else if (el.kind === "greeting") { text = greetingText(el); }
+    else if (el.kind === "week") { text = "Week " + weekNumber(new Date()); }
     else { text = el.text || "Text"; }
     // multi:"day" — a text element holding several lines shows one per day.
     if (el.kind === "text" && el.multi === "day" && text.indexOf("\n") >= 0) {

@@ -790,7 +790,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 54;
+const WK_VERSION = 55;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -919,11 +919,12 @@ function weatherEmoji(code) {
   if (code >= 95) return "⛈";
   return "🌡";
 }
-// Free weather from Open-Meteo (no API key). Location and result are cached
-// so widget refreshes stay fast and work offline with the last reading.
+// Free weather from Open-Meteo (no API key). One fetch grabs the full
+// picture — current, today's high/low, rain odds, tomorrow, and the next
+// hours — cached so widget refreshes stay fast and work offline.
 async function fetchWeather() {
   const fm = FileManager.local();
-  const cachePath = fm.joinPath(fm.documentsDirectory(), "widgetking-weather.json");
+  const cachePath = fm.joinPath(fm.documentsDirectory(), "widgetking-weather2.json");
   try {
     if (fm.fileExists(cachePath)) {
       const cached = JSON.parse(fm.readString(cachePath));
@@ -941,9 +942,34 @@ async function fetchWeather() {
       savePrefs(prefs);
     }
     const url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon +
-      "&current=temperature_2m,weather_code&temperature_unit=fahrenheit";
+      "&current=temperature_2m,weather_code" +
+      "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code" +
+      "&hourly=temperature_2m,weather_code&forecast_days=2&timezone=auto&temperature_unit=fahrenheit";
     const data = await new Request(url).loadJSON();
     const out = { at: Date.now(), tempF: Math.round(data.current.temperature_2m), code: data.current.weather_code };
+    try {
+      const d = data.daily;
+      out.hiF = Math.round(d.temperature_2m_max[0]);
+      out.loF = Math.round(d.temperature_2m_min[0]);
+      out.rainPct = Math.round(d.precipitation_probability_max[0] || 0);
+      out.tmHiF = Math.round(d.temperature_2m_max[1]);
+      out.tmLoF = Math.round(d.temperature_2m_min[1]);
+      out.tmCode = d.weather_code[1];
+    } catch (e) {}
+    try {
+      // Next hours at 2-hour steps, starting from the current hour.
+      const nowH = new Date().getHours();
+      out.hours = [];
+      for (let k = 1; k <= 3; k++) {
+        const idx = nowH + k * 2;
+        if (idx > 47) break;
+        out.hours.push({
+          h: idx % 24,
+          tempF: Math.round(data.hourly.temperature_2m[idx]),
+          code: data.hourly.weather_code[idx]
+        });
+      }
+    } catch (e) {}
     fm.writeString(cachePath, JSON.stringify(out));
     return out;
   } catch (e) {
@@ -951,11 +977,60 @@ async function fetchWeather() {
     return null;
   }
 }
+function weatherWord(code) {
+  if (code === 0) return "Clear";
+  if (code <= 2) return "Partly cloudy";
+  if (code === 3) return "Overcast";
+  if (code === 45 || code === 48) return "Foggy";
+  if (code >= 51 && code <= 57) return "Drizzle";
+  if (code >= 61 && code <= 67) return "Rain";
+  if (code >= 71 && code <= 77) return "Snow";
+  if (code >= 80 && code <= 82) return "Showers";
+  if (code >= 85 && code <= 86) return "Snow showers";
+  if (code >= 95) return "Thunderstorms";
+  return "Weather";
+}
+function degFor(el, f) {
+  if (typeof f !== "number" || !isFinite(f)) return "--";
+  return String(el.unit === "c" ? Math.round((f - 32) * 5 / 9) : Math.round(f));
+}
+function hourLabel(h) {
+  const ap = h >= 12 ? "P" : "A";
+  let x = h % 12; if (x === 0) x = 12;
+  return x + ap;
+}
 function weatherText(el, wx) {
-  if (!wx) return "--°";
-  let temp = wx.tempF;
-  if (el.unit === "c") temp = Math.round((wx.tempF - 32) * 5 / 9);
-  return weatherEmoji(wx.code) + " " + temp + "°";
+  const mode = el.wmode || "now";
+  if (!wx) return mode === "rain" ? "☔ --%" : "--°";
+  const now = weatherEmoji(wx.code) + " " + degFor(el, wx.tempF) + "°";
+  if (mode === "hilo") return "H " + degFor(el, wx.hiF) + "° · L " + degFor(el, wx.loF) + "°";
+  if (mode === "full") return now + "  H" + degFor(el, wx.hiF) + " L" + degFor(el, wx.loF);
+  if (mode === "cond") return weatherWord(wx.code) + " " + degFor(el, wx.tempF) + "°";
+  if (mode === "rain") return "☔ " + (typeof wx.rainPct === "number" ? wx.rainPct : "--") + "%";
+  if (mode === "tomorrow") return "Tmrw " + weatherEmoji(wx.tmCode) + " " + degFor(el, wx.tmHiF) + "°/" + degFor(el, wx.tmLoF) + "°";
+  if (mode === "hourly") {
+    if (!Array.isArray(wx.hours) || !wx.hours.length) return now;
+    return wx.hours.map(function (hh) {
+      return hourLabel(hh.h) + " " + weatherEmoji(hh.code) + degFor(el, hh.tempF) + "°";
+    }).join("  ");
+  }
+  return now;
+}
+// Time-of-day greeting — the little touch that makes a dashboard feel personal.
+function greetingText(el) {
+  const hr = new Date().getHours();
+  const base = hr < 5 ? "Good night" : hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : "Good evening";
+  const emo = el.emoji === false ? "" : (hr < 5 ? " 🌙" : hr < 12 ? " ☀️" : hr < 17 ? " 👋" : " 🌆");
+  const name = String(el.name || "").trim();
+  return base + (name ? ", " + name : "") + emo;
+}
+function weekNumber(d) {
+  // ISO-8601 week number (Monday start, week 1 holds the year's first Thursday).
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return Math.ceil(((t - yearStart) / 86400000 + 1) / 7);
 }
 // Moon phase is pure math (synodic month from a known new moon) — no network.
 function moonInfo(d) {
@@ -1771,6 +1846,8 @@ function drawFreestyle(design, family, bgImg, live) {
     }
     else if (el.kind === "worldclock") { text = worldClockText(el, new Date()); }
     else if (el.kind === "reminders") { text = remindersText(el, live ? live.reminders : null); }
+    else if (el.kind === "greeting") { text = greetingText(el); }
+    else if (el.kind === "week") { text = "Week " + weekNumber(new Date()); }
     else { text = el.text || "Text"; }
     // multi:"day" — a text element holding several lines shows one per day.
     if (el.kind === "text" && el.multi === "day" && text.indexOf("\n") >= 0) {
@@ -2935,7 +3012,15 @@ function normalizeDesign(design) {
       if (!["none", "polaroid", "border", "film"].includes(el.frame)) el.frame = "none";
       if (!/^#[0-9a-fA-F]{6}$/.test(el.frameHex || "")) el.frameHex = "#FFFFFF";
     }
-    if (el.kind === "weather" && el.unit !== "c") el.unit = "f";
+    if (el.kind === "weather") {
+      if (el.unit !== "c") el.unit = "f";
+      if (!["now", "hilo", "full", "cond", "rain", "tomorrow", "hourly"].includes(el.wmode)) el.wmode = "now";
+    }
+    if (el.kind === "greeting") {
+      if (typeof el.name !== "string") el.name = "";
+      el.name = el.name.slice(0, 16);
+      if (el.emoji !== false) el.emoji = true;
+    }
     if (el.kind === "calendar" || el.kind === "reminders") {
       el.count = Math.min(Math.max(Math.round(Number(el.count) || 1), 1), 4);
     }
@@ -3329,7 +3414,7 @@ const AI_SCHEMA = {
       items: {
         type: "object",
         properties: {
-          kind: { type: "string", "enum": ["text", "clock", "date", "emoji", "icon", "shape", "battery", "countdown", "app", "weather", "calendar", "progress", "ring", "sleeper", "sleeperlogo", "month", "art", "astro", "stock", "worldclock", "reminders"] },
+          kind: { type: "string", "enum": ["text", "clock", "date", "emoji", "icon", "shape", "battery", "countdown", "app", "weather", "calendar", "progress", "ring", "sleeper", "sleeperlogo", "month", "art", "astro", "stock", "worldclock", "reminders", "greeting", "week"] },
           text: { type: "string", description: "Text or emoji content; for kind=icon a single glyph like ★ ♥ ● ▲ ☾ ⚡ ✈ ⚙ →; empty for other kinds" },
           label: { type: "string", description: "App name for kind=app; empty otherwise" },
           url: { type: "string", description: "URL scheme to open for kind=app (e.g. spotify://); empty otherwise" },
@@ -3394,7 +3479,7 @@ function aiSystemPrompt() {
   const today = new Date().toISOString().slice(0, 10);
   return "You are WidgetKing's expert widget designer. Design at the level of the most beautiful Home Screen setups people share online: intentional composition, real hierarchy, restraint. The user describes a widget; return a spec.\n" +
     "Kinds: clock (time+date), date (big day), countdown, quote, note, launcher (tappable app grid), battery, freestyle (a canvas of elements — PREFER freestyle for anything creative; simple kinds are only for plain requests).\n" +
-    "FREESTYLE ELEMENTS (max 24; array order is z-order, bottom first): text, clock, date, emoji, icon (monochrome glyph ★ ☆ ♥ ● ◆ ▲ ✦ ❀ ☀ ☾ ☁ ⚡ ♪ ☕ ✈ ⌂ ✉ ⚙ ✓ → ∞, tinted via colorHex — prefer over emoji for elegance), shape (rect/pill/circle), battery, countdown, app (tappable icon: set label+url), weather (live temp), calendar (next event), progress (bar), ring (circular gauge; w=diameter 0-1 of short side, size=stroke pt 5-10; source day/year/battery/countdown), month (full mini month-calendar grid with today circled: size=day-number pt 8-10, w=grid width, accentHex=today circle color), calendar with count 2-4 = a multi-line upcoming-events list, art (baked decorative graphics — mode arc: STATIC text curved along a circle (w=diameter, size=font pt); mode rotated: tilted static text (angle deg); mode gradshape: gradient-filled shape colorHex to borderHex at angle. Art is for decoration only, NEVER for live values like time), astro (LIVE sunrise/sunset: mode sun both, sunrise, sunset; mode moon = moon phase emoji + name, moonicon = big emoji only), stock (LIVE market quote — put the ticker in text: AAPL, TSLA, BTC-USD, ETH-USD; renders 'AAPL 229 ▲1.2%' auto-colored green/red), worldclock (another city's current time — put the city in text; known: Tokyo, London, Paris, New York, Los Angeles, Sydney, Dubai, Hong Kong, Singapore, Berlin, Chicago, Honolulu), reminders (the user's REAL iOS Reminders to-do list; count 1-4 lines — great for productivity widgets).\n" +
+    "FREESTYLE ELEMENTS (max 24; array order is z-order, bottom first): text, clock, date, emoji, icon (monochrome glyph ★ ☆ ♥ ● ◆ ▲ ✦ ❀ ☀ ☾ ☁ ⚡ ♪ ☕ ✈ ⌂ ✉ ⚙ ✓ → ∞, tinted via colorHex — prefer over emoji for elegance), shape (rect/pill/circle), battery, countdown, app (tappable icon: set label+url), weather (live temp), calendar (next event), progress (bar), ring (circular gauge; w=diameter 0-1 of short side, size=stroke pt 5-10; source day/year/battery/countdown), month (full mini month-calendar grid with today circled: size=day-number pt 8-10, w=grid width, accentHex=today circle color), calendar with count 2-4 = a multi-line upcoming-events list, art (baked decorative graphics — mode arc: STATIC text curved along a circle (w=diameter, size=font pt); mode rotated: tilted static text (angle deg); mode gradshape: gradient-filled shape colorHex to borderHex at angle. Art is for decoration only, NEVER for live values like time), astro (LIVE sunrise/sunset: mode sun both, sunrise, sunset; mode moon = moon phase emoji + name, moonicon = big emoji only), stock (LIVE market quote — put the ticker in text: AAPL, TSLA, BTC-USD, ETH-USD; renders 'AAPL 229 ▲1.2%' auto-colored green/red), worldclock (another city's current time — put the city in text; known: Tokyo, London, Paris, New York, Los Angeles, Sydney, Dubai, Hong Kong, Singapore, Berlin, Chicago, Honolulu), reminders (the user's REAL iOS Reminders to-do list; count 1-4 lines — great for productivity widgets), greeting (LIVE time-of-day greeting — 'Good morning ☀️' that changes through the day; the user adds their own name afterward), week ('Week 32', ISO week number). WEATHER MODES via the element's mode field: now (temp), full (temp + high/low), hilo, cond (words + temp), rain (chance %), hourly (next hours strip — needs medium width), tomorrow. Stack 2-3 weather modes for a real forecast card.\n" +
     "ARCHETYPES — proven layouts; pick one and adapt, or blend two:\n" +
     "1 Ring Dashboard: ring at x .3 y .5 w .5 + its stat text centered on it (battery/countdown, size 18-22) + right column at x .72: label 10pt, date/calendar 11pt, thin divider, small progress bar.\n" +
     "2 Hero Type: one oversized clock/countdown/date size 44-58 at y .42-.48, tiny styled caption .16 below, one accent glyph in a corner.\n" +
@@ -3529,7 +3614,7 @@ function specToDesign(spec) {
     return { emoji: app.emoji || "🌐", label: (app.label || "App").slice(0, 12), url: app.url || "" };
   });
   design.canvasElements = (spec.canvasElements || []).slice(0, 24).map(function (el) {
-    const kind = ["text","clock","date","emoji","icon","shape","battery","countdown","app","weather","calendar","progress","ring","sleeper","sleeperlogo","month","art","astro","stock","worldclock","reminders"].includes(el.kind) ? el.kind : "text";
+    const kind = ["text","clock","date","emoji","icon","shape","battery","countdown","app","weather","calendar","progress","ring","sleeper","sleeperlogo","month","art","astro","stock","worldclock","reminders","greeting","week"].includes(el.kind) ? el.kind : "text";
     const rawW = Number(el.w) || 0;
     const out = {
       id: uid(),
@@ -3572,7 +3657,11 @@ function specToDesign(spec) {
       out.shape = "rounded"; out.showLabel = false;
     }
     if (kind === "icon" && !out.text) out.text = "★";
-    if (kind === "weather") out.unit = "f";
+    if (kind === "weather") {
+      out.unit = "f";
+      out.wmode = ["now","hilo","full","cond","rain","tomorrow","hourly"].includes(el.mode) ? el.mode : "now";
+    }
+    if (kind === "greeting") { out.name = ""; out.emoji = true; }
     if (kind === "calendar" || kind === "reminders") out.count = Math.min(Math.max(Math.round(Number(el.count) || 1), 1), 4);
     if (kind === "astro") out.mode = ["sun","sunrise","sunset","moon","moonicon"].includes(el.mode) ? el.mode : "sun";
     if (kind === "stock") {
@@ -3975,7 +4064,9 @@ function renderFreestyleInto(node, design, w, h, interactive) {
       else if (el.kind === "countdown") div.textContent = String(Math.abs(daysFromISO(el.dateISO)));
       else if (el.kind === "symbol") div.textContent = SYMBOL_EMOJI[el.symbolName] || "⭐";
       else if (el.kind === "icon") div.textContent = el.text || "★";
-      else if (el.kind === "weather") div.textContent = "☀️ " + (el.unit === "c" ? "22°" : "72°");
+      else if (el.kind === "weather") div.textContent = weatherPreviewText(el);
+      else if (el.kind === "greeting") div.textContent = greetingPreviewText(el);
+      else if (el.kind === "week") div.textContent = "Week " + isoWeekPreview(now);
       else if (el.kind === "astro") div.textContent = astroPreviewText(el);
       else if (el.kind === "worldclock") div.textContent = worldClockPreview(el, now);
       else if (el.kind === "stock") {
@@ -4439,7 +4530,7 @@ window.addEventListener("pointerdown", function (event) {
 
 // ==================== Freestyle palette & inspector ====================
 const ELEMENT_PALETTE = [["text", "Text"], ["photo", "🖼 Photo"], ["app", "📲 App icon"],
-  ["clock", "🕐 Clock"], ["date", "📅 Date"], ["weather", "☀️ Weather"], ["calendar", "📆 Calendar"], ["month", "🗓 Month"],
+  ["clock", "🕐 Clock"], ["date", "📅 Date"], ["greeting", "👋 Greeting"], ["weather", "☀️ Weather"], ["calendar", "📆 Calendar"], ["month", "🗓 Month"], ["week", "🔢 Week #"],
   ["reminders", "✅ Reminders"], ["worldclock", "🌍 World clock"], ["stock", "📈 Stocks"], ["astro", "🌗 Sun & moon"],
   ["progress", "▬ Progress"], ["ring", "◯ Ring"], ["sleeper", "🏈 Fantasy"], ["sleeperlogo", "🛡 Team logo"], ["icon", "◆ Icon"], ["emoji", "✨ Emoji"],
   ["shape", "▢ Shape"], ["art", "🌀 Art"], ["battery", "🔋 Battery"], ["countdown", "⏳ Countdown"]];
@@ -4497,6 +4588,31 @@ function stockPreviewText(el) {
   if (el.mode === "change") return sym + " ▲ 1.2%";
   return sym + " 229 ▲1.2%";
 }
+function weatherPreviewText(el) {
+  const d = el.unit === "c" ? ["22", "26", "18", "24"] : ["72", "79", "64", "76"];
+  const mode = el.wmode || "now";
+  if (mode === "hilo") return "H " + d[1] + "° · L " + d[2] + "°";
+  if (mode === "full") return "☀️ " + d[0] + "°  H" + d[1] + " L" + d[2];
+  if (mode === "cond") return "Partly cloudy " + d[0] + "°";
+  if (mode === "rain") return "☔ 20%";
+  if (mode === "tomorrow") return "Tmrw 🌤 " + d[3] + "°/" + d[2] + "°";
+  if (mode === "hourly") return "3P ☀️" + d[1] + "°  5P 🌤" + d[0] + "°  7P 🌤" + d[2] + "°";
+  return "☀️ " + d[0] + "°";
+}
+function greetingPreviewText(el) {
+  const hr = new Date().getHours();
+  const base = hr < 5 ? "Good night" : hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : "Good evening";
+  const emo = el.emoji === false ? "" : (hr < 5 ? " 🌙" : hr < 12 ? " ☀️" : hr < 17 ? " 👋" : " 🌆");
+  const name = String(el.name || "").trim();
+  return base + (name ? ", " + name : "") + emo;
+}
+function isoWeekPreview(d) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return Math.ceil(((t - yearStart) / 86400000 + 1) / 7);
+}
 
 function dayOfYear(d) {
   const start = new Date(d.getFullYear(), 0, 0);
@@ -4543,13 +4659,14 @@ function addElement(kind) {
       : kind === "calendar" ? 12 : kind === "progress" ? 8 : kind === "ring" ? 7
       : kind === "sleeper" ? 24 : kind === "month" ? 9 : kind === "art" ? 15
       : kind === "worldclock" ? 16 : kind === "stock" ? 16 : kind === "astro" ? 14
-      : kind === "reminders" ? 12 : 18,
+      : kind === "reminders" ? 12 : kind === "greeting" ? 16 : kind === "week" ? 12 : 18,
     colorHex: "#FFFFFF", opacity: kind === "shape" ? 0.25 : 1
   };
   if (kind === "shape") { el.shape = "rect"; el.w = 0.5; el.h = 0.25; }
   if (kind === "text") { el.w = 0; el.align = "center"; el.bold = true; }
   if (kind === "countdown") { el.dateISO = isoInDays(30); }
-  if (kind === "weather") { el.unit = "f"; }
+  if (kind === "weather") { el.unit = "f"; el.wmode = "now"; }
+  if (kind === "greeting") { el.name = ""; el.emoji = true; }
   if (kind === "progress") { el.source = "day"; el.w = 0.7; }
   if (kind === "ring") { el.source = "battery"; el.w = 0.55; }
   if (kind === "month") { el.w = 0.6; el.accentHex = "#4A90F6"; }
@@ -4635,7 +4752,11 @@ function labelForElement(el) {
   if (el.kind === "photo") return "🖼 Photo";
   if (el.kind === "app") return "📲 " + (el.label || "App");
   if (el.kind === "icon") return "◆ " + (el.text || "★");
-  if (el.kind === "weather") return "☀️ Weather";
+  if (el.kind === "weather") return "☀️ " + (el.wmode === "hilo" ? "Hi/Lo" : el.wmode === "hourly" ? "Hourly"
+    : el.wmode === "tomorrow" ? "Tomorrow" : el.wmode === "rain" ? "Rain %" : el.wmode === "cond" ? "Conditions"
+    : el.wmode === "full" ? "Now+Hi/Lo" : "Weather");
+  if (el.kind === "greeting") return "👋 Greeting";
+  if (el.kind === "week") return "🔢 Week #";
   if (el.kind === "calendar") return "📆 Events ×" + (el.count || 1);
   if (el.kind === "reminders") return "✅ To-dos ×" + (el.count || 1);
   if (el.kind === "astro") return el.mode === "moon" || el.mode === "moonicon" ? "🌗 Moon" : "🌅 Sun";
@@ -4856,11 +4977,19 @@ function buildInspectorContent(inspector) {
   }
 
   if (el.kind === "weather") {
-    const unitRow = document.createElement("div");
-    unitRow.className = "row";
-    const unitLabel = document.createElement("span");
-    unitLabel.textContent = "Unit";
-    unitLabel.style.cssText = "font-size:12px;color:var(--muted);width:52px";
+    const modeRow = document.createElement("div");
+    modeRow.className = "row";
+    const modeSel = document.createElement("select");
+    for (const [value, label] of [["now", "☀️ Now (temp)"], ["full", "☀️ Now + high/low"],
+      ["hilo", "🌡 High / low"], ["cond", "🌤 Conditions + temp"], ["rain", "☔ Rain chance"],
+      ["hourly", "🕐 Next hours"], ["tomorrow", "📅 Tomorrow"]]) {
+      const option = document.createElement("option");
+      option.value = value; option.textContent = label;
+      modeSel.appendChild(option);
+    }
+    modeSel.value = el.wmode || "now";
+    modeSel.onchange = function () { el.wmode = modeSel.value; refreshEditors(); };
+    modeRow.appendChild(modeSel);
     const unitSel = document.createElement("select");
     for (const [value, label] of [["f", "°F"], ["c", "°C"]]) {
       const option = document.createElement("option");
@@ -4869,12 +4998,34 @@ function buildInspectorContent(inspector) {
     }
     unitSel.value = el.unit === "c" ? "c" : "f";
     unitSel.onchange = function () { el.unit = unitSel.value; refreshCanvases(); };
-    unitRow.append(unitLabel, unitSel);
-    inspector.appendChild(unitRow);
+    modeRow.appendChild(unitSel);
+    inspector.appendChild(modeRow);
     const wxHint = document.createElement("p");
     wxHint.className = "hint";
-    wxHint.textContent = "Live temperature on your phone (free, no key). First run asks for location; updates every ~30 min.";
+    wxHint.textContent = "All live, free, no key — stack a few modes (now, high/low, next hours) for a full forecast card. First run asks for location; updates every ~30 min.";
     inspector.appendChild(wxHint);
+  }
+
+  if (el.kind === "greeting") {
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.placeholder = "Your name (optional) — “Good morning, Andrew”";
+    nameInput.maxLength = 16;
+    nameInput.value = el.name || "";
+    nameInput.oninput = function () { el.name = nameInput.value; refreshCanvases(); };
+    inspector.appendChild(nameInput);
+    const emojiLabel = document.createElement("label");
+    emojiLabel.style.cssText = "font-size:12px;display:flex;align-items:center;gap:4px;margin:6px 0";
+    const emojiCheck = document.createElement("input");
+    emojiCheck.type = "checkbox";
+    emojiCheck.checked = el.emoji !== false;
+    emojiCheck.onchange = function () { el.emoji = emojiCheck.checked; refreshCanvases(); };
+    emojiLabel.append(emojiCheck, document.createTextNode("Time-of-day emoji (☀️ 👋 🌆 🌙)"));
+    inspector.appendChild(emojiLabel);
+    const greetHint = document.createElement("p");
+    greetHint.className = "hint";
+    greetHint.textContent = "Changes through the day automatically: Good morning → afternoon → evening → night.";
+    inspector.appendChild(greetHint);
   }
 
   if (el.kind === "calendar") {
@@ -5211,7 +5362,7 @@ function buildInspectorContent(inspector) {
     }
   }
 
-  if (["text", "clock", "date", "countdown", "battery", "icon", "weather", "calendar", "sleeper", "art", "astro", "stock", "worldclock", "reminders"].includes(el.kind)) {
+  if (["text", "clock", "date", "countdown", "battery", "icon", "weather", "calendar", "sleeper", "art", "astro", "stock", "worldclock", "reminders", "greeting", "week"].includes(el.kind)) {
     const fontRow = document.createElement("div");
     fontRow.className = "row";
     const fontLabel = document.createElement("span");
@@ -6004,6 +6155,24 @@ function setupLauncherControls() {
 function buildTemplates() {
   return [
     // 👑 Picks — curated full designs showing off the newest elements.
+    { category: "Picks", pack: "Picks", size: "medium", design: { name: "Daily Brief", kind: "freestyle", themeID: "navy", fontStyle: "avenir", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
+      { kind: "greeting", name: "", emoji: true, x: 0.28, y: 0.16, size: 15, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "date", x: 0.28, y: 0.34, size: 11, colorHex: "#8FD3FE", opacity: 0.95 },
+      { kind: "calendar", count: 2, x: 0.28, y: 0.62, size: 10, colorHex: "#FFFFFF", opacity: 0.92 },
+      { kind: "shape", shape: "rect", x: 0.52, y: 0.5, w: 0.004, h: 0.72, size: 0, colorHex: "#FFFFFF", opacity: 0.25 },
+      { kind: "weather", wmode: "full", unit: "f", x: 0.76, y: 0.18, size: 14, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "weather", wmode: "hourly", unit: "f", x: 0.76, y: 0.42, size: 9, colorHex: "#D7E3F4", opacity: 0.95 },
+      { kind: "weather", wmode: "rain", unit: "f", x: 0.66, y: 0.64, size: 10, colorHex: "#8FD3FE", opacity: 0.95 },
+      { kind: "astro", mode: "sunset", x: 0.86, y: 0.64, size: 10, colorHex: "#F2B694", opacity: 0.95 },
+      { kind: "week", x: 0.76, y: 0.84, size: 9, colorHex: "#FFFFFF", opacity: 0.55 }
+    ] } },
+    { category: "Picks", pack: "Picks", size: "small", design: { name: "Weather Pro", kind: "freestyle", themeID: "ocean", fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "weather", wmode: "cond", unit: "f", x: 0.5, y: 0.18, size: 12, colorHex: "#D7F0FF", opacity: 0.95 },
+      { kind: "weather", wmode: "now", unit: "f", x: 0.5, y: 0.44, size: 34, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "weather", wmode: "hilo", unit: "f", x: 0.5, y: 0.68, size: 11, colorHex: "#FFFFFF", opacity: 0.9 },
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.78, w: 0.5, h: 0.006, size: 0, colorHex: "#FFFFFF", opacity: 0.25 },
+      { kind: "weather", wmode: "tomorrow", unit: "f", x: 0.5, y: 0.88, size: 10, colorHex: "#D7F0FF", opacity: 0.9 }
+    ] } },
     { category: "Picks", pack: "Picks", size: "small", design: { name: "Sun & Moon", kind: "freestyle", themeID: "cosmos", fontStyle: "optima", textColorHex: "#F5EFFF", canvasElements: [
       { kind: "astro", mode: "moonicon", x: 0.5, y: 0.34, size: 44, colorHex: "#FFFFFF", opacity: 1 },
       { kind: "astro", mode: "moon", x: 0.5, y: 0.6, size: 11, colorHex: "#D8C9F5", opacity: 0.95 },
