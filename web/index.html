@@ -809,7 +809,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 62;
+const WK_VERSION = 63;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -3355,7 +3355,8 @@ function themeNeedsCanvas(themeName) {
 const REAL_STYLES = [["original", "🎨 Original"], ["mono", "⚪ Mono"], ["tint", "🎯 Tinted"],
   ["darktile", "⬛ On dark"], ["lighttile", "⬜ On light"],
   ["logotile", "🔘 Logo tile"], ["logoglitter", "✨ Glitter logo"], ["logoline", "🌈 Gradient outline"],
-  ["logocircle", "🔵 Brand button"], ["logocloud", "☁️ Cloud cute"]];
+  ["logocircle", "🔵 Brand button"], ["logosquare", "🟦 Brand square"], ["logoframe", "◻️ Framed mono"],
+  ["logopastel", "🎀 Soft pastel"], ["logosticker", "🧵 Sticker"], ["logocloud", "☁️ Cloud cute"]];
 function hueShiftHex(hex, degrees) {
   const rgb = hexToRgb(hex).map(function (v) { return v / 255; });
   const mx = Math.max(rgb[0], rgb[1], rgb[2]), mn = Math.min(rgb[0], rgb[1], rgb[2]);
@@ -3487,15 +3488,89 @@ async function styledRealIcon(url, styleKey, tintHex, px) {
       realStyleCache[key] = c3.toDataURL("image/png");
       return realStyleCache[key];
     }
-    if (styleKey === "logotile" || styleKey === "logoglitter" || styleKey === "logoline" || styleKey === "logocircle") {
+    if (styleKey === "logopastel") {
+      // Soft pastel: the original artwork, desaturated and lifted toward
+      // white. Extraction-free — works on every icon.
+      const c4 = document.createElement("canvas");
+      c4.width = px; c4.height = px;
+      const x4 = c4.getContext("2d");
+      x4.save();
+      x4.beginPath();
+      if (x4.roundRect) x4.roundRect(0, 0, px, px, px * 0.24); else x4.rect(0, 0, px, px);
+      x4.clip();
+      x4.drawImage(img, 0, 0, px, px);
+      x4.restore();
+      const data4 = x4.getImageData(0, 0, px, px);
+      const p4 = data4.data;
+      for (let i = 0; i < p4.length; i += 4) {
+        const g = 0.299 * p4[i] + 0.587 * p4[i + 1] + 0.114 * p4[i + 2];
+        for (let ch = 0; ch < 3; ch++) {
+          const desat = p4[i + ch] * 0.62 + g * 0.38;
+          p4[i + ch] = Math.round(desat * 0.68 + 255 * 0.32);
+        }
+      }
+      x4.putImageData(data4, 0, 0);
+      realStyleCache[key] = c4.toDataURL("image/png");
+      return realStyleCache[key];
+    }
+    if (styleKey === "logotile" || styleKey === "logoglitter" || styleKey === "logoline" ||
+        styleKey === "logocircle" || styleKey === "logosquare" || styleKey === "logoframe" || styleKey === "logosticker") {
       const marked = extractMark(img, px);
       if (!marked) { realStyleCache[key] = null; return null; }
       const accent = tintHex || "#8F52FA";
+      const pastelBg = lerpHex(marked.bg, "#FFFFFF", 0.38);
       const tileFill = styleKey === "logoline" ? "#FBF8F3"
-        : styleKey === "logocircle" ? marked.bg : accent;
-      const c2 = tileBase(px, tileFill, styleKey === "logocircle" ? 0.5 : 0.24);
+        : (styleKey === "logocircle" || styleKey === "logosquare") ? marked.bg
+        : styleKey === "logoframe" ? (tintHex || "#EFEFEF")
+        : styleKey === "logosticker" ? pastelBg : accent;
+      const c2 = tileBase(px, tileFill, styleKey === "logocircle" ? 0.5 : styleKey === "logosquare" ? 0.16 : 0.24);
       const x2 = c2.getContext("2d");
-      if (styleKey === "logocircle") {
+      if (styleKey === "logoframe") {
+        // Thin outlined frame + dark mark on a light tile.
+        const inset = px * 0.06;
+        x2.strokeStyle = "#1B1B1E";
+        x2.lineWidth = Math.max(1.2, px * 0.018);
+        x2.beginPath();
+        if (x2.roundRect) x2.roundRect(inset, inset, px - 2 * inset, px - 2 * inset, px * 0.18);
+        else x2.rect(inset, inset, px - 2 * inset, px - 2 * inset);
+        x2.stroke();
+        const fill = document.createElement("canvas");
+        fill.width = px; fill.height = px;
+        const fx = fill.getContext("2d");
+        fx.fillStyle = "#1B1B1E";
+        fx.fillRect(0, 0, px, px);
+        fx.globalCompositeOperation = "destination-in";
+        fx.drawImage(marked.mask, 0, 0);
+        x2.drawImage(fill, px * 0.22, px * 0.22, px * 0.56, px * 0.56);
+      } else if (styleKey === "logosticker") {
+        // Sticker: muted brand tile, plum outline, dashed stitch, cream mark.
+        const inset = px * 0.035;
+        x2.strokeStyle = "#6E5A85";
+        x2.lineWidth = Math.max(1.5, px * 0.03);
+        x2.beginPath();
+        if (x2.roundRect) x2.roundRect(inset, inset, px - 2 * inset, px - 2 * inset, px * 0.2);
+        else x2.rect(inset, inset, px - 2 * inset, px - 2 * inset);
+        x2.stroke();
+        const stitch = px * 0.1;
+        x2.setLineDash([px * 0.022, px * 0.028]);
+        x2.lineWidth = Math.max(1, px * 0.014);
+        x2.strokeStyle = "rgba(110,90,133,.75)";
+        x2.beginPath();
+        x2.moveTo(stitch, stitch * 1.15);
+        x2.lineTo(px - stitch, stitch * 1.15);
+        x2.moveTo(stitch, px - stitch * 1.15);
+        x2.lineTo(px - stitch, px - stitch * 1.15);
+        x2.stroke();
+        x2.setLineDash([]);
+        const fill = document.createElement("canvas");
+        fill.width = px; fill.height = px;
+        const fx = fill.getContext("2d");
+        fx.fillStyle = "#F5EDD8";
+        fx.fillRect(0, 0, px, px);
+        fx.globalCompositeOperation = "destination-in";
+        fx.drawImage(marked.mask, 0, 0);
+        x2.drawImage(fill, px * 0.2, px * 0.2, px * 0.6, px * 0.6);
+      } else if (styleKey === "logocircle" || styleKey === "logosquare") {
         // The flat-button classic: the mark in white (or dark, on light
         // brands) on a circle of the icon's OWN detected brand color.
         const markColor = luminanceOf(marked.bg) > 0.72 ? "#1B1B1E" : "#FFFFFF";
@@ -3808,7 +3883,7 @@ function launcherStyleOf(design) {
     labels: style.labels !== false,
     columns: Math.min(Math.max(Math.round(Number(style.columns) || 0), 0), 6),
     iconTheme: (ICON_THEMES[style.iconTheme] || String(style.iconTheme || "").indexOf("pack:") === 0) ? style.iconTheme : "real",
-    realStyle: ["mono", "tint", "darktile", "lighttile", "logotile", "logoglitter", "logoline", "logocircle", "logocloud"].indexOf(style.realStyle) >= 0 ? style.realStyle : "original",
+    realStyle: ["mono", "tint", "darktile", "lighttile", "logotile", "logoglitter", "logoline", "logocircle", "logosquare", "logoframe", "logopastel", "logosticker", "logocloud"].indexOf(style.realStyle) >= 0 ? style.realStyle : "original",
     tintHex: /^#[0-9a-fA-F]{6}$/.test(style.tintHex || "") ? style.tintHex : "#8F52FA"
   };
 }
@@ -3982,7 +4057,7 @@ function normalizeDesign(design) {
         if (scheme) el.url = scheme;
       }
       if (el.iconTheme != null && !ICON_THEMES[el.iconTheme] && String(el.iconTheme).indexOf("pack:") !== 0) delete el.iconTheme;
-      if (el.realStyle != null && ["mono", "tint", "darktile", "lighttile", "logotile", "logoglitter", "logoline", "logocircle", "logocloud"].indexOf(el.realStyle) < 0) delete el.realStyle;
+      if (el.realStyle != null && ["mono", "tint", "darktile", "lighttile", "logotile", "logoglitter", "logoline", "logocircle", "logosquare", "logoframe", "logopastel", "logosticker", "logocloud"].indexOf(el.realStyle) < 0) delete el.realStyle;
       if (el.tintHex != null && !/^#[0-9a-fA-F]{6}$/.test(el.tintHex)) delete el.tintHex;
     }
     if (el.font != null && !FONT_CSS[el.font]) delete el.font;
