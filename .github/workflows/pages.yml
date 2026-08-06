@@ -33,3 +33,8 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          # GitHub's Pages queue occasionally backs up for 10+ minutes; the
+          # default 10-minute timeout then aborts a deploy that would have
+          # landed. Wait up to 30 minutes before giving up.
+          timeout: 1800000
