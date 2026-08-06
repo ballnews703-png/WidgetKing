@@ -343,7 +343,7 @@
   <div class="method-cards">
     <button id="exploreTabBtn">🧭 Explore gallery<br><span style="font-size:11px;color:var(--muted)">widgets &amp; icon styles</span></button>
     <button id="newWidgetBtn">➕ Create new widget<br><span style="font-size:11px;color:var(--muted)">start from scratch</span></button>
-    <button id="cloneBtn" style="display:none">📷 Clone a widget<br><span style="font-size:11px;color:var(--muted)">from any photo</span></button>
+    <button id="cloneBtn">📷 Clone a widget<br><span style="font-size:11px;color:var(--muted)">from any photo</span></button>
     <button id="pageStudioBtn">📱 Design a page<br><span style="font-size:11px;color:var(--muted)">whole Home Screen</span></button>
   </div>
   <input type="file" id="cloneInput" accept="image/*" style="display:none">
@@ -838,7 +838,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 66;
+const WK_VERSION = 67;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -8196,7 +8196,6 @@ function renderAll() {
 function updateMagicHint() {
   document.getElementById("magicHint").textContent =
     "Tell WidgetKing what you want — a launcher with your top apps, a countdown, a weather clock, a quote — and it designs the widget for you.";
-  document.getElementById("cloneBtn").style.display = getApiKey() ? "block" : "none";
 }
 
 // ==================== Wiring ====================
@@ -8446,6 +8445,13 @@ document.getElementById("newWidgetBtn").onclick = function () {
   toast("Blank canvas ready — pick a type, or go 🎨 Freestyle ✨");
 };
 document.getElementById("cloneBtn").onclick = function () {
+  if (!getApiKey()) {
+    const setup = document.querySelector("#magicSection details");
+    if (setup) setup.open = true;
+    document.getElementById("apiKeyInput").focus();
+    toast("📷 Cloning needs the full designer — finish ⚙️ Designer setup first");
+    return;
+  }
   document.getElementById("cloneInput").click();
 };
 document.getElementById("cloneInput").onchange = function (event) {
