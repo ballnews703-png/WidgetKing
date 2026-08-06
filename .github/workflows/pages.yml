@@ -30,11 +30,20 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: web
+      # deploy-pages hard-caps its wait at 10 minutes, and GitHub's Pages
+      # queue occasionally backs up longer than that. Retrying the deploy
+      # step (same artifact — a re-upload would trip deploy-pages' duplicate
+      # artifact check) gives one run up to ~30 minutes of patience.
       - name: Deploy
         id: deployment
+        continue-on-error: true
         uses: actions/deploy-pages@v4
-        with:
-          # GitHub's Pages queue occasionally backs up for 10+ minutes; the
-          # default 10-minute timeout then aborts a deploy that would have
-          # landed. Wait up to 30 minutes before giving up.
-          timeout: 1800000
+      - name: Deploy (retry 1)
+        id: deployment2
+        if: steps.deployment.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+      - name: Deploy (retry 2)
+        id: deployment3
+        if: steps.deployment.outcome == 'failure' && steps.deployment2.outcome == 'failure'
+        uses: actions/deploy-pages@v4
