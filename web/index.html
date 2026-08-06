@@ -641,6 +641,10 @@
   <h2>Put it on your iPhone (no Mac needed)</h2>
   <button class="primary" id="wizardBtn" style="width:100%;font-size:16px;padding:14px">🪄 Set up my iPhone — step by step</button>
   <p class="hint" style="margin-top:8px">💡 Make this designer feel like an app: in Safari tap <b>Share → Add to Home Screen</b> — you'll get a WidgetKing 👑 icon that opens full-screen.</p>
+  <h3 style="margin:16px 0 4px">👑 Pick your WidgetKing icon</h3>
+  <p class="hint">Tap a style — same crown, your color. It applies the next time the app is added to your Home Screen.</p>
+  <div id="appIconGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:8px"></div>
+  <p class="hint" id="appIconHint" style="display:none;margin-top:8px">✓ Saved. To see it on your Home Screen: remove the current WidgetKing icon (it won't delete anything), then <b>Share → Add to Home Screen</b> again — iPhones only read the icon at add-time.</p>
   <details>
   <summary>The full instructions, if you prefer reading</summary>
   <ol style="margin-top:8px">
@@ -838,7 +842,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 68;
+const WK_VERSION = 69;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -9217,6 +9221,46 @@ document.getElementById("modeToggle").onclick = function () {
   toast(appearance === "auto" ? "🌗 Auto — matches your phone"
     : appearance === "light" ? "☀️ Light and lovely" : "🌙 Back to dark");
 };
+
+// ==================== WidgetKing app icon ====================
+const APP_ICON_STYLES = [
+  ["royal", "Royal"], ["noir", "Noir"], ["glass", "Glass"], ["cream", "Cream"],
+  ["ocean", "Ocean"], ["sunset", "Sunset"], ["neon", "Neon"], ["pastel", "Pastel"]
+];
+function appIconFile(style) { return style === "royal" ? "icon-180.png" : "appicon-" + style + ".png"; }
+function applyAppIcon(style) {
+  const link = document.querySelector('link[rel="apple-touch-icon"]');
+  if (link) link.href = appIconFile(style);
+}
+function renderAppIconGrid() {
+  const grid = document.getElementById("appIconGrid");
+  if (!grid) return;
+  const chosen = localStorage.getItem("widgetking.appicon") || "royal";
+  grid.innerHTML = "";
+  for (const pair of APP_ICON_STYLES) {
+    const btn = document.createElement("button");
+    btn.style.cssText = "padding:6px;display:flex;flex-direction:column;align-items:center;gap:4px;border-radius:14px" +
+      (pair[0] === chosen ? ";outline:2px solid var(--accent)" : "");
+    const img = document.createElement("img");
+    img.src = appIconFile(pair[0]);
+    img.alt = pair[1];
+    img.style.cssText = "width:52px;height:52px;border-radius:12px";
+    const cap = document.createElement("span");
+    cap.textContent = pair[1];
+    cap.style.cssText = "font-size:11px;color:var(--muted)";
+    btn.appendChild(img); btn.appendChild(cap);
+    btn.onclick = function () {
+      localStorage.setItem("widgetking.appicon", pair[0]);
+      applyAppIcon(pair[0]);
+      renderAppIconGrid();
+      document.getElementById("appIconHint").style.display = "block";
+      toast("👑 " + pair[1] + " it is");
+    };
+    grid.appendChild(btn);
+  }
+}
+applyAppIcon(localStorage.getItem("widgetking.appicon") || "royal");
+renderAppIconGrid();
 
 // ==================== Guided builder ====================
 const B_USES = [["time", "🕐 Tell time"], ["photos", "🖼 Show my photos"], ["apps", "🚀 Launch my apps"],
