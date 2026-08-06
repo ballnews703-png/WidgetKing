@@ -790,7 +790,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 55;
+const WK_VERSION = 56;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -5694,9 +5694,9 @@ function renderStudioUI() {
     button.textContent = key === "small" ? "S" : key === "medium" ? "M" : "L";
     button.className = studioSize === key ? "active" : "";
     button.onclick = function () {
-      refitElements(current, SIZES[current.fitSize] ? current.fitSize : studioSize, key);
+      switchDesignSize(current, studioSize, key);
       studioSize = key;
-      current.fitSize = key;
+      previewSize = key;
       renderStudioUI();
       renderStudioCanvas();
       renderPreview();
@@ -6472,6 +6472,55 @@ function refitElements(design, fromKey, toKey) {
     if (typeof el.h === "number" && el.h > 0) el.h = Math.min(el.h * f[1] * k / t[1], 1);
   }
 }
+// Size round-trips must be LOSSLESS. refitElements is deliberately
+// asymmetric (shrink to fit going down, drop-in untouched going up), so
+// chaining refits (medium → small → medium) permanently compressed layouts.
+// Instead, each design remembers its exact per-size geometry for the session:
+// leaving a size stashes it, returning restores it. Manual edits invalidate
+// the other sizes' stashes so a refit runs fresh from the edited layout.
+const sizeMemory = {};
+function geomSignature(els) {
+  return JSON.stringify((els || []).map(function (e) {
+    return [e.id, Math.round(e.x * 1000), Math.round(e.y * 1000), e.size || 0, e.w || 0, e.h || 0];
+  }));
+}
+function geomCopy(els) {
+  return (els || []).map(function (e) {
+    return { id: e.id, x: e.x, y: e.y, size: e.size, w: e.w, h: e.h };
+  });
+}
+function geomApply(els, saved) {
+  const byId = {};
+  for (const s of saved) byId[s.id] = s;
+  for (const e of els || []) {
+    const s = byId[e.id];
+    if (!s) continue;
+    e.x = s.x; e.y = s.y;
+    if (typeof s.size === "number") e.size = s.size;
+    if (typeof s.w === "number") e.w = s.w;
+    if (typeof s.h === "number") e.h = s.h;
+  }
+}
+function resetSizeMemory(design, atSize) {
+  sizeMemory[design.id] = { snaps: {}, cleanGeom: geomSignature(design.canvasElements) };
+  const store = sizeMemory[design.id];
+  store.snaps[atSize] = geomCopy(design.canvasElements);
+}
+function switchDesignSize(design, fromSize, toSize) {
+  if (fromSize === toSize) return;
+  let store = sizeMemory[design.id];
+  if (!store) { store = sizeMemory[design.id] = { snaps: {}, cleanGeom: null }; }
+  const edited = store.cleanGeom !== null && geomSignature(design.canvasElements) !== store.cleanGeom;
+  if (edited) store.snaps = {};
+  store.snaps[fromSize] = geomCopy(design.canvasElements);
+  if (store.snaps[toSize]) {
+    geomApply(design.canvasElements, store.snaps[toSize]);
+  } else {
+    refitElements(design, SIZES[design.fitSize] ? design.fitSize : fromSize, toSize);
+  }
+  design.fitSize = toSize;
+  store.cleanGeom = geomSignature(design.canvasElements);
+}
 function popCanvas() {
   const canvas = document.getElementById("canvas");
   canvas.classList.remove("pop");
@@ -6487,6 +6536,7 @@ function loadIntoEditor(design) {
   // as small got double-refitted, and only Undo restored the proportions.)
   if (SIZES[current.fitSize]) previewSize = current.fitSize;
   else current.fitSize = previewSize;
+  resetSizeMemory(current, previewSize);
   selectedElId = null;
   multiSelect = null;
   if (editorSubTab !== "widget") {
@@ -6732,9 +6782,8 @@ function renderControls() {
     button.textContent = size[0].toUpperCase() + size.slice(1);
     if (previewSize === size) button.className = "active";
     button.onclick = function () {
-      refitElements(current, SIZES[current.fitSize] ? current.fitSize : previewSize, size);
+      switchDesignSize(current, previewSize, size);
       previewSize = size;
-      current.fitSize = size;
       renderAll();
     };
     sizeButtons.appendChild(button);
