@@ -809,7 +809,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 60;
+const WK_VERSION = 61;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -3353,7 +3353,8 @@ function themeNeedsCanvas(themeName) {
 // tint, or floated on a tile. We never redraw trademarks; we transform the
 // genuine artwork the user picked to identify and open that app.
 const REAL_STYLES = [["original", "🎨 Original"], ["mono", "⚪ Mono"], ["tint", "🎯 Tinted"],
-  ["darktile", "⬛ On dark"], ["lighttile", "⬜ On light"]];
+  ["darktile", "⬛ On dark"], ["lighttile", "⬜ On light"],
+  ["logotile", "🔘 Logo tile"], ["logoglitter", "✨ Glitter logo"], ["logoline", "◻️ Outline logo"]];
 const realStyleCache = {};
 function loadCrossImage(url) {
   return new Promise(function (resolve) {
@@ -3364,6 +3365,63 @@ function loadCrossImage(url) {
     img.src = url;
   });
 }
+// Pull the logo MARK out of a flat app icon: estimate the background from
+// the border ring, then keep pixels that differ from it (soft-edged mask).
+// Works on flat and gradient backgrounds as long as the mark contrasts;
+// photographic icons fail the coverage sanity check and fall back.
+function extractMark(img, px) {
+  const c = document.createElement("canvas");
+  c.width = px; c.height = px;
+  const x = c.getContext("2d");
+  x.drawImage(img, 0, 0, px, px);
+  const data = x.getImageData(0, 0, px, px);
+  const p = data.data;
+  let br = 0, bg = 0, bb = 0, n = 0;
+  const step = Math.max(1, Math.floor(px / 40));
+  for (let i = 0; i < px; i += step) {
+    for (const j of [Math.floor(px * 0.04), px - 1 - Math.floor(px * 0.04)]) {
+      let idx = (j * px + i) * 4;
+      br += p[idx]; bg += p[idx + 1]; bb += p[idx + 2]; n++;
+      idx = (i * px + j) * 4;
+      br += p[idx]; bg += p[idx + 1]; bb += p[idx + 2]; n++;
+    }
+  }
+  br /= n; bg /= n; bb /= n;
+  let covered = 0;
+  const mask = x.createImageData(px, px);
+  const mp = mask.data;
+  for (let i = 0; i < p.length; i += 4) {
+    const dr = p[i] - br, dg = p[i + 1] - bg, db = p[i + 2] - bb;
+    const dist = Math.sqrt(dr * dr + dg * dg + db * db);
+    const a = Math.max(0, Math.min(1, (dist - 40) / 60));
+    mp[i] = mp[i + 1] = mp[i + 2] = 255;
+    mp[i + 3] = Math.round(a * 255 * (p[i + 3] / 255));
+    if (a > 0.5) covered++;
+  }
+  const coverage = covered / (px * px);
+  if (coverage < 0.02 || coverage > 0.6) return null;
+  const mc = document.createElement("canvas");
+  mc.width = px; mc.height = px;
+  mc.getContext("2d").putImageData(mask, 0, 0);
+  return { mask: mc, bg: rgbToHex([br, bg, bb]) };
+}
+function tileBase(px, fillHex, radiusFrac) {
+  const c = document.createElement("canvas");
+  c.width = px; c.height = px;
+  const x = c.getContext("2d");
+  if (fillHex) {
+    x.beginPath();
+    if (x.roundRect) x.roundRect(0, 0, px, px, px * (radiusFrac == null ? 0.24 : radiusFrac));
+    else x.rect(0, 0, px, px);
+    x.fillStyle = fillHex;
+    x.fill();
+  }
+  return c;
+}
+function luminanceOf(hex) {
+  const rgb = hexToRgb(hex);
+  return (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
+}
 async function styledRealIcon(url, styleKey, tintHex, px) {
   if (!url || !styleKey || styleKey === "original") return null;
   const key = url + "|" + styleKey + "|" + (tintHex || "") + "|" + px;
@@ -3371,6 +3429,66 @@ async function styledRealIcon(url, styleKey, tintHex, px) {
   const img = await loadCrossImage(url);
   if (!img) { realStyleCache[key] = null; return null; }
   try {
+    if (styleKey === "logotile" || styleKey === "logoglitter" || styleKey === "logoline") {
+      const marked = extractMark(img, px);
+      if (!marked) { realStyleCache[key] = null; return null; }
+      const accent = tintHex || "#8F52FA";
+      const c2 = tileBase(px, styleKey === "logoline" ? "#FBF8F3" : accent, 0.24);
+      const x2 = c2.getContext("2d");
+      if (styleKey === "logotile") {
+        // Mark recolored for contrast against the chosen tile.
+        const markColor = luminanceOf(accent) > 0.6 ? "#1B1B1E" : "#FFFFFF";
+        const fill = document.createElement("canvas");
+        fill.width = px; fill.height = px;
+        const fx = fill.getContext("2d");
+        fx.fillStyle = markColor;
+        fx.fillRect(0, 0, px, px);
+        fx.globalCompositeOperation = "destination-in";
+        fx.drawImage(marked.mask, 0, 0);
+        x2.drawImage(fill, px * 0.14, px * 0.14, px * 0.72, px * 0.72);
+      } else if (styleKey === "logoglitter") {
+        // Speckle-filled mark — the glitter-pack look.
+        const fill = document.createElement("canvas");
+        fill.width = px; fill.height = px;
+        const fx = fill.getContext("2d");
+        fx.fillStyle = accent;
+        fx.fillRect(0, 0, px, px);
+        const dots = Math.round(px * px / 22);
+        for (let d = 0; d < dots; d++) {
+          const lx = Math.random() * px, ly = Math.random() * px;
+          const bright = Math.random() > 0.45;
+          fx.fillStyle = bright ? "rgba(255,255,255," + (0.25 + Math.random() * 0.55) + ")"
+            : "rgba(0,0,0," + (0.1 + Math.random() * 0.25) + ")";
+          const ds = 1 + Math.random() * Math.max(1, px / 220);
+          fx.fillRect(lx, ly, ds, ds);
+        }
+        fx.globalCompositeOperation = "destination-in";
+        fx.drawImage(marked.mask, 0, 0);
+        const glitterTile = tileBase(px, luminanceOf(accent) > 0.6 ? "#FFFFFF" : "#FDF6F0", 0.24);
+        const gx = glitterTile.getContext("2d");
+        gx.drawImage(fill, px * 0.14, px * 0.14, px * 0.72, px * 0.72);
+        realStyleCache[key] = glitterTile.toDataURL("image/png");
+        return realStyleCache[key];
+      } else {
+        // Outline: dilate the mask, punch the mark back out, keep the ring.
+        const ring = document.createElement("canvas");
+        ring.width = px; ring.height = px;
+        const rx = ring.getContext("2d");
+        const rad = Math.max(1.5, px * 0.012);
+        for (let a = 0; a < 16; a++) {
+          const ang = (a / 16) * Math.PI * 2;
+          rx.drawImage(marked.mask, Math.cos(ang) * rad, Math.sin(ang) * rad);
+        }
+        rx.globalCompositeOperation = "destination-out";
+        rx.drawImage(marked.mask, 0, 0);
+        rx.globalCompositeOperation = "source-in";
+        rx.fillStyle = luminanceOf(accent) > 0.85 ? "#1B1B1E" : accent;
+        rx.fillRect(0, 0, px, px);
+        x2.drawImage(ring, px * 0.14, px * 0.14, px * 0.72, px * 0.72);
+      }
+      realStyleCache[key] = c2.toDataURL("image/png");
+      return realStyleCache[key];
+    }
     const c = document.createElement("canvas");
     c.width = px; c.height = px;
     const x = c.getContext("2d");
@@ -3612,7 +3730,7 @@ function launcherStyleOf(design) {
     labels: style.labels !== false,
     columns: Math.min(Math.max(Math.round(Number(style.columns) || 0), 0), 6),
     iconTheme: (ICON_THEMES[style.iconTheme] || String(style.iconTheme || "").indexOf("pack:") === 0) ? style.iconTheme : "real",
-    realStyle: ["mono", "tint", "darktile", "lighttile"].indexOf(style.realStyle) >= 0 ? style.realStyle : "original",
+    realStyle: ["mono", "tint", "darktile", "lighttile", "logotile", "logoglitter", "logoline"].indexOf(style.realStyle) >= 0 ? style.realStyle : "original",
     tintHex: /^#[0-9a-fA-F]{6}$/.test(style.tintHex || "") ? style.tintHex : "#8F52FA"
   };
 }
@@ -3786,7 +3904,7 @@ function normalizeDesign(design) {
         if (scheme) el.url = scheme;
       }
       if (el.iconTheme != null && !ICON_THEMES[el.iconTheme] && String(el.iconTheme).indexOf("pack:") !== 0) delete el.iconTheme;
-      if (el.realStyle != null && ["mono", "tint", "darktile", "lighttile"].indexOf(el.realStyle) < 0) delete el.realStyle;
+      if (el.realStyle != null && ["mono", "tint", "darktile", "lighttile", "logotile", "logoglitter", "logoline"].indexOf(el.realStyle) < 0) delete el.realStyle;
       if (el.tintHex != null && !/^#[0-9a-fA-F]{6}$/.test(el.tintHex)) delete el.tintHex;
     }
     if (el.font != null && !FONT_CSS[el.font]) delete el.font;
@@ -4535,7 +4653,10 @@ function designPreviewHTML(design, sizeKey) {
         } else {
           const rs = style.realStyle || "original";
           let inner;
-          if (app.iconUrl && (rs === "darktile" || rs === "lighttile")) {
+          if (app.iconUrl && rs.indexOf("logo") === 0) {
+            inner = '<img src="' + esc(app.iconUrl) + '" alt="" data-rs="' + rs +
+              '" data-rsurl="' + esc(app.iconUrl) + '" data-rstint="' + esc(style.tintHex || "") + '">';
+          } else if (app.iconUrl && (rs === "darktile" || rs === "lighttile")) {
             inner = '<div style="width:100%;height:100%;background:' + (rs === "darktile" ? "#17171C" : "#F4EFE8") +
               ';display:flex;align-items:center;justify-content:center">' +
               '<img src="' + esc(app.iconUrl) + '" alt="" style="width:62%;height:62%;border-radius:15%">' + "</div>";
@@ -4746,7 +4867,15 @@ function renderFreestyleInto(node, design, w, h, interactive) {
           "font-size:" + Math.round(pt * 0.6) + "px";
         if (el.iconUrl) {
           const rs = el.realStyle || "original";
-          if (rs === "darktile" || rs === "lighttile") {
+          if (rs.indexOf("logo") === 0) {
+            const img = document.createElement("img");
+            img.src = el.iconUrl;
+            img.style.cssText = "width:100%;height:100%;object-fit:cover;pointer-events:none;display:block";
+            iconBox.appendChild(img);
+            styledRealIcon(el.iconUrl, rs, el.tintHex || "", 128).then(function (styled) {
+              if (styled && img.isConnected) img.src = styled;
+            });
+          } else if (rs === "darktile" || rs === "lighttile") {
             iconBox.style.background = rs === "darktile" ? "#17171C" : "#F4EFE8";
             const img = document.createElement("img");
             img.src = el.iconUrl;
@@ -4875,6 +5004,17 @@ function lockPreviewHTML(design) {
     'padding:4px;box-sizing:border-box;font-family:' + (FONT_CSS[design.fontStyle] || FONT_CSS.rounded) + '">' +
     inner + "</div></div>";
 }
+// Logo-style previews render async: original shows instantly, the derived
+// version swaps in when the canvas pipeline finishes.
+function upgradeRealPreviews(root) {
+  if (!root) return;
+  root.querySelectorAll("img[data-rs]").forEach(function (img) {
+    styledRealIcon(img.getAttribute("data-rsurl"), img.getAttribute("data-rs"),
+      img.getAttribute("data-rstint") || "", 128).then(function (styled) {
+      if (styled && img.isConnected) img.src = styled;
+    });
+  });
+}
 function renderPreview() {
   recordHistory();
   const canvas = document.getElementById("canvas");
@@ -4912,6 +5052,7 @@ function renderPreview() {
   } else {
     canvas.innerHTML = designPreviewHTML(current, previewSize);
   }
+  upgradeRealPreviews(canvas);
 }
 // Track when the dock is actually pinned so its opaque cover only appears
 // mid-scroll (at rest it would hide the section heading above it).
