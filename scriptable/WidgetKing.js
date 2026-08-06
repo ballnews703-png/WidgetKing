@@ -29,7 +29,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 52;
+const WK_VERSION = 53;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -196,6 +196,153 @@ function weatherText(el, wx) {
   if (el.unit === "c") temp = Math.round((wx.tempF - 32) * 5 / 9);
   return weatherEmoji(wx.code) + " " + temp + "°";
 }
+// Moon phase is pure math (synodic month from a known new moon) — no network.
+function moonInfo(d) {
+  const synodic = 29.530588853;
+  const ref = Date.UTC(2000, 0, 6, 18, 14);
+  let age = ((d.getTime() - ref) / 86400000) % synodic;
+  if (age < 0) age += synodic;
+  const idx = Math.floor((age / synodic) * 8 + 0.5) % 8;
+  const emojis = ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"];
+  const names = ["New moon", "Waxing crescent", "First quarter", "Waxing gibbous",
+    "Full moon", "Waning gibbous", "Last quarter", "Waning crescent"];
+  return { emoji: emojis[idx], name: names[idx] };
+}
+// Sunrise/sunset from Open-Meteo (same free API + cached location as weather).
+async function fetchAstro() {
+  const fm = FileManager.local();
+  const cachePath = fm.joinPath(fm.documentsDirectory(), "widgetking-astro.json");
+  try {
+    if (fm.fileExists(cachePath)) {
+      const cached = JSON.parse(fm.readString(cachePath));
+      if (cached && (Date.now() - cached.at) < 3 * 60 * 60 * 1000) return cached;
+    }
+  } catch (e) {}
+  try {
+    const prefs = loadPrefs();
+    let lat = prefs.lat, lon = prefs.lon;
+    if (typeof lat !== "number" || typeof lon !== "number") {
+      Location.setAccuracyToKilometer();
+      const loc = await Location.current();
+      lat = loc.latitude; lon = loc.longitude;
+      prefs.lat = lat; prefs.lon = lon;
+      savePrefs(prefs);
+    }
+    const url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon +
+      "&daily=sunrise,sunset&timezone=auto&forecast_days=1";
+    const data = await new Request(url).loadJSON();
+    const out = { at: Date.now(), sunrise: data.daily.sunrise[0], sunset: data.daily.sunset[0] };
+    fm.writeString(cachePath, JSON.stringify(out));
+    return out;
+  } catch (e) {
+    try { if (fm.fileExists(cachePath)) return JSON.parse(fm.readString(cachePath)); } catch (e2) {}
+    return null;
+  }
+}
+function shortClock(d) {
+  let h = d.getHours(); const mi = d.getMinutes();
+  const ap = h >= 12 ? " PM" : " AM";
+  h = h % 12; if (h === 0) h = 12;
+  return h + ":" + (mi < 10 ? "0" + mi : mi) + ap;
+}
+function astroText(el, astro) {
+  const mode = el.mode || "sun";
+  if (mode === "moon") { const m = moonInfo(new Date()); return m.emoji + " " + m.name; }
+  if (mode === "moonicon") return moonInfo(new Date()).emoji;
+  if (!astro) return "🌅 --  🌇 --";
+  const rise = shortClock(new Date(astro.sunrise));
+  const set = shortClock(new Date(astro.sunset));
+  if (mode === "sunrise") return "🌅 " + rise;
+  if (mode === "sunset") return "🌇 " + set;
+  return "🌅 " + rise + "  🌇 " + set;
+}
+// Live quote from Yahoo Finance's public chart endpoint — no key needed.
+// Works for stocks (AAPL), crypto (BTC-USD), and indexes. Cached 15 min.
+async function fetchStock(symbol) {
+  const clean = String(symbol || "").trim().toUpperCase();
+  if (!clean) return null;
+  const fm = FileManager.local();
+  const safe = clean.replace(/[^A-Z0-9.\-]/g, "_");
+  const cachePath = fm.joinPath(fm.documentsDirectory(), "widgetking-stock-" + safe + ".json");
+  try {
+    if (fm.fileExists(cachePath)) {
+      const cached = JSON.parse(fm.readString(cachePath));
+      if (cached && (Date.now() - cached.at) < 15 * 60 * 1000) return cached;
+    }
+  } catch (e) {}
+  try {
+    const url = "https://query1.finance.yahoo.com/v8/finance/chart/" + encodeURIComponent(clean) +
+      "?range=1d&interval=1d";
+    const data = await new Request(url).loadJSON();
+    const meta = data.chart.result[0].meta;
+    const price = Number(meta.regularMarketPrice);
+    const prev = Number(meta.chartPreviousClose || meta.previousClose) || price;
+    const out = { at: Date.now(), price: price, pct: prev ? ((price - prev) / prev) * 100 : 0 };
+    fm.writeString(cachePath, JSON.stringify(out));
+    return out;
+  } catch (e) {
+    try { if (fm.fileExists(cachePath)) return JSON.parse(fm.readString(cachePath)); } catch (e2) {}
+    return null;
+  }
+}
+function stockText(el, q) {
+  const sym = String(el.symbol || "").trim().toUpperCase() || "STOCK";
+  if (!q || !isFinite(q.price)) return sym + " --";
+  const arrow = q.pct >= 0 ? "▲" : "▼";
+  const price = q.price >= 1000 ? String(Math.round(q.price)) : String(Math.round(q.price * 100) / 100);
+  const pct = Math.abs(Math.round(q.pct * 10) / 10);
+  if (el.mode === "price") return sym + " " + price;
+  if (el.mode === "change") return sym + " " + arrow + " " + pct + "%";
+  return sym + " " + price + " " + arrow + pct + "%";
+}
+// Another city's current time. Prefers real time-zone math (handles DST);
+// falls back to the city's stored UTC offset if the runtime lacks it.
+function worldClockText(el, d) {
+  let t = "";
+  try {
+    t = d.toLocaleTimeString("en-US", { timeZone: el.tz, hour: "numeric", minute: "2-digit" });
+  } catch (e) {
+    const offMin = Number(el.offsetMin) || 0;
+    t = shortClock(new Date(d.getTime() + d.getTimezoneOffset() * 60000 + offMin * 60000));
+  }
+  return (el.showCity === false ? "" : (el.city || "") + " ") + t;
+}
+// Your real iOS Reminders (permission asked on first run). Overdue and
+// soonest-due first; undated ones fill in after.
+async function fetchReminders(count) {
+  try {
+    const all = await Reminder.allIncomplete();
+    const now = new Date();
+    all.sort(function (a, b) {
+      const ad = a.dueDate ? a.dueDate.getTime() : 9e15;
+      const bd = b.dueDate ? b.dueDate.getTime() : 9e15;
+      return ad - bd;
+    });
+    const out = [];
+    for (const r of all.slice(0, count)) {
+      let title = String(r.title || "Reminder");
+      if (title.length > 22) title = title.slice(0, 21) + "…";
+      let when = "";
+      if (r.dueDate) {
+        const dayDiff = Math.round(
+          (new Date(r.dueDate.getFullYear(), r.dueDate.getMonth(), r.dueDate.getDate()) -
+           new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
+        when = dayDiff < 0 ? "overdue" : dayDiff === 0 ? "today"
+          : dayDiff === 1 ? "tomorrow" : "in " + dayDiff + "d";
+      }
+      out.push({ title: title, when: when });
+    }
+    return out;
+  } catch (e) { return null; }
+}
+function remindersText(el, items) {
+  if (!items) return "Reminders off";
+  if (items.length === 0) return "All done ✓";
+  const n = Math.min(Math.max(Number(el.count) || 1, 1), 4);
+  return items.slice(0, n).map(function (r) {
+    return "○ " + r.title + (r.when ? " · " + r.when : "");
+  }).join("\n");
+}
 // Upcoming calendar events (asks for calendar permission on first run).
 // Gathers today through next week, including all-day events like birthdays.
 async function fetchUpcomingEvents(count) {
@@ -326,6 +473,24 @@ async function liveDataFor(design) {
     for (const el of sleeperEls) {
       if (!live.sleeper[el.leagueID]) live.sleeper[el.leagueID] = await fetchSleeper(el);
     }
+  }
+  if (els.some(function (e) {
+    return e.kind === "astro" && (e.mode || "sun") !== "moon" && e.mode !== "moonicon";
+  })) live.astro = await fetchAstro();
+  const stockEls = els.filter(function (e) { return e.kind === "stock" && e.symbol; });
+  if (stockEls.length) {
+    live.stocks = {};
+    for (const el of stockEls) {
+      const key = String(el.symbol).trim().toUpperCase();
+      if (!live.stocks[key]) live.stocks[key] = await fetchStock(key);
+    }
+  }
+  const remEls = els.filter(function (e) { return e.kind === "reminders"; });
+  if (remEls.length) {
+    const maxR = Math.max.apply(null, remEls.map(function (e) {
+      return Math.min(Math.max(Number(e.count) || 1, 1), 4);
+    }));
+    live.reminders = await fetchReminders(maxR);
   }
   return live;
 }
@@ -825,6 +990,7 @@ function drawFreestyle(design, family, bgImg, live) {
     }
     if (el.kind === "app" || el.kind === "sleeperlogo") continue; // rendered as overlay stacks
     let text;
+    let liveColor = null; // e.g. stock green/red decided by live data
     if (el.kind === "clock") { const df = new DateFormatter(); df.useShortTimeStyle(); text = df.string(new Date()); }
     else if (el.kind === "date") { const df = new DateFormatter(); df.dateFormat = "EEE MMM d"; text = df.string(new Date()); }
     else if (el.kind === "battery") { text = Math.round(Device.batteryLevel() * 100) + "%"; }
@@ -834,6 +1000,16 @@ function drawFreestyle(design, family, bgImg, live) {
     else if (el.kind === "weather") { text = weatherText(el, live ? live.weather : null); }
     else if (el.kind === "calendar") { text = calendarText(el, live ? live.events : null); }
     else if (el.kind === "sleeper") { text = sleeperText(el, live && live.sleeper ? live.sleeper[el.leagueID] : null); }
+    else if (el.kind === "astro") { text = astroText(el, live ? live.astro : null); }
+    else if (el.kind === "stock") {
+      const q = live && live.stocks ? live.stocks[String(el.symbol || "").trim().toUpperCase()] : null;
+      text = stockText(el, q);
+      if (el.autoColor !== false && q && isFinite(q.pct)) {
+        liveColor = q.pct >= 0 ? "#30D158" : "#FF6961";
+      }
+    }
+    else if (el.kind === "worldclock") { text = worldClockText(el, new Date()); }
+    else if (el.kind === "reminders") { text = remindersText(el, live ? live.reminders : null); }
     else { text = el.text || "Text"; }
     // multi:"day" — a text element holding several lines shows one per day.
     if (el.kind === "text" && el.multi === "day" && text.indexOf("\n") >= 0) {
@@ -842,7 +1018,7 @@ function drawFreestyle(design, family, bgImg, live) {
     }
     const isBold = el.kind !== "text" || el.bold !== false;
     ctx.setFont(fontFor(el.font || design.fontStyle, fs, isBold));
-    ctx.setTextColor(new Color(el.colorHex || "#FFFFFF", el.kind === "emoji" ? 1 : op));
+    ctx.setTextColor(new Color(liveColor || el.colorHex || "#FFFFFF", el.kind === "emoji" ? 1 : op));
     if (el.kind === "text" && el.w > 0) {
       // Text box: fixed width, wraps, top-anchored — mirrors the designer.
       if (el.align === "left") { ctx.setTextAlignedLeft(); }
@@ -852,7 +1028,8 @@ function drawFreestyle(design, family, bgImg, live) {
       ctx.drawTextInRect(text, new Rect(px - boxW / 2, py - fs * 0.72, boxW, H));
     } else {
       ctx.setTextAlignedCenter();
-      const lines = el.kind === "calendar" ? Math.min(Math.max(Number(el.count) || 1, 1), 4) : 1;
+      const lines = (el.kind === "calendar" || el.kind === "reminders")
+        ? Math.min(Math.max(Number(el.count) || 1, 1), 4) : 1;
       ctx.drawTextInRect(text, new Rect(px - W / 2, py - fs * 0.72, W, fs * 1.7 * lines));
     }
   }
@@ -1148,8 +1325,77 @@ async function buildLauncher(w, design, family, tc, style) {
   }
   root.addSpacer(Math.max(0, (H - contentH) / 2));
 }
+// Lock Screen (accessory) widgets: iOS renders them in vibrant monochrome and
+// supplies the background, so rows of NATIVE text keep them crisp — no baked
+// images. Time and countdown rows use system date text, so they stay live.
+async function buildLockWidget(design, family) {
+  const w = new ListWidget();
+  w.setPadding(2, 2, 2, 2);
+  if (design.tapUrl) w.url = design.tapUrl;
+  const style = design.fontStyle || "rounded";
+  const circle = family === "accessoryCircular";
+  let rows = Array.isArray(design.lockRows) ? design.lockRows.slice(0, circle ? 2 : 3) : [];
+  if (!rows.length) {
+    // Any regular design still works on the Lock Screen — map it to rows.
+    if (design.kind === "clock") rows = [{ kind: "time" }, { kind: "date" }];
+    else if (design.kind === "countdown") rows = [
+      { kind: "text", text: design.primaryText || design.name || "Countdown" },
+      { kind: "countdown", dateISO: design.targetDate }];
+    else if (design.kind === "battery") rows = [{ kind: "battery" }];
+    else if (design.kind === "date") rows = [{ kind: "date" }];
+    else rows = [{ kind: "text", text: design.primaryText || design.name || "WidgetKing" }];
+  }
+  const live = {};
+  if (rows.some(function (r) { return r.kind === "weather"; })) live.weather = await fetchWeather();
+  if (rows.some(function (r) { return r.kind === "reminder"; })) live.reminders = await fetchReminders(1);
+  w.addSpacer();
+  for (const row of rows) {
+    const big = rows.length === 1 || (rows.length > 1 && row === rows[0] && circle);
+    const size = big ? (circle ? 20 : 18) : (rows.length >= 3 ? 10 : 12);
+    const fnt = fontFor(style, size, row === rows[0]);
+    if (row.kind === "time") {
+      const t = w.addDate(new Date());
+      t.applyTimeStyle(); t.font = fnt; t.textColor = new Color("#FFFFFF");
+      t.centerAlignText(); t.minimumScaleFactor = 0.5; t.lineLimit = 1;
+    } else if (row.kind === "date") {
+      const t = w.addDate(new Date());
+      t.applyDateStyle(); t.font = fnt; t.textColor = new Color("#FFFFFF");
+      t.centerAlignText(); t.minimumScaleFactor = 0.5; t.lineLimit = 1;
+    } else if (row.kind === "countdown") {
+      const iso = row.dateISO || design.targetDate;
+      if (iso) {
+        const t = w.addDate(new Date(iso + "T00:00:00"));
+        t.applyRelativeStyle(); t.font = fnt; t.textColor = new Color("#FFFFFF");
+        t.centerAlignText(); t.minimumScaleFactor = 0.5; t.lineLimit = 1;
+      } else {
+        const t = w.addText("Set a date");
+        t.font = fnt; t.textColor = new Color("#FFFFFF"); t.centerAlignText();
+      }
+    } else {
+      let str = "";
+      if (row.kind === "battery") {
+        let lvl = 80;
+        try { lvl = Math.round(Device.batteryLevel() * 100); } catch (e) {}
+        str = "🔋 " + lvl + "%";
+      } else if (row.kind === "weather") { str = weatherText({ unit: row.unit || "f" }, live.weather); }
+      else if (row.kind === "reminder") {
+        str = live.reminders && live.reminders.length ? "○ " + live.reminders[0].title
+          : (live.reminders ? "All done ✓" : "Reminders off");
+      } else { str = String(row.text || ""); }
+      const t = w.addText(str);
+      t.font = fnt; t.textColor = new Color("#FFFFFF");
+      t.centerAlignText(); t.minimumScaleFactor = 0.5; t.lineLimit = 1;
+    }
+  }
+  w.addSpacer();
+  w.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000);
+  return w;
+}
 async function buildWidget(design, position) {
   const family = config.widgetFamily || "small";
+  if (String(family).indexOf("accessory") === 0) {
+    return buildLockWidget(design, family);
+  }
   const w = new ListWidget();
   w.setPadding(12, 12, 12, 12);
   const bgImg = backgroundImageFor(design, family, position);
@@ -1453,13 +1699,30 @@ if (config.runsInWidget || runPreview) {
         (DESIGNS.length > 6 ? "…" : "") + "\nFix the Parameter, or re-copy the script." };
   }
   if (!design) design = DESIGNS[0];
+  // Day Flow: a playlist points at other designs by id — swap in whichever
+  // one owns the current time of day, keeping the playlist's saved position.
+  let playlistPosition = "";
+  if (design && design.kind === "playlist") {
+    playlistPosition = design.position || "";
+    const hr = new Date().getHours();
+    const slotKey = hr >= 5 && hr < 11 ? "morning" : hr >= 11 && hr < 16 ? "midday"
+      : hr >= 16 && hr < 21 ? "evening" : "night";
+    const pl = design.playlist || {};
+    const wanted = pl[slotKey] || pl.morning || pl.midday || pl.evening || pl.night || "";
+    const target = DESIGNS.find(function (d) { return d.id === wanted && d.kind !== "playlist"; });
+    design = target || { name: design.name, kind: "note", themeID: design.themeID || "midnight",
+      fontStyle: "rounded", textColorHex: "#FFFFFF", background: "gradient",
+      canvasElements: [], apps: [],
+      primaryText: "This Day Flow has no design for its " + slotKey +
+        " slot.\nOpen it in WidgetKing, pick designs, then 🔁 Update phone." };
+  }
   if (!design) {
     const w = new ListWidget();
     w.addText("No designs yet — build one in the WidgetKing designer.");
     if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentSmall(); }
   } else {
     // Position priority: typed in the Parameter > saved inside the design.
-    const w = await buildWidget(design, widgetPosition || design.position || "");
+    const w = await buildWidget(design, widgetPosition || design.position || playlistPosition || "");
     if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentMedium(); }
   }
 }
