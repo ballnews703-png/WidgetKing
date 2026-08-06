@@ -567,6 +567,7 @@
   <div id="library"></div>
   <div class="row" style="margin-top:12px">
     <button class="primary" id="copyScriptBtn">📋 Copy Scriptable Script</button>
+    <button id="installScriptBtn">⚡ Install in Scriptable (one tap)</button>
     <button id="downloadScriptBtn">⬇️ Download Script</button>
     <button id="backupBtn">💾 Back up all designs</button>
     <button id="importJsonBtn">📂 Restore / Import</button>
@@ -765,7 +766,64 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 50;
+const WK_VERSION = 51;
+const WK_PAGE_URL = "__PAGE_URL__";
+
+// The script can update ITSELF: fetch the deployed designer page, extract
+// the newer renderer, splice this script's own designs back in, and rewrite
+// this file in place. Runs only inside the Scriptable app, never in widgets.
+async function checkForUpdates(manual) {
+  function say(title, message) {
+    const a = new Alert();
+    a.title = title;
+    a.message = message;
+    a.addAction("OK");
+    return a.presentAlert();
+  }
+  if (!WK_PAGE_URL || WK_PAGE_URL.indexOf("http") !== 0) {
+    if (manual) await say("Updates unavailable", "This copy wasn't exported from the hosted designer.");
+    return;
+  }
+  const prefs = loadPrefs();
+  const now = Date.now();
+  if (!manual && now - (Number(prefs.lastUpdateCheck) || 0) < 20 * 60 * 60 * 1000) return;
+  prefs.lastUpdateCheck = now;
+  savePrefs(prefs);
+  try {
+    const html = await new Request(WK_PAGE_URL + "?wkupd=" + now).loadString();
+    const startTag = 'id="scriptableTemplate">';
+    const i = html.indexOf(startTag);
+    const j = i < 0 ? -1 : html.indexOf("<" + "/script>", i);
+    if (i < 0 || j < 0) { if (manual) await say("Update check failed", "Couldn't read the designer page."); return; }
+    const tpl = html.substring(i + startTag.length, j).trim();
+    const m = tpl.match(/WK_VERSION = (\d+)/);
+    if (!m || Number(m[1]) <= WK_VERSION) {
+      if (manual) await say("Up to date ✓", "You're on v" + WK_VERSION + " — the latest.");
+      return;
+    }
+    let fm = FileManager.local();
+    if (!fm.fileExists(module.filename)) {
+      try {
+        const icloud = FileManager.iCloud();
+        if (icloud.fileExists(module.filename)) fm = icloud;
+      } catch (e) {}
+    }
+    if (!fm.fileExists(module.filename)) {
+      if (manual) await say("Update failed", "Couldn't locate this script's file.");
+      return;
+    }
+    // Placeholder tokens are built by concatenation so this code never
+    // contains them literally (the designer requires exactly one of each).
+    const dTok = '"__DESIGNS' + '__"';
+    const uTok = '"__PAGE_URL' + '__"';
+    let next = tpl.replace(dTok, JSON.stringify(DESIGNS, null, 2));
+    next = next.replace(uTok, JSON.stringify(WK_PAGE_URL));
+    fm.writeString(module.filename, next);
+    await say("Updated to v" + m[1] + " ✓", "Your designs are kept exactly as they were. Close and reopen the script to finish.");
+  } catch (e) {
+    if (manual) await say("Update check failed", String(e && e.message || e));
+  }
+}
 
 const THEMES = {
   midnight: ["#232526", "#414345"], royal: ["#5B2C98", "#8E44AD"],
@@ -1316,6 +1374,8 @@ function drawFreestyle(design, family, bgImg, live) {
   const scale = Math.min(W, H) / 158;
   const els = design.canvasElements || [];
   for (const el of els) {
+    // Clocks and countdowns render as live native overlays, never baked.
+    if (el.kind === "clock" || el.kind === "countdown") continue;
     const px = el.x * W; const py = el.y * H; const fs = (el.size || 20) * scale;
     const op = (typeof el.opacity === "number" && el.opacity >= 0 && el.opacity <= 1) ? el.opacity : 1;
     if (el.kind === "shape") {
@@ -1538,24 +1598,47 @@ function drawFreestyle(design, family, bgImg, live) {
 // App elements in freestyle designs are laid over the drawn background as
 // real stacks, so they get crisp rounded icons AND per-icon tap targets
 // (iOS allows multiple tap targets on medium/large widgets only).
+// Native overlay cell footprint [w, h] in points. Clocks and countdowns
+// render as SYSTEM date text — iOS keeps them current forever with zero
+// widget refreshes (the same mechanism Apple's own clock widgets use).
+function overlayCellSize(el) {
+  if (el.kind === "clock" || el.kind === "countdown") {
+    const s = Math.min(Math.max(Number(el.size) || 34, 8), 90);
+    return [s * 0.56 * (el.kind === "clock" ? 7 : 8), s * 1.25];
+  }
+  const pt = Math.min(Math.max(Number(el.size) || 40, 16), 120);
+  return [pt, pt];
+}
 async function addFreestyleApps(w, design, family, live) {
-  const apps = (design.canvasElements || []).filter(function (el) { return el.kind === "app" || el.kind === "sleeperlogo"; });
+  const OVERLAY = { app: 1, sleeperlogo: 1, clock: 1, countdown: 1 };
+  let apps = (design.canvasElements || []).filter(function (el) { return OVERLAY[el.kind]; });
+  // Native texts can't stack on each other — drop shadow-twin clocks and
+  // countdowns, keeping only the topmost at a given position.
+  apps = apps.filter(function (el, i) {
+    if (el.kind !== "clock" && el.kind !== "countdown") return true;
+    for (let j = i + 1; j < apps.length; j++) {
+      const o = apps[j];
+      if (o.kind === el.kind && Math.abs(o.x - el.x) < 0.03 && Math.abs(o.y - el.y) < 0.03) return false;
+    }
+    return true;
+  });
   if (apps.length === 0) return;
   const dims = widgetPointSizes(family);
   const W = dims[0], H = dims[1];
-  if (!w.url && apps[0].url) w.url = apps[0].url;
+  const tappable = apps.find(function (e) { return e.url; });
+  if (!w.url && tappable) w.url = tappable.url;
   // Group into rows: elements whose vertical centers overlap share a row.
   const sorted = apps.slice().sort(function (a, b) { return a.y - b.y; });
   const rows = [];
   for (const el of sorted) {
-    const pt = Math.min(Math.max(Number(el.size) || 40, 16), 120);
-    const top = el.y * H - pt / 2;
+    const cellH = overlayCellSize(el)[1];
+    const top = el.y * H - cellH / 2;
     const last = rows[rows.length - 1];
     if (last && top < last.bottom) {
       last.items.push(el);
-      last.bottom = Math.max(last.bottom, top + pt + (el.showLabel ? 13 : 0));
+      last.bottom = Math.max(last.bottom, top + cellH + (el.showLabel ? 13 : 0));
     } else {
-      rows.push({ top: Math.max(0, top), bottom: top + pt + (el.showLabel ? 13 : 0), items: [el] });
+      rows.push({ top: Math.max(0, top), bottom: top + cellH + (el.showLabel ? 13 : 0), items: [el] });
     }
   }
   const root = w.addStack();
@@ -1570,9 +1653,27 @@ async function addFreestyleApps(w, design, family, live) {
     let cursorX = 0;
     row.items.sort(function (a, b) { return a.x - b.x; });
     for (const el of row.items) {
-      const pt = Math.min(Math.max(Number(el.size) || 40, 16), 120);
+      const cellDims = overlayCellSize(el);
+      const pt = cellDims[0];
       const left = Math.max(0, el.x * W - pt / 2);
       if (left > cursorX) rowStack.addSpacer(left - cursorX);
+      if (el.kind === "clock" || el.kind === "countdown") {
+        const liveCell = rowStack.addStack();
+        liveCell.size = new Size(cellDims[0], cellDims[1]);
+        liveCell.centerAlignContent();
+        const fs = Math.min(Math.max(Number(el.size) || 34, 8), 90);
+        const t = el.kind === "clock"
+          ? liveCell.addDate(new Date())
+          : liveCell.addDate(new Date((el.dateISO || "2030-01-01") + "T00:00:00"));
+        if (el.kind === "clock") { t.applyTimeStyle(); } else { t.applyRelativeStyle(); }
+        t.font = fontFor(el.font || design.fontStyle, fs, el.bold !== false);
+        t.textColor = new Color(el.colorHex || "#FFFFFF", typeof el.opacity === "number" ? el.opacity : 1);
+        t.centerAlignText();
+        t.lineLimit = 1;
+        t.minimumScaleFactor = 0.4;
+        cursorX = left + pt;
+        continue;
+      }
       const cell = rowStack.addStack();
       cell.layoutVertically();
       if (el.url) cell.url = el.url;
@@ -1891,6 +1992,7 @@ if (config.runsInApp) {
   const pickedModel = DEVICE_MODELS.find(function (m) { return m[0] === String(prefs.screenKey || ""); });
   menu.addAction("iPhone model: " + (pickedModel ? pickedModel[1].split(" / ")[0] : "Auto-detect"));
   menu.addAction("Set up app shortcuts…");
+  menu.addAction("⬆️ Check for updates…");
   menu.addCancelAction("Cancel");
   const choice = await menu.presentAlert();
   if (choice === 1) {
@@ -2026,9 +2128,14 @@ if (config.runsInApp) {
         Safari.open("shortcuts://create-shortcut");
       }
     }
+  } else if (choice === 6) {
+    runPreview = false;
+    await checkForUpdates(true);
   } else if (choice === -1) {
     runPreview = false;
   }
+  // Quiet daily check so renderer fixes arrive on their own.
+  if (choice !== 6) await checkForUpdates(false);
 }
 
 if (config.runsInWidget || runPreview) {
@@ -6007,8 +6114,27 @@ async function buildScript() {
     alert("⚠️ No photo attached in: " + missingPhotos.join(", ") +
       "\n\nThose widgets will show “photo missing” on your phone. Open each one in the Editor, tap its photo box, and re-add the picture (photos don't travel in sync links — use 💾 Back up for full copies). Then copy the script again.");
   }
-  return template.replace('"__DESIGNS__"', JSON.stringify(list, null, 2)).trim() + "\n";
+  // Stamp where this copy came from so the script can self-update from it.
+  const pageUrl = location.protocol.indexOf("http") === 0 ? location.origin + location.pathname : "";
+  return template.replace('"__DESIGNS__"', JSON.stringify(list, null, 2))
+    .replace('"__PAGE_URL__"', JSON.stringify(pageUrl)).trim() + "\n";
 }
+// One-tap install: Scriptable imports .scriptable files (JSON with the
+// script inside) straight from the iOS share sheet — no copy/paste.
+async function buildInstallFile() {
+  return JSON.stringify({
+    always_run_in_app: false,
+    icon: { color: "deep-purple", glyph: "crown" },
+    name: "WidgetKing",
+    script: await buildScript(),
+    share_sheet_inputs: []
+  });
+}
+document.getElementById("installScriptBtn").onclick = async function () {
+  download("WidgetKing.scriptable", await buildInstallFile(), "application/json");
+  markCopied();
+  toast("⬇️ Open the file and share it to Scriptable — one tap installs it. (Best for FIRST installs; for updates use 📋 Copy, or delete any duplicate the import creates.)");
+};
 // The version rides inside the script, so "did my paste take?" is checkable:
 // run the script in Scriptable — its menu title shows the same number.
 function scriptVersion() {
