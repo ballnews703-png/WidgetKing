@@ -497,6 +497,8 @@
         <div class="row" style="margin-top:6px">
           <span style="font-size:12px;color:var(--muted)">Look</span>
           <select id="iconTheme" style="width:130px"></select>
+          <select id="realStyleSel" style="width:110px;display:none"></select>
+          <input type="color" id="realTint" style="display:none">
           <span style="font-size:12px;color:var(--muted)">Per row</span>
           <select id="iconColumns" style="width:90px">
             <option value="0">Auto</option>
@@ -807,7 +809,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 59;
+const WK_VERSION = 60;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -3344,6 +3346,91 @@ function themeNeedsCanvas(themeName) {
   const theme = ICON_THEMES[themeName];
   return !!(theme && (theme.glyphStyle || theme.wordTile || theme.neu || theme.dots));
 }
+
+// ==================== Real-icon restyler ====================
+// The trick every big widget app uses: fetch the app's REAL App Store icon
+// (Apple serves this artwork publicly) and restyle it — grayscale, duotone
+// tint, or floated on a tile. We never redraw trademarks; we transform the
+// genuine artwork the user picked to identify and open that app.
+const REAL_STYLES = [["original", "🎨 Original"], ["mono", "⚪ Mono"], ["tint", "🎯 Tinted"],
+  ["darktile", "⬛ On dark"], ["lighttile", "⬜ On light"]];
+const realStyleCache = {};
+function loadCrossImage(url) {
+  return new Promise(function (resolve) {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = function () { resolve(img); };
+    img.onerror = function () { resolve(null); };
+    img.src = url;
+  });
+}
+async function styledRealIcon(url, styleKey, tintHex, px) {
+  if (!url || !styleKey || styleKey === "original") return null;
+  const key = url + "|" + styleKey + "|" + (tintHex || "") + "|" + px;
+  if (key in realStyleCache) return realStyleCache[key];
+  const img = await loadCrossImage(url);
+  if (!img) { realStyleCache[key] = null; return null; }
+  try {
+    const c = document.createElement("canvas");
+    c.width = px; c.height = px;
+    const x = c.getContext("2d");
+    const r = px * 0.24;
+    if (styleKey === "darktile" || styleKey === "lighttile") {
+      x.beginPath();
+      if (x.roundRect) x.roundRect(0, 0, px, px, r); else x.rect(0, 0, px, px);
+      x.fillStyle = styleKey === "darktile" ? "#17171C" : "#F4EFE8";
+      x.fill();
+      const inset = px * 0.19;
+      x.save();
+      x.beginPath();
+      if (x.roundRect) x.roundRect(inset, inset, px - 2 * inset, px - 2 * inset, px * 0.15);
+      else x.rect(inset, inset, px - 2 * inset, px - 2 * inset);
+      x.clip();
+      x.drawImage(img, inset, inset, px - 2 * inset, px - 2 * inset);
+      x.restore();
+    } else {
+      x.save();
+      x.beginPath();
+      if (x.roundRect) x.roundRect(0, 0, px, px, r); else x.rect(0, 0, px, px);
+      x.clip();
+      x.drawImage(img, 0, 0, px, px);
+      x.restore();
+      const data = x.getImageData(0, 0, px, px);
+      const p = data.data;
+      const tc = styleKey === "tint" ? hexToRgb(tintHex || "#8F52FA") : null;
+      for (let i = 0; i < p.length; i += 4) {
+        const g = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2];
+        if (tc) {
+          // Duotone: shadows take the tint color, highlights go to white.
+          const t = g / 255;
+          p[i] = Math.round(tc[0] + (255 - tc[0]) * t);
+          p[i + 1] = Math.round(tc[1] + (255 - tc[1]) * t);
+          p[i + 2] = Math.round(tc[2] + (255 - tc[2]) * t);
+        } else {
+          p[i] = p[i + 1] = p[i + 2] = g;
+        }
+      }
+      x.putImageData(data, 0, 0);
+    }
+    const out = c.toDataURL("image/png");
+    realStyleCache[key] = out;
+    return out;
+  } catch (e) {
+    // Tainted canvas: the artwork host refused cross-origin reads.
+    realStyleCache[key] = null;
+    return null;
+  }
+}
+// CSS-filter approximation for instant previews while the canvas version loads.
+function realStyleCss(styleKey, tintHex) {
+  if (styleKey === "mono") return "filter:grayscale(1)";
+  if (styleKey === "tint") {
+    const rgb = hexToRgb(tintHex || "#8F52FA");
+    const hue = Math.round(Math.atan2(1.732 * (rgb[1] - rgb[2]), 2 * rgb[0] - rgb[1] - rgb[2]) * 180 / Math.PI);
+    return "filter:grayscale(1) sepia(1) saturate(2.6) hue-rotate(" + ((hue - 50 + 360) % 360) + "deg)";
+  }
+  return "";
+}
 // HTML tile for a themed launcher icon (mirrors themedIconTile in the template).
 function themedIconCss(themeName, index, sizePx) {
   const theme = ICON_THEMES[themeName];
@@ -3524,7 +3611,9 @@ function launcherStyleOf(design) {
     shape: style.shape === "circle" ? "circle" : "rounded",
     labels: style.labels !== false,
     columns: Math.min(Math.max(Math.round(Number(style.columns) || 0), 0), 6),
-    iconTheme: (ICON_THEMES[style.iconTheme] || String(style.iconTheme || "").indexOf("pack:") === 0) ? style.iconTheme : "real"
+    iconTheme: (ICON_THEMES[style.iconTheme] || String(style.iconTheme || "").indexOf("pack:") === 0) ? style.iconTheme : "real",
+    realStyle: ["mono", "tint", "darktile", "lighttile"].indexOf(style.realStyle) >= 0 ? style.realStyle : "original",
+    tintHex: /^#[0-9a-fA-F]{6}$/.test(style.tintHex || "") ? style.tintHex : "#8F52FA"
   };
 }
 function themeOf(design) {
@@ -3697,6 +3786,8 @@ function normalizeDesign(design) {
         if (scheme) el.url = scheme;
       }
       if (el.iconTheme != null && !ICON_THEMES[el.iconTheme] && String(el.iconTheme).indexOf("pack:") !== 0) delete el.iconTheme;
+      if (el.realStyle != null && ["mono", "tint", "darktile", "lighttile"].indexOf(el.realStyle) < 0) delete el.realStyle;
+      if (el.tintHex != null && !/^#[0-9a-fA-F]{6}$/.test(el.tintHex)) delete el.tintHex;
     }
     if (el.font != null && !FONT_CSS[el.font]) delete el.font;
     if (el.kind === "text") {
@@ -4442,9 +4533,18 @@ function designPreviewHTML(design, sizeKey) {
         } else if (style.iconTheme !== "real" && ICON_THEMES[style.iconTheme]) {
           cellIcon = '<div style="' + themedIconCss(style.iconTheme, j, style.iconSize) + '">' + esc(iconGlyph(app, style.iconTheme)) + '</div>';
         } else {
-          const inner = app.iconUrl
-            ? '<img src="' + esc(app.iconUrl) + '" alt="">'
-            : esc(app.emoji || "🌐");
+          const rs = style.realStyle || "original";
+          let inner;
+          if (app.iconUrl && (rs === "darktile" || rs === "lighttile")) {
+            inner = '<div style="width:100%;height:100%;background:' + (rs === "darktile" ? "#17171C" : "#F4EFE8") +
+              ';display:flex;align-items:center;justify-content:center">' +
+              '<img src="' + esc(app.iconUrl) + '" alt="" style="width:62%;height:62%;border-radius:15%">' + "</div>";
+          } else if (app.iconUrl) {
+            const fcss = realStyleCss(rs, style.tintHex);
+            inner = '<img src="' + esc(app.iconUrl) + '" alt=""' + (fcss ? ' style="' + fcss + '"' : "") + ">";
+          } else {
+            inner = esc(app.emoji || "🌐");
+          }
           cellIcon = '<div class="launch-icon" style="' + iconCss + '">' + inner + '</div>';
         }
         grid += '<div class="launch-cell" style="width:' + style.iconSize + 'px">' + cellIcon +
@@ -4645,10 +4745,20 @@ function renderFreestyleInto(node, design, w, h, interactive) {
           "display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.15);" +
           "font-size:" + Math.round(pt * 0.6) + "px";
         if (el.iconUrl) {
-          const img = document.createElement("img");
-          img.src = el.iconUrl;
-          img.style.cssText = "width:100%;height:100%;object-fit:cover;pointer-events:none;display:block";
-          iconBox.appendChild(img);
+          const rs = el.realStyle || "original";
+          if (rs === "darktile" || rs === "lighttile") {
+            iconBox.style.background = rs === "darktile" ? "#17171C" : "#F4EFE8";
+            const img = document.createElement("img");
+            img.src = el.iconUrl;
+            img.style.cssText = "width:62%;height:62%;border-radius:15%;pointer-events:none;display:block";
+            iconBox.appendChild(img);
+          } else {
+            const img = document.createElement("img");
+            img.src = el.iconUrl;
+            img.style.cssText = "width:100%;height:100%;object-fit:cover;pointer-events:none;display:block;" +
+              realStyleCss(rs, el.tintHex);
+            iconBox.appendChild(img);
+          }
         } else {
           iconBox.textContent = el.emoji || "📲";
         }
@@ -5579,10 +5689,34 @@ function buildInspectorContent(inspector) {
     themeSel.value = el.iconTheme && (ICON_THEMES[el.iconTheme] || packIconFor(el.iconTheme, 0)) ? el.iconTheme : "real";
     themeSel.onchange = function () {
       if (themeSel.value === "real") { delete el.iconTheme; } else { el.iconTheme = themeSel.value; }
-      refreshCanvases();
+      refreshEditors();
     };
     optRow.append(shapeSelect, labelToggle, themeSel);
     inspector.appendChild(optRow);
+    if (!el.iconTheme && el.iconUrl) {
+      const realRow = document.createElement("div");
+      realRow.className = "row";
+      const realSel = document.createElement("select");
+      for (const [value, label] of REAL_STYLES) {
+        const option = document.createElement("option");
+        option.value = value; option.textContent = label;
+        realSel.appendChild(option);
+      }
+      realSel.value = el.realStyle || "original";
+      realSel.onchange = function () {
+        if (realSel.value === "original") delete el.realStyle; else el.realStyle = realSel.value;
+        refreshEditors();
+      };
+      realRow.appendChild(realSel);
+      if (el.realStyle === "tint") {
+        const tintInput = document.createElement("input");
+        tintInput.type = "color";
+        tintInput.value = (el.tintHex || "#8F52FA").toLowerCase();
+        tintInput.oninput = function () { el.tintHex = tintInput.value.toUpperCase(); refreshCanvases(); };
+        realRow.appendChild(tintInput);
+      }
+      inspector.appendChild(realRow);
+    }
     const tapHint = document.createElement("p");
     tapHint.className = "hint";
     tapHint.innerHTML = "Tappable on <b>Medium/Large</b> widgets (Small opens its first app). Tap details live in the <b>Shortcut Guide</b> on the Install tab.";
@@ -6633,6 +6767,32 @@ function renderLauncherUI() {
   }
   themeSelect.value = style.iconTheme || "real";
   if (themeSelect.value !== (style.iconTheme || "real")) themeSelect.value = "real";
+  const realSel = document.getElementById("realStyleSel");
+  const realTint = document.getElementById("realTint");
+  const showReal = themeSelect.value === "real";
+  realSel.style.display = showReal ? "" : "none";
+  realTint.style.display = showReal && style.realStyle === "tint" ? "" : "none";
+  if (showReal) {
+    realSel.innerHTML = "";
+    for (const [value, label] of REAL_STYLES) {
+      const option = document.createElement("option");
+      option.value = value; option.textContent = label;
+      realSel.appendChild(option);
+    }
+    realSel.value = style.realStyle || "original";
+    realSel.onchange = function () {
+      current.launcherStyle = launcherStyleOf(current);
+      current.launcherStyle.realStyle = realSel.value;
+      renderLauncherUI();
+      renderPreview();
+    };
+    realTint.value = (style.tintHex || "#8F52FA").toLowerCase();
+    realTint.oninput = function () {
+      current.launcherStyle = launcherStyleOf(current);
+      current.launcherStyle.tintHex = realTint.value.toUpperCase();
+      renderPreview();
+    };
+  }
 
   const shortcutApps = (current.apps || []).filter(function (app) {
     return (app.url || "").indexOf("shortcuts://run-shortcut") === 0;
@@ -8171,6 +8331,21 @@ async function buildScript() {
         delete el.iconTheme;
       }
     });
+    // Restyled real icons travel baked — Scriptable can't run image filters.
+    const ls2 = design.launcherStyle || {};
+    if ((!ls2.iconTheme || ls2.iconTheme === "real") && ls2.realStyle && ls2.realStyle !== "original") {
+      for (const app of design.apps || []) {
+        if (!app.iconUrl) continue;
+        const styled = await styledRealIcon(app.iconUrl, ls2.realStyle, ls2.tintHex, 512);
+        if (styled) { app.iconB64 = styled.split(",")[1] || ""; app.iconUrl = ""; }
+      }
+    }
+    for (const el of appEls) {
+      if (!el.iconTheme && el.iconUrl && el.realStyle && el.realStyle !== "original") {
+        const styled = await styledRealIcon(el.iconUrl, el.realStyle, el.tintHex, 512);
+        if (styled) { el.iconB64 = styled.split(",")[1] || ""; el.iconUrl = ""; }
+      }
+    }
   }
   if (missingPhotos.length) {
     // Photos don't travel inside sync links — designs that arrived that way
@@ -9305,6 +9480,9 @@ document.getElementById("pageSaveBtn").onclick = function () {
 
 // ==================== Home Screen App Icon Maker ====================
 let iconMakerStyle = "real";
+let iconMakerRealStyle = localStorage.getItem("widgetking.realstyle") || "original";
+let iconMakerTint = localStorage.getItem("widgetking.realtint") || "#8F52FA";
+let realTaintWarned = false;
 let iconMakerApps = [
   { label: "Messages", emoji: "💬" }, { label: "Phone", emoji: "📞" },
   { label: "Instagram", emoji: "📸" }, { label: "Spotify", emoji: "🎧" },
@@ -9422,6 +9600,34 @@ function renderIconMaker() {
     chip.onclick = function () { iconMakerStyle = id; renderIconMaker(); };
     styleChips.appendChild(chip);
   }
+  if (iconMakerStyle === "real") {
+    // Koco-style variants of the genuine App Store artwork.
+    const variantRow = document.createElement("div");
+    variantRow.style.cssText = "flex-basis:100%;display:flex;gap:6px;flex-wrap:wrap;margin-top:4px";
+    for (const [value, label] of REAL_STYLES) {
+      const chip = document.createElement("button");
+      chip.textContent = label;
+      chip.className = (iconMakerRealStyle || "original") === value ? "sel" : "";
+      chip.onclick = function () {
+        iconMakerRealStyle = value;
+        localStorage.setItem("widgetking.realstyle", value);
+        renderIconMaker();
+      };
+      variantRow.appendChild(chip);
+    }
+    if (iconMakerRealStyle === "tint") {
+      const tint = document.createElement("input");
+      tint.type = "color";
+      tint.value = iconMakerTint.toLowerCase();
+      tint.oninput = function () {
+        iconMakerTint = tint.value.toUpperCase();
+        localStorage.setItem("widgetking.realtint", iconMakerTint);
+        renderIconMaker();
+      };
+      variantRow.appendChild(tint);
+    }
+    styleChips.appendChild(variantRow);
+  }
   if (iconMakerStyle === "real") fetchMakerIcons();
   const appChips = document.getElementById("iconAppChips");
   appChips.innerHTML = "";
@@ -9442,6 +9648,18 @@ function renderIconMaker() {
     } else if (iconMakerStyle === "real") {
       if (app.iconUrl) {
         img.src = app.iconUrl;
+        const rs = iconMakerRealStyle || "original";
+        if (rs !== "original") {
+          // Instant CSS preview, then the saveable canvas version swaps in.
+          img.style.filter = realStyleCss(rs, iconMakerTint).replace("filter:", "");
+          styledRealIcon(app.iconUrl, rs, iconMakerTint, 1024).then(function (styled) {
+            if (styled) { img.src = styled; img.style.filter = ""; }
+            else if (!realTaintWarned) {
+              realTaintWarned = true;
+              toast("⚠️ Some artwork blocks restyling — those keep their original look when saved");
+            }
+          });
+        }
       } else {
         // Artwork still loading (or not found) — pastel placeholder for now.
         img.src = drawHomeIcon(app, "pastel", index);
