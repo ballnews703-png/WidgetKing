@@ -838,7 +838,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 67;
+const WK_VERSION = 68;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -9196,16 +9196,26 @@ function applyAppearance(mode) {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.content = mode === "light" ? "#f5f1ec" : "#131318";
 }
-let appearance = localStorage.getItem("widgetking.appearance");
-if (!appearance) {
-  appearance = (window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches) ? "light" : "dark";
+function systemAppearance() {
+  return (window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches) ? "light" : "dark";
 }
-applyAppearance(appearance);
+// "auto" follows the phone's appearance live; a manual pick sticks until the
+// toggle cycles back around to auto.
+let appearance = localStorage.getItem("widgetking.appearance") || "auto";
+function effectiveAppearance() { return appearance === "auto" ? systemAppearance() : appearance; }
+applyAppearance(effectiveAppearance());
+if (window.matchMedia) {
+  const mq = matchMedia("(prefers-color-scheme: light)");
+  const followSystem = function () { if (appearance === "auto") applyAppearance(effectiveAppearance()); };
+  if (mq.addEventListener) mq.addEventListener("change", followSystem);
+  else if (mq.addListener) mq.addListener(followSystem);
+}
 document.getElementById("modeToggle").onclick = function () {
-  appearance = appearance === "light" ? "dark" : "light";
+  appearance = appearance === "auto" ? "light" : appearance === "light" ? "dark" : "auto";
   localStorage.setItem("widgetking.appearance", appearance);
-  applyAppearance(appearance);
-  toast(appearance === "light" ? "☀️ Light and lovely" : "🌙 Back to dark");
+  applyAppearance(effectiveAppearance());
+  toast(appearance === "auto" ? "🌗 Auto — matches your phone"
+    : appearance === "light" ? "☀️ Light and lovely" : "🌙 Back to dark");
 };
 
 // ==================== Guided builder ====================
