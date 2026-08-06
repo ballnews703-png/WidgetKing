@@ -48,6 +48,13 @@
     padding: calc(12px + env(safe-area-inset-top)) 16px calc(84px + env(safe-area-inset-bottom)); max-width: 1080px; margin: 0 auto;
     transition: background .25s ease, color .25s ease;
   }
+  /* Home-Screen (standalone) mode: env() occasionally reports 0 on some iOS
+     builds, dropping the header under the Dynamic Island — the max() floor
+     guarantees clearance either way. */
+  @media (display-mode: standalone) {
+    body { padding-top: max(calc(12px + env(safe-area-inset-top)), 64px); }
+  }
+  html.wk-standalone body { padding-top: max(calc(12px + env(safe-area-inset-top)), 64px); }
   header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
   header h1 { font-size: 22px; }
   header .spacer { flex: 1; }
@@ -262,13 +269,16 @@
   #inspector .row { margin-bottom: 8px; }
   input[type=range] { flex: 1; min-width: 60px; }
   input[type=color] { width: 44px; height: 32px; border: none; background: none; padding: 0; cursor: pointer; }
-  .tpl-row { display: flex; gap: 12px; overflow-x: auto; padding: 4px 2px 10px;
+  .tpl-row { display: flex; align-items: stretch; gap: 10px; overflow-x: auto; padding: 4px 2px 12px;
     scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
   .tpl-card { flex-shrink: 0; scroll-snap-align: start; cursor: pointer; text-align: center;
+    background: var(--card2); border-radius: 16px; padding: 10px 10px 8px;
+    display: flex; flex-direction: column; justify-content: flex-start;
     transition: transform .15s ease; }
   .tpl-card:hover { transform: translateY(-3px); }
-  .tpl-name { font-size: 12px; font-weight: 600; margin-top: 6px; }
-  .tpl-cat { font-size: 10px; color: var(--muted); }
+  .tpl-name { font-size: 12px; font-weight: 600; margin-top: 8px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tpl-cat { font-size: 10px; color: var(--muted); margin-top: 1px; }
   .lib-item { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 10px;
     border-radius: 12px; background: var(--card2); margin-bottom: 8px; }
   .lib-item .meta { flex: 1; min-width: 110px; overflow: hidden; }
@@ -317,6 +327,7 @@
   <h2>What are we making today?</h2>
   <button class="primary" id="builderBtn" style="width:100%;font-size:16px;padding:15px">✨ Build it for me — 3 quick questions</button>
   <div class="method-cards">
+    <button id="newWidgetBtn">➕ Create new widget<br><span style="font-size:11px;color:var(--muted)">start from scratch</span></button>
     <button id="cloneBtn" style="display:none">📷 Clone a widget<br><span style="font-size:11px;color:var(--muted)">from any photo</span></button>
     <button id="pageStudioBtn">📱 Design a page<br><span style="font-size:11px;color:var(--muted)">whole Home Screen</span></button>
   </div>
@@ -477,14 +488,7 @@
         </div>
         <div class="row" style="margin-top:6px">
           <span style="font-size:12px;color:var(--muted)">Look</span>
-          <select id="iconTheme" style="width:130px">
-            <option value="real">📱 Real icons</option>
-            <option value="pastel">🌸 Pastel</option>
-            <option value="line">▫️ Line</option>
-            <option value="noir">⬛ Noir</option>
-            <option value="zen">🍃 Zen</option>
-            <option value="neon">⚡ Neon</option>
-          </select>
+          <select id="iconTheme" style="width:130px"></select>
           <span style="font-size:12px;color:var(--muted)">Per row</span>
           <select id="iconColumns" style="width:90px">
             <option value="0">Auto</option>
@@ -617,6 +621,12 @@
   <p class="hint">💡 Tap any icon below to swap in <b>your own image</b> (from Canva, Photos, anywhere). Uploads stay on your device.
   Only use images you own or have permission to use — WidgetKing isn't responsible for third-party content.</p>
   <input type="file" id="iconUploadInput" accept="image/*" style="display:none">
+  <input type="file" id="bulkIconInput" accept="image/*" multiple style="display:none">
+  <div class="row" style="margin:6px 0">
+    <button id="bulkIconBtn">📁 Upload icon pack (bulk)</button>
+  </div>
+  <div class="chips" id="myIconPacks"></div>
+  <p class="hint">A pack is a named set of your own icons (upload up to 24 at once). Use it anywhere an icon style is offered — launchers, app buttons, or applied to the grid below.</p>
   <label style="font-size:12px;color:var(--muted)">Quick-start packs — one tap picks the style and starter apps</label>
   <div class="chips" id="iconPackChips"></div>
   <label style="font-size:12px;color:var(--muted);margin-top:6px;display:block">Icon style</label>
@@ -780,7 +790,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 53;
+const WK_VERSION = 54;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -1893,7 +1903,9 @@ async function addFreestyleApps(w, design, family, live) {
         const tile = iconStack.addImage(themedIconTile(el, elTheme, apps.indexOf(el), pt));
         tile.imageSize = new Size(pt, pt);
       } else {
-        if (el.iconUrl) realIcon = await loadIcon(el.iconUrl);
+        // Custom pack icons travel baked into the script itself.
+        if (el.iconB64) { try { realIcon = Image.fromData(Data.fromBase64String(el.iconB64)); } catch (e) {} }
+        if (!realIcon && el.iconUrl) realIcon = await loadIcon(el.iconUrl);
         if (realIcon) {
           const img = iconStack.addImage(realIcon);
           img.imageSize = new Size(pt, pt);
@@ -1934,10 +1946,20 @@ const ICON_THEMES = {
   line:   { colors: ["#FBFAF7"], glyph: "#33303B", line: true },
   noir:   { colors: ["#111116"], glyph: "#F2F2F5", line: false },
   zen:    { colors: ["#DDE5D6", "#E9E4D8", "#CDD9CE"], glyph: "#4A5A4E", line: false },
-  neon:   { colors: ["#14002E"], glyph: "#00F0FF", line: false, glyphCycle: ["#FF2079", "#00F0FF", "#39FF14", "#FFD300"] }
+  neon:   { colors: ["#14002E"], glyph: "#00F0FF", line: false, glyphCycle: ["#FF2079", "#00F0FF", "#39FF14", "#FFD300"] },
+  duo:    { colors: ["#5B2C98", "#1A2980", "#B0345C", "#134E5E", "#7A3803"], glyph: "#FFFFFF",
+            duo: ["#B06AB3", "#26D0CE", "#F09819", "#71B280", "#FFD300"] },
+  frost:  { colors: ["#FFFFFF"], glyph: "#FFFFFF", frost: true },
+  retro:  { colors: ["#1B1B2E"], glyph: "#FF6B6B", lineCycle: true,
+            glyphCycle: ["#FF6B6B", "#FFD93D", "#6BCB77", "#4D96FF"] },
+  candy:  { colors: ["#FF9A9E", "#A18CD1", "#7FD8BE", "#F6C90E", "#8FD3F4"], glyph: "#FFFFFF", radius: 0.3 },
+  basic:  { colors: ["#3A3A44"], glyph: "#FFFFFF", emojiTile: true }
 };
-function iconGlyph(app) {
-  if (app.emoji && app.emoji !== "📱" && app.emoji !== "🌐" && app.emoji !== "📲") return app.emoji;
+// Themed tiles use clean letter monograms; only the Basic theme (and the
+// untinted fallback) keeps the app's emoji.
+function iconGlyph(app, themeName) {
+  const letterOnly = themeName && themeName !== "basic";
+  if (!letterOnly && app.emoji && app.emoji !== "📱" && app.emoji !== "🌐" && app.emoji !== "📲") return app.emoji;
   return (app.label || "A").trim().charAt(0).toUpperCase();
 }
 function themedIconTile(app, themeName, index, pt) {
@@ -1947,29 +1969,38 @@ function themedIconTile(app, themeName, index, pt) {
   ctx.size = new Size(S, S);
   ctx.opaque = false;
   ctx.respectScreenScale = false;
-  const r = Math.round(S * 0.24);
+  const r = Math.round(S * (theme.radius || 0.24));
   const rect = new Rect(0, 0, S, S);
   const bg = theme.colors[index % theme.colors.length];
   const path = new Path();
   path.addRoundedRect(rect, r, r);
   ctx.addPath(path);
-  ctx.setFillColor(new Color(bg));
+  if (theme.frost) { ctx.setFillColor(new Color("#FFFFFF", 0.25)); }
+  else { ctx.setFillColor(new Color(bg)); }
   ctx.fillPath();
-  if (theme.line) {
+  if (theme.duo) {
+    // Soft accent orb toward the lower-right — stays inside the tile so it
+    // never pokes past the rounded corners (DrawContext can't clip).
+    const b = theme.duo[index % theme.duo.length];
+    ctx.setFillColor(new Color(b, 0.8));
+    ctx.fillEllipse(new Rect(S * 0.34, S * 0.34, S * 0.62, S * 0.62));
+  }
+  const glyphColor = theme.glyphCycle ? theme.glyphCycle[index % theme.glyphCycle.length] : theme.glyph;
+  if (theme.line || theme.lineCycle || theme.frost) {
     const inset = Math.max(2, Math.round(S * 0.035));
     const inner = new Path();
     inner.addRoundedRect(new Rect(inset, inset, S - 2 * inset, S - 2 * inset), r - inset, r - inset);
     ctx.addPath(inner);
-    ctx.setStrokeColor(new Color(theme.glyph));
+    const strokeColor = theme.lineCycle ? glyphColor : (theme.frost ? "#FFFFFF" : theme.glyph);
+    ctx.setStrokeColor(new Color(strokeColor, theme.frost ? 0.5 : 1));
     ctx.setLineWidth(Math.max(2, Math.round(S * 0.03)));
     ctx.strokePath();
   }
-  const glyph = iconGlyph(app);
-  const glyphColor = theme.glyphCycle ? theme.glyphCycle[index % theme.glyphCycle.length] : theme.glyph;
+  const glyph = iconGlyph(app, themeName);
   ctx.setTextColor(new Color(glyphColor));
-  ctx.setFont(Font.boldSystemFont(Math.round(S * 0.42)));
+  ctx.setFont(theme.emojiTile ? Font.systemFont(Math.round(S * 0.5)) : Font.boldSystemFont(Math.round(S * 0.42)));
   ctx.setTextAlignedCenter();
-  ctx.drawTextInRect(glyph, new Rect(0, S * 0.22, S, S * 0.62));
+  ctx.drawTextInRect(glyph, new Rect(0, S * (theme.emojiTile ? 0.18 : 0.22), S, S * 0.62));
   return ctx.getImage();
 }
 async function loadIcon(url) {
@@ -2050,7 +2081,8 @@ async function buildLauncher(w, design, family, tc, style) {
         const tile = cell.addImage(themedIconTile(app, iconTheme, i + j, iconPt));
         tile.imageSize = new Size(iconPt, iconPt);
       } else {
-        if (app.iconUrl) realIcon = await loadIcon(app.iconUrl);
+        if (app.iconB64) { try { realIcon = Image.fromData(Data.fromBase64String(app.iconB64)); } catch (e) {} }
+        if (!realIcon && app.iconUrl) realIcon = await loadIcon(app.iconUrl);
         if (realIcon) {
           const img = cell.addImage(realIcon);
           img.imageSize = new Size(iconPt, iconPt);
@@ -2483,6 +2515,9 @@ Script.complete();
 <script>
 "use strict";
 
+// Belt-and-braces for the display-mode media query (see CSS note above).
+if (navigator.standalone) document.documentElement.classList.add("wk-standalone");
+
 const THEMES = {
   midnight: ["#232526", "#414345"], royal: ["#5B2C98", "#8E44AD"],
   sunset: ["#FF512F", "#F09819"], ocean: ["#1A2980", "#26D0CE"],
@@ -2647,21 +2682,50 @@ const ICON_THEMES = {
   line:   { name: "▫️ Line", colors: ["#FBFAF7"], glyph: "#33303B", line: true },
   noir:   { name: "⬛ Noir", colors: ["#111116"], glyph: "#F2F2F5", line: false },
   zen:    { name: "🍃 Zen", colors: ["#DDE5D6", "#E9E4D8", "#CDD9CE"], glyph: "#4A5A4E", line: false },
-  neon:   { name: "⚡ Neon", colors: ["#14002E"], glyph: "#00F0FF", line: false, glyphCycle: ["#FF2079", "#00F0FF", "#39FF14", "#FFD300"] }
+  neon:   { name: "⚡ Neon", colors: ["#14002E"], glyph: "#00F0FF", line: false, glyphCycle: ["#FF2079", "#00F0FF", "#39FF14", "#FFD300"] },
+  duo:    { name: "🌈 Duotone", colors: ["#5B2C98", "#1A2980", "#B0345C", "#134E5E", "#7A3803"], glyph: "#FFFFFF",
+            duo: ["#B06AB3", "#26D0CE", "#F09819", "#71B280", "#FFD300"] },
+  frost:  { name: "🧊 Frosted", colors: ["#FFFFFF"], glyph: "#FFFFFF", frost: true },
+  retro:  { name: "🕹 Retro", colors: ["#1B1B2E"], glyph: "#FF6B6B", lineCycle: true,
+            glyphCycle: ["#FF6B6B", "#FFD93D", "#6BCB77", "#4D96FF"] },
+  candy:  { name: "🍬 Candy", colors: ["#FF9A9E", "#A18CD1", "#7FD8BE", "#F6C90E", "#8FD3F4"], glyph: "#FFFFFF", radius: 0.3 },
+  basic:  { name: "😀 Basic (emoji)", colors: ["#3A3A44"], glyph: "#FFFFFF", emojiTile: true }
 };
-function iconGlyph(app) {
-  if (app.emoji && app.emoji !== "📱" && app.emoji !== "🌐" && app.emoji !== "📲") return app.emoji;
+// Themed tiles use clean letter monograms; only Basic keeps the emoji.
+function iconGlyph(app, themeName) {
+  const letterOnly = themeName && themeName !== "basic";
+  if (!letterOnly && app.emoji && app.emoji !== "📱" && app.emoji !== "🌐" && app.emoji !== "📲") return app.emoji;
   return (app.label || "A").trim().charAt(0).toUpperCase();
+}
+// User-uploaded icon packs (stored locally; baked into the script at export).
+let iconPacks = [];
+try { iconPacks = JSON.parse(localStorage.getItem("widgetking.iconpacks") || "[]") || []; } catch (e) {}
+function saveIconPacks() {
+  try { localStorage.setItem("widgetking.iconpacks", JSON.stringify(iconPacks)); }
+  catch (e) { toast("⚠️ Storage is full — delete an icon pack or upload fewer icons"); }
+}
+function packIconFor(themeName, index) {
+  if (!themeName || String(themeName).indexOf("pack:") !== 0) return null;
+  const pack = iconPacks.find(function (p) { return "pack:" + p.id === themeName; });
+  if (!pack || !pack.icons.length) return null;
+  return pack.icons[index % pack.icons.length];
 }
 // HTML tile for a themed launcher icon (mirrors themedIconTile in the template).
 function themedIconCss(themeName, index, sizePx) {
   const theme = ICON_THEMES[themeName];
-  const bg = theme.colors[index % theme.colors.length];
+  const bg = theme.frost ? "rgba(255,255,255,.25)" : theme.colors[index % theme.colors.length];
   const glyphColor = theme.glyphCycle ? theme.glyphCycle[index % theme.glyphCycle.length] : theme.glyph;
-  return "width:" + sizePx + "px;height:" + sizePx + "px;border-radius:24%;background:" + bg +
-    ";display:flex;align-items:center;justify-content:center;font-weight:700;color:" + glyphColor +
-    ";font-size:" + Math.round(sizePx * 0.44) + "px" +
-    (theme.line ? ";box-shadow:inset 0 0 0 " + Math.max(1, Math.round(sizePx * 0.045)) + "px " + theme.glyph : "");
+  let background = bg;
+  if (theme.duo) {
+    const b = theme.duo[index % theme.duo.length];
+    background = "radial-gradient(circle at 65% 65%, " + b + " 0%, " + hexToRgba(b, 0.85) + " 30%, transparent 62%), " + bg;
+  }
+  const strokeColor = theme.lineCycle ? glyphColor : (theme.frost ? "rgba(255,255,255,.5)" : theme.glyph);
+  return "width:" + sizePx + "px;height:" + sizePx + "px;border-radius:" + Math.round((theme.radius || 0.24) * 100) + "%;background:" + background +
+    ";display:flex;align-items:center;justify-content:center;font-weight:" + (theme.emojiTile ? "400" : "700") + ";color:" + glyphColor +
+    ";font-size:" + Math.round(sizePx * (theme.emojiTile ? 0.52 : 0.44)) + "px" +
+    ((theme.line || theme.lineCycle || theme.frost)
+      ? ";box-shadow:inset 0 0 0 " + Math.max(1, Math.round(sizePx * 0.045)) + "px " + strokeColor : "");
 }
 const SYMBOL_EMOJI = {
   "star.fill": "⭐", "heart.fill": "❤️", "bolt.fill": "⚡",
@@ -2774,7 +2838,7 @@ function launcherStyleOf(design) {
     shape: style.shape === "circle" ? "circle" : "rounded",
     labels: style.labels !== false,
     columns: Math.min(Math.max(Math.round(Number(style.columns) || 0), 0), 6),
-    iconTheme: ICON_THEMES[style.iconTheme] ? style.iconTheme : "real"
+    iconTheme: (ICON_THEMES[style.iconTheme] || String(style.iconTheme || "").indexOf("pack:") === 0) ? style.iconTheme : "real"
   };
 }
 function themeOf(design) {
@@ -2816,6 +2880,9 @@ function normalizeDesign(design) {
   if (design.glassTint !== "light") design.glassTint = "dark";
   if (typeof design.bgOpacity !== "number" || design.bgOpacity < 0.1 || design.bgOpacity > 1) design.bgOpacity = 1;
   design.launcherStyle = launcherStyleOf(design);
+  // The widget size this design's layout was authored at — refits between
+  // sizes must start from here, not from whatever the editor last showed.
+  if (!SIZES[design.fitSize]) delete design.fitSize;
   if (design.kind === "playlist") {
     if (!design.playlist || typeof design.playlist !== "object") design.playlist = {};
     for (const pair of [["morning"], ["midday"], ["evening"], ["night"]]) {
@@ -2935,7 +3002,7 @@ function normalizeDesign(design) {
         const scheme = schemeForName(el.label);
         if (scheme) el.url = scheme;
       }
-      if (el.iconTheme != null && !ICON_THEMES[el.iconTheme]) delete el.iconTheme;
+      if (el.iconTheme != null && !ICON_THEMES[el.iconTheme] && String(el.iconTheme).indexOf("pack:") !== 0) delete el.iconTheme;
     }
     if (el.font != null && !FONT_CSS[el.font]) delete el.font;
     if (el.kind === "text") {
@@ -3225,6 +3292,7 @@ const AI_SCHEMA = {
   type: "object",
   properties: {
     name: { type: "string", description: "Short widget name, max 24 characters" },
+    size: { type: "string", "enum": ["small", "medium", "large"], description: "The widget size this layout is designed for. small unless the user asks for a wider/bigger widget or the content needs the room" },
     kind: { type: "string", "enum": ["clock", "date", "countdown", "quote", "note", "launcher", "battery", "freestyle"] },
     themeID: { type: "string", "enum": Object.keys(THEMES) },
     fontStyle: { type: "string", "enum": Object.keys(FONT_CSS) },
@@ -3291,7 +3359,7 @@ const AI_SCHEMA = {
       }
     }
   },
-  required: ["name", "kind", "themeID", "fontStyle", "textColorHex", "primaryText", "secondaryText", "targetDate", "background", "glassTint", "bgOpacity", "backgroundColors", "tapUrl", "apps", "canvasElements"],
+  required: ["name", "size", "kind", "themeID", "fontStyle", "textColorHex", "primaryText", "secondaryText", "targetDate", "background", "glassTint", "bgOpacity", "backgroundColors", "tapUrl", "apps", "canvasElements"],
   additionalProperties: false
 };
 
@@ -3346,6 +3414,7 @@ function aiSystemPrompt() {
     "- Font pairing: ONE display font (didot, script, futura, marker, copperplate) for the hero element only via its font field; classic/avenir/optima for data and captions. Never three fonts.\n" +
     "- Color discipline: ONE accent color used 2-3 times (ring, caption, glyph); everything else white/near-black at varied opacities. Text must contrast the background.\n" +
     "SPACING: keep everything inside x/y .08-.92; give the hero room; captions sit .12-.16 below their hero; fewer, larger elements beat many small ones.\n" +
+    "SIZE: set the top-level size field to the widget size the layout is drawn for — small 158x158pt, medium 338x158, large 338x354. x/y fractions map onto THAT canvas; a row of three columns or a launcher of 6+ apps needs medium, a full dashboard large.\n" +
     "FIT — nothing may spill past an edge: a text's width in x-fraction is roughly fontPt × 0.55 × charCount / 158 (so a 44pt clock spans ~0.8 — it MUST sit at x .5). Any text over 30pt stays centered at x .45-.55; on medium widgets cap the hero at 40pt unless it is very short. Dividers/bars w ≤ .7 centered under their text.\n" +
     "Fonts (fontStyle or per-element font): " + Object.keys(FONT_CSS).join(", ") + ".\n" +
     "Themes: " + Object.keys(THEMES).join(", ") + ". 'paper' is light (use dark text #333333); others are dark (use light text). For specific moods prefer TWO custom backgroundColors (e.g. dusk plum #2A1A34 to terracotta #B0626A) over presets.\n" +
@@ -3438,6 +3507,7 @@ function archiveExemplar(idea) {
 function specToDesign(spec) {
   const design = newDesign();
   design.name = (spec.name || "My Widget").slice(0, 24);
+  if (SIZES[spec.size]) design.fitSize = spec.size;
   design.kind = ["clock","date","countdown","quote","note","launcher","battery","freestyle"].includes(spec.kind) ? spec.kind : "note";
   if (THEMES[spec.themeID]) design.themeID = spec.themeID;
   if (FONT_CSS[spec.fontStyle]) design.fontStyle = spec.fontStyle;
@@ -3665,8 +3735,11 @@ function designPreviewHTML(design, sizeKey) {
       let j = i;
       for (const app of list.slice(i, i + perRow)) {
         let cellIcon;
-        if (style.iconTheme !== "real") {
-          cellIcon = '<div style="' + themedIconCss(style.iconTheme, j, style.iconSize) + '">' + esc(iconGlyph(app)) + '</div>';
+        const packIcon = packIconFor(style.iconTheme, j);
+        if (packIcon) {
+          cellIcon = '<div class="launch-icon" style="' + iconCss + '"><img src="' + packIcon + '" alt=""></div>';
+        } else if (style.iconTheme !== "real" && ICON_THEMES[style.iconTheme]) {
+          cellIcon = '<div style="' + themedIconCss(style.iconTheme, j, style.iconSize) + '">' + esc(iconGlyph(app, style.iconTheme)) + '</div>';
         } else {
           const inner = app.iconUrl
             ? '<img src="' + esc(app.iconUrl) + '" alt="">'
@@ -3847,10 +3920,18 @@ function renderFreestyleInto(node, design, w, h, interactive) {
     } else if (el.kind === "app") {
       const pt = (el.size || 40) * scale;
       const iconBox = document.createElement("div");
-      if (el.iconTheme && ICON_THEMES[el.iconTheme]) {
-        const idx = design.canvasElements.filter(function (e) { return e.kind === "app"; }).indexOf(el);
-        iconBox.style.cssText = themedIconCss(el.iconTheme, Math.max(0, idx), pt) + ";margin:0 auto;pointer-events:none";
-        iconBox.textContent = iconGlyph(el);
+      const appIdx = design.canvasElements.filter(function (e) { return e.kind === "app"; }).indexOf(el);
+      const packIcon = packIconFor(el.iconTheme, Math.max(0, appIdx));
+      if (packIcon) {
+        iconBox.style.cssText = "width:" + pt + "px;height:" + pt + "px;overflow:hidden;margin:0 auto;pointer-events:none;" +
+          "border-radius:" + (el.shape === "circle" ? "50%" : Math.round(pt * 0.24) + "px");
+        const img = document.createElement("img");
+        img.src = packIcon;
+        img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block";
+        iconBox.appendChild(img);
+      } else if (el.iconTheme && ICON_THEMES[el.iconTheme]) {
+        iconBox.style.cssText = themedIconCss(el.iconTheme, Math.max(0, appIdx), pt) + ";margin:0 auto;pointer-events:none";
+        iconBox.textContent = iconGlyph(el, el.iconTheme);
       } else {
         iconBox.style.cssText = "width:" + pt + "px;height:" + pt + "px;overflow:hidden;margin:0 auto;" +
           "border-radius:" + (el.shape === "circle" ? "50%" : Math.round(pt * 0.24) + "px") + ";" +
@@ -4518,7 +4599,10 @@ document.getElementById("photoInput").onchange = function (event) {
       const c = document.createElement("canvas");
       c.width = cw; c.height = ch;
       c.getContext("2d").drawImage(img, 0, 0, cw, ch);
-      const dataUrl = c.toDataURL("image/jpeg", 0.82);
+      // PNG/WebP keep their transparency (logos, stickers, cut-outs);
+      // camera photos stay JPEG so designs remain small.
+      const keepAlpha = /png|webp|gif/i.test(file.type || "");
+      const dataUrl = keepAlpha ? c.toDataURL("image/png") : c.toDataURL("image/jpeg", 0.82);
       if (job.mode === "add" && job.el) {
         if (!Array.isArray(job.el.photos) || job.el.photos.length === 0) {
           job.el.photos = job.el.dataUrl ? [job.el.dataUrl] : [];
@@ -4745,7 +4829,12 @@ function buildInspectorContent(inspector) {
       option.value = id; option.textContent = ICON_THEMES[id].name;
       themeSel.appendChild(option);
     }
-    themeSel.value = el.iconTheme && ICON_THEMES[el.iconTheme] ? el.iconTheme : "real";
+    for (const pack of iconPacks) {
+      const option = document.createElement("option");
+      option.value = "pack:" + pack.id; option.textContent = "📁 " + pack.name;
+      themeSel.appendChild(option);
+    }
+    themeSel.value = el.iconTheme && (ICON_THEMES[el.iconTheme] || packIconFor(el.iconTheme, 0)) ? el.iconTheme : "real";
     themeSel.onchange = function () {
       if (themeSel.value === "real") { delete el.iconTheme; } else { el.iconTheme = themeSel.value; }
       refreshCanvases();
@@ -5220,6 +5309,22 @@ function buildInspectorContent(inspector) {
     frameSel.value = el.frame || "none";
     frameSel.onchange = function () { el.frame = frameSel.value; refreshEditors(); };
     frameRow.append(frameLabel, frameSel);
+    if (el.dataUrl) {
+      const cutBtn = document.createElement("button");
+      cutBtn.textContent = "✂️ Remove background";
+      cutBtn.onclick = async function () {
+        cutBtn.disabled = true;
+        cutBtn.textContent = "✂️ Working…";
+        const sources = (el.photos && el.photos.length) ? el.photos : [el.dataUrl];
+        const cut = [];
+        for (const src of sources) cut.push(await removeImageBackground(src));
+        el.photos = cut;
+        el.dataUrl = cut[0];
+        refreshEditors();
+        toast("✂️ Background removed — tap Undo if it grabbed too much");
+      };
+      frameRow.appendChild(cutBtn);
+    }
     if ((el.frame || "none") === "border") {
       const frameColor = document.createElement("input");
       frameColor.type = "color";
@@ -5438,8 +5543,9 @@ function renderStudioUI() {
     button.textContent = key === "small" ? "S" : key === "medium" ? "M" : "L";
     button.className = studioSize === key ? "active" : "";
     button.onclick = function () {
-      refitElements(current, studioSize, key);
+      refitElements(current, SIZES[current.fitSize] ? current.fitSize : studioSize, key);
       studioSize = key;
+      current.fitSize = key;
       renderStudioUI();
       renderStudioCanvas();
       renderPreview();
@@ -5731,7 +5837,23 @@ function renderLauncherUI() {
   document.getElementById("iconShape").value = style.shape;
   document.getElementById("showLabels").checked = style.labels;
   document.getElementById("iconColumns").value = String(style.columns);
-  document.getElementById("iconTheme").value = style.iconTheme || "real";
+  const themeSelect = document.getElementById("iconTheme");
+  themeSelect.innerHTML = "";
+  const realOpt = document.createElement("option");
+  realOpt.value = "real"; realOpt.textContent = "📱 Real icons";
+  themeSelect.appendChild(realOpt);
+  for (const id of Object.keys(ICON_THEMES)) {
+    const option = document.createElement("option");
+    option.value = id; option.textContent = ICON_THEMES[id].name;
+    themeSelect.appendChild(option);
+  }
+  for (const pack of iconPacks) {
+    const option = document.createElement("option");
+    option.value = "pack:" + pack.id; option.textContent = "📁 " + pack.name;
+    themeSelect.appendChild(option);
+  }
+  themeSelect.value = style.iconTheme || "real";
+  if (themeSelect.value !== (style.iconTheme || "real")) themeSelect.value = "real";
 
   const shortcutApps = (current.apps || []).filter(function (app) {
     return (app.url || "").indexOf("shortcuts://run-shortcut") === 0;
@@ -6127,8 +6249,10 @@ function renderTemplates() {
     const design = normalizeDesign(JSON.parse(JSON.stringify(template.design)));
     const dims = SIZES[sizeKey];
     const scale = 87 / dims[1];
+    const thumbW = Math.round(dims[0] * scale);
+    card.style.width = (thumbW + 20) + "px";
     const thumbWrap = document.createElement("div");
-    thumbWrap.style.cssText = "width:" + Math.round(dims[0] * scale) + "px;height:87px;overflow:hidden;" +
+    thumbWrap.style.cssText = "width:" + thumbW + "px;height:87px;overflow:hidden;" +
       "border-radius:" + Math.round(24 * scale) + "px;margin:0 auto";
     const inner = renderDesignNode(design, sizeKey);
     inner.style.transform = "scale(" + scale + ")";
@@ -6189,6 +6313,11 @@ function popCanvas() {
 // ==================== Controls ====================
 function loadIntoEditor(design) {
   current = normalizeDesign(JSON.parse(JSON.stringify(design)));
+  // Open at the size the layout was made for — clicking a size button then
+  // refits from the TRUE authored size. (Before this, a medium design opened
+  // as small got double-refitted, and only Undo restored the proportions.)
+  if (SIZES[current.fitSize]) previewSize = current.fitSize;
+  else current.fitSize = previewSize;
   selectedElId = null;
   multiSelect = null;
   if (editorSubTab !== "widget") {
@@ -6434,8 +6563,9 @@ function renderControls() {
     button.textContent = size[0].toUpperCase() + size.slice(1);
     if (previewSize === size) button.className = "active";
     button.onclick = function () {
-      refitElements(current, previewSize, size);
+      refitElements(current, SIZES[current.fitSize] ? current.fitSize : previewSize, size);
       previewSize = size;
+      current.fitSize = size;
       renderAll();
     };
     sizeButtons.appendChild(button);
@@ -6454,13 +6584,58 @@ function libFolderNames() {
 }
 function setDesignFolder(design) {
   const existing = libFolderNames();
-  const answer = prompt("Folder for “" + design.name + "”\n(leave empty for no folder" +
-    (existing.length ? "; existing: " + existing.join(", ") : "") + ")", design.folder || "");
-  if (answer === null) return;
-  const name = answer.trim().slice(0, 24);
-  if (name) design.folder = name; else delete design.folder;
-  persist();
-  renderLibrary();
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:80;" +
+    "display:flex;align-items:center;justify-content:center;padding:20px";
+  const card = document.createElement("div");
+  card.style.cssText = "background:var(--card);border-radius:16px;padding:18px;width:min(340px,100%);" +
+    "display:flex;flex-direction:column;gap:10px";
+  const title = document.createElement("div");
+  title.style.cssText = "font-weight:700;font-size:15px";
+  title.textContent = "📁 Folder for “" + (design.name || "Widget") + "”";
+  const sel = document.createElement("select");
+  const optNone = document.createElement("option");
+  optNone.value = ""; optNone.textContent = "— No folder —";
+  sel.appendChild(optNone);
+  for (const name of existing) {
+    const option = document.createElement("option");
+    option.value = name; option.textContent = "📁 " + name;
+    sel.appendChild(option);
+  }
+  const optNew = document.createElement("option");
+  optNew.value = "__new__"; optNew.textContent = "➕ Create new folder…";
+  sel.appendChild(optNew);
+  sel.value = design.folder && existing.indexOf(design.folder) >= 0 ? design.folder : "";
+  const newInput = document.createElement("input");
+  newInput.type = "text";
+  newInput.placeholder = "New folder name";
+  newInput.maxLength = 24;
+  newInput.style.display = "none";
+  sel.onchange = function () {
+    newInput.style.display = sel.value === "__new__" ? "block" : "none";
+    if (sel.value === "__new__") newInput.focus();
+  };
+  const buttons = document.createElement("div");
+  buttons.style.cssText = "display:flex;gap:8px;justify-content:flex-end";
+  const cancelBtn = document.createElement("button");
+  cancelBtn.textContent = "Cancel";
+  cancelBtn.onclick = function () { wrap.remove(); };
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "primary";
+  saveBtn.textContent = "Save";
+  saveBtn.onclick = function () {
+    const value = sel.value === "__new__" ? newInput.value.trim().slice(0, 24) : sel.value;
+    if (value) design.folder = value; else delete design.folder;
+    persist();
+    wrap.remove();
+    renderLibrary();
+    toast(value ? "Moved to 📁 " + value : "Removed from folder");
+  };
+  buttons.append(cancelBtn, saveBtn);
+  card.append(title, sel, newInput, buttons);
+  wrap.appendChild(card);
+  wrap.onclick = function (event) { if (event.target === wrap) wrap.remove(); };
+  document.body.appendChild(wrap);
 }
 function renderLibrary() {
   renderShortcutGuide();
@@ -6770,6 +6945,13 @@ document.getElementById("mfNote").onclick = function () {
   deliverMagicDesign(parseIdea(document.getElementById("magicInput").value.trim()), "Saved as a note — tweak away.");
 };
 // 📷 Clone a widget: screenshot in, editable design out (vision, needs a key).
+document.getElementById("newWidgetBtn").onclick = function () {
+  const design = newDesign();
+  design.name = dedupedName("My Widget", null);
+  loadIntoEditor(design);
+  switchTab("editor");
+  toast("Blank canvas ready — pick a type, or go 🎨 Freestyle ✨");
+};
 document.getElementById("cloneBtn").onclick = function () {
   document.getElementById("cloneInput").click();
 };
@@ -6859,6 +7041,68 @@ document.getElementById("remixBtn").onclick = async function () {
 
 // Bakes a photo element's crop shape + opacity into a PNG so the Scriptable
 // renderer (which has no clipping or image alpha) can draw it directly.
+// Best-effort background removal: sample the image's border to find the
+// background color, then flood-fill transparency in from the edges so
+// similar colors INSIDE the subject survive. Great for logos/stickers on
+// plain backgrounds; busy photos won't cut cleanly (undo is one tap away).
+function removeImageBackground(dataUrl) {
+  return new Promise(function (resolve) {
+    const img = new Image();
+    img.onload = function () {
+      try {
+        const w = img.width, h = img.height;
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const ctx = c.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        const data = ctx.getImageData(0, 0, w, h);
+        const px = data.data;
+        let r = 0, g = 0, b = 0, n = 0;
+        const stepX = Math.max(1, Math.floor(w / 40)), stepY = Math.max(1, Math.floor(h / 40));
+        for (let x = 0; x < w; x += stepX) {
+          for (const y of [0, h - 1]) {
+            const i = (y * w + x) * 4;
+            r += px[i]; g += px[i + 1]; b += px[i + 2]; n++;
+          }
+        }
+        for (let y = 0; y < h; y += stepY) {
+          for (const x of [0, w - 1]) {
+            const i = (y * w + x) * 4;
+            r += px[i]; g += px[i + 1]; b += px[i + 2]; n++;
+          }
+        }
+        r /= n; g /= n; b /= n;
+        const tolSq = 46 * 46 * 3;
+        const visited = new Uint8Array(w * h);
+        const queue = [];
+        function tryPush(x, y) {
+          const idx = y * w + x;
+          if (visited[idx]) return;
+          const i = idx * 4;
+          const dr = px[i] - r, dg = px[i + 1] - g, db = px[i + 2] - b;
+          if (dr * dr + dg * dg + db * db > tolSq) return;
+          visited[idx] = 1;
+          queue.push(idx);
+        }
+        for (let x = 0; x < w; x++) { tryPush(x, 0); tryPush(x, h - 1); }
+        for (let y = 0; y < h; y++) { tryPush(0, y); tryPush(w - 1, y); }
+        while (queue.length) {
+          const idx = queue.pop();
+          const x = idx % w, y = (idx / w) | 0;
+          px[idx * 4 + 3] = 0;
+          if (x > 0) tryPush(x - 1, y);
+          if (x < w - 1) tryPush(x + 1, y);
+          if (y > 0) tryPush(x, y - 1);
+          if (y < h - 1) tryPush(x, y + 1);
+        }
+        ctx.putImageData(data, 0, 0);
+        resolve(c.toDataURL("image/png"));
+      } catch (e) { resolve(dataUrl); }
+    };
+    img.onerror = function () { resolve(dataUrl); };
+    img.src = dataUrl;
+  });
+}
 function bakePhoto(dataUrl, shape, opacity, frame, frameHex) {
   const el = { dataUrl: dataUrl, shape: shape, opacity: opacity };
   const hasFrame = frame && frame !== "none";
@@ -6967,6 +7211,24 @@ async function buildScript() {
         } catch (e) { el.b64 = ""; }
       }
     }
+    // Custom icon packs live only in this browser — bake their images into
+    // the script so the widget can render them anywhere.
+    const lsTheme = String((design.launcherStyle || {}).iconTheme || "");
+    if (lsTheme.indexOf("pack:") === 0) {
+      (design.apps || []).forEach(function (app, i) {
+        const icon = packIconFor(lsTheme, i);
+        if (icon) { app.iconB64 = icon.split(",")[1] || ""; app.iconUrl = ""; }
+      });
+      design.launcherStyle.iconTheme = "real";
+    }
+    const appEls = (design.canvasElements || []).filter(function (e) { return e.kind === "app"; });
+    appEls.forEach(function (el, i) {
+      if (el.iconTheme && String(el.iconTheme).indexOf("pack:") === 0) {
+        const icon = packIconFor(el.iconTheme, i);
+        if (icon) { el.iconB64 = icon.split(",")[1] || ""; el.iconUrl = ""; }
+        delete el.iconTheme;
+      }
+    });
   }
   if (missingPhotos.length) {
     // Photos don't travel inside sync links — designs that arrived that way
@@ -8040,6 +8302,8 @@ document.getElementById("pageAIBtn").onclick = async function () {
       const design = specToDesign(slotSpec.design);
       design.name = dedupedName(design.name, null);
       design.position = slot.pos;
+      // A page slot's size is authoritative — the layout was drawn for it.
+      if (SIZES[slot.size]) design.fitSize = slot.size;
       const stored = JSON.parse(JSON.stringify(design));
       designs.push(stored);
       newDesigns.push(stored);
@@ -8316,6 +8580,75 @@ document.getElementById("iconUploadInput").onchange = function (event) {
   };
   reader.readAsDataURL(file);
 };
+
+// Bulk icon packs: many images at once become a named, reusable icon set.
+document.getElementById("bulkIconBtn").onclick = function () {
+  document.getElementById("bulkIconInput").click();
+};
+document.getElementById("bulkIconInput").onchange = async function (event) {
+  const files = Array.prototype.slice.call(event.target.files || []).slice(0, 24);
+  event.target.value = "";
+  if (!files.length) return;
+  const name = (prompt("Name this icon pack (this becomes its label everywhere)", "My icons") || "").trim().slice(0, 20);
+  if (!name) return;
+  const icons = [];
+  for (const file of files) {
+    const icon = await new Promise(function (resolve) {
+      const reader = new FileReader();
+      reader.onload = function () {
+        const img = new Image();
+        img.onload = function () {
+          const S = 160;
+          const c = document.createElement("canvas");
+          c.width = S; c.height = S;
+          const x = c.getContext("2d");
+          const side = Math.min(img.width, img.height);
+          x.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, S, S);
+          resolve(c.toDataURL("image/png"));
+        };
+        img.onerror = function () { resolve(null); };
+        img.src = reader.result;
+      };
+      reader.onerror = function () { resolve(null); };
+      reader.readAsDataURL(file);
+    });
+    if (icon) icons.push(icon);
+  }
+  if (!icons.length) { toast("Couldn't read those images 😕"); return; }
+  iconPacks.push({ id: uid(), name: name, icons: icons });
+  if (iconPacks.length > 6) iconPacks = iconPacks.slice(-6);
+  saveIconPacks();
+  renderMyIconPacks();
+  renderAll();
+  toast("📁 “" + name + "” saved (" + icons.length + " icons) — it's now in every icon style picker");
+};
+function renderMyIconPacks() {
+  const box = document.getElementById("myIconPacks");
+  if (!box) return;
+  box.innerHTML = "";
+  iconPacks.forEach(function (pack, packIndex) {
+    const chip = document.createElement("button");
+    chip.textContent = "📁 " + pack.name + " → use below";
+    chip.title = "Apply this pack to the icon grid";
+    chip.onclick = function () {
+      iconMakerApps.forEach(function (app, i) { if (pack.icons[i]) app.customB64 = pack.icons[i]; });
+      renderIconMaker();
+      toast("Applied “" + pack.name + "” — long-press each icon to save it");
+    };
+    const del = document.createElement("button");
+    del.textContent = "✕";
+    del.title = "Delete this pack";
+    del.onclick = function () {
+      if (!confirm("Delete icon pack “" + pack.name + "”? Widgets already exported keep their icons.")) return;
+      iconPacks.splice(packIndex, 1);
+      saveIconPacks();
+      renderMyIconPacks();
+      renderAll();
+    };
+    box.append(chip, del);
+  });
+}
+renderMyIconPacks();
 
 // ==================== Auto Shortcut Guide ====================
 // Reads every saved widget and lists what each app button does on tap, plus

@@ -29,7 +29,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 53;
+const WK_VERSION = 54;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -1142,7 +1142,9 @@ async function addFreestyleApps(w, design, family, live) {
         const tile = iconStack.addImage(themedIconTile(el, elTheme, apps.indexOf(el), pt));
         tile.imageSize = new Size(pt, pt);
       } else {
-        if (el.iconUrl) realIcon = await loadIcon(el.iconUrl);
+        // Custom pack icons travel baked into the script itself.
+        if (el.iconB64) { try { realIcon = Image.fromData(Data.fromBase64String(el.iconB64)); } catch (e) {} }
+        if (!realIcon && el.iconUrl) realIcon = await loadIcon(el.iconUrl);
         if (realIcon) {
           const img = iconStack.addImage(realIcon);
           img.imageSize = new Size(pt, pt);
@@ -1183,10 +1185,20 @@ const ICON_THEMES = {
   line:   { colors: ["#FBFAF7"], glyph: "#33303B", line: true },
   noir:   { colors: ["#111116"], glyph: "#F2F2F5", line: false },
   zen:    { colors: ["#DDE5D6", "#E9E4D8", "#CDD9CE"], glyph: "#4A5A4E", line: false },
-  neon:   { colors: ["#14002E"], glyph: "#00F0FF", line: false, glyphCycle: ["#FF2079", "#00F0FF", "#39FF14", "#FFD300"] }
+  neon:   { colors: ["#14002E"], glyph: "#00F0FF", line: false, glyphCycle: ["#FF2079", "#00F0FF", "#39FF14", "#FFD300"] },
+  duo:    { colors: ["#5B2C98", "#1A2980", "#B0345C", "#134E5E", "#7A3803"], glyph: "#FFFFFF",
+            duo: ["#B06AB3", "#26D0CE", "#F09819", "#71B280", "#FFD300"] },
+  frost:  { colors: ["#FFFFFF"], glyph: "#FFFFFF", frost: true },
+  retro:  { colors: ["#1B1B2E"], glyph: "#FF6B6B", lineCycle: true,
+            glyphCycle: ["#FF6B6B", "#FFD93D", "#6BCB77", "#4D96FF"] },
+  candy:  { colors: ["#FF9A9E", "#A18CD1", "#7FD8BE", "#F6C90E", "#8FD3F4"], glyph: "#FFFFFF", radius: 0.3 },
+  basic:  { colors: ["#3A3A44"], glyph: "#FFFFFF", emojiTile: true }
 };
-function iconGlyph(app) {
-  if (app.emoji && app.emoji !== "📱" && app.emoji !== "🌐" && app.emoji !== "📲") return app.emoji;
+// Themed tiles use clean letter monograms; only the Basic theme (and the
+// untinted fallback) keeps the app's emoji.
+function iconGlyph(app, themeName) {
+  const letterOnly = themeName && themeName !== "basic";
+  if (!letterOnly && app.emoji && app.emoji !== "📱" && app.emoji !== "🌐" && app.emoji !== "📲") return app.emoji;
   return (app.label || "A").trim().charAt(0).toUpperCase();
 }
 function themedIconTile(app, themeName, index, pt) {
@@ -1196,29 +1208,38 @@ function themedIconTile(app, themeName, index, pt) {
   ctx.size = new Size(S, S);
   ctx.opaque = false;
   ctx.respectScreenScale = false;
-  const r = Math.round(S * 0.24);
+  const r = Math.round(S * (theme.radius || 0.24));
   const rect = new Rect(0, 0, S, S);
   const bg = theme.colors[index % theme.colors.length];
   const path = new Path();
   path.addRoundedRect(rect, r, r);
   ctx.addPath(path);
-  ctx.setFillColor(new Color(bg));
+  if (theme.frost) { ctx.setFillColor(new Color("#FFFFFF", 0.25)); }
+  else { ctx.setFillColor(new Color(bg)); }
   ctx.fillPath();
-  if (theme.line) {
+  if (theme.duo) {
+    // Soft accent orb toward the lower-right — stays inside the tile so it
+    // never pokes past the rounded corners (DrawContext can't clip).
+    const b = theme.duo[index % theme.duo.length];
+    ctx.setFillColor(new Color(b, 0.8));
+    ctx.fillEllipse(new Rect(S * 0.34, S * 0.34, S * 0.62, S * 0.62));
+  }
+  const glyphColor = theme.glyphCycle ? theme.glyphCycle[index % theme.glyphCycle.length] : theme.glyph;
+  if (theme.line || theme.lineCycle || theme.frost) {
     const inset = Math.max(2, Math.round(S * 0.035));
     const inner = new Path();
     inner.addRoundedRect(new Rect(inset, inset, S - 2 * inset, S - 2 * inset), r - inset, r - inset);
     ctx.addPath(inner);
-    ctx.setStrokeColor(new Color(theme.glyph));
+    const strokeColor = theme.lineCycle ? glyphColor : (theme.frost ? "#FFFFFF" : theme.glyph);
+    ctx.setStrokeColor(new Color(strokeColor, theme.frost ? 0.5 : 1));
     ctx.setLineWidth(Math.max(2, Math.round(S * 0.03)));
     ctx.strokePath();
   }
-  const glyph = iconGlyph(app);
-  const glyphColor = theme.glyphCycle ? theme.glyphCycle[index % theme.glyphCycle.length] : theme.glyph;
+  const glyph = iconGlyph(app, themeName);
   ctx.setTextColor(new Color(glyphColor));
-  ctx.setFont(Font.boldSystemFont(Math.round(S * 0.42)));
+  ctx.setFont(theme.emojiTile ? Font.systemFont(Math.round(S * 0.5)) : Font.boldSystemFont(Math.round(S * 0.42)));
   ctx.setTextAlignedCenter();
-  ctx.drawTextInRect(glyph, new Rect(0, S * 0.22, S, S * 0.62));
+  ctx.drawTextInRect(glyph, new Rect(0, S * (theme.emojiTile ? 0.18 : 0.22), S, S * 0.62));
   return ctx.getImage();
 }
 async function loadIcon(url) {
@@ -1299,7 +1320,8 @@ async function buildLauncher(w, design, family, tc, style) {
         const tile = cell.addImage(themedIconTile(app, iconTheme, i + j, iconPt));
         tile.imageSize = new Size(iconPt, iconPt);
       } else {
-        if (app.iconUrl) realIcon = await loadIcon(app.iconUrl);
+        if (app.iconB64) { try { realIcon = Image.fromData(Data.fromBase64String(app.iconB64)); } catch (e) {} }
+        if (!realIcon && app.iconUrl) realIcon = await loadIcon(app.iconUrl);
         if (realIcon) {
           const img = cell.addImage(realIcon);
           img.imageSize = new Size(iconPt, iconPt);
