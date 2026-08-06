@@ -30,7 +30,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 65;
+const WK_VERSION = 66;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract

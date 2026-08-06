@@ -385,26 +385,21 @@
     </div>
   </div>
   <details>
-    <summary>⚙️ Designer setup — unlock the full designer</summary>
+    <summary>⚙️ Designer setup</summary>
     <p class="hint" style="margin-top:8px">
-      Simple ideas build instantly with no setup. For open-ended ideas, paste an
-      Anthropic API key and WidgetKing designs whole widgets from your words
-      (and clones them from photos). <b>The only paid thing in
-      WidgetKing</b> — a few cents per widget, key stored only in this browser.
-      Sharing with family: use <b>📲 Send all to my other device</b> and include
-      the key — their device gets designs + AI with zero setup, and your prepaid
-      balance ($5, auto-reload off) stays a hard cap for everyone combined.
+      Paste the access key to unlock the full designer on this device. Stored
+      only in this browser.
     </p>
-    <input type="password" id="apiKeyInput" placeholder="sk-ant-…" autocomplete="off">
+    <input type="password" id="apiKeyInput" placeholder="Access key" autocomplete="off">
     <div class="row" style="margin-top:8px">
       <span style="font-size:12px;color:var(--muted)">Model</span>
       <select id="aiModel" style="flex:1">
-        <option value="claude-opus-5">Best quality (~1–4¢ per widget)</option>
-        <option value="claude-haiku-4-5">Fast &amp; cheap (a fraction of a cent)</option>
+        <option value="claude-opus-5">Best quality</option>
+        <option value="claude-haiku-4-5">Fastest</option>
       </select>
     </div>
     <label style="font-size:13px;display:flex;align-items:center;gap:6px;margin-top:8px">
-      <input type="checkbox" id="aiPolish"> ✨ Design-director pass — a second AI review for extra polish (doubles the per-widget cost)
+      <input type="checkbox" id="aiPolish"> ✨ Design-director pass — a second AI review for extra polish
     </label>
     <div class="row" style="margin-top:8px">
       <span style="font-size:12px;color:var(--muted)">Budget $</span>
@@ -412,10 +407,6 @@
       <span id="spendReadout" style="font-size:12px;color:var(--muted);flex:1"></span>
       <button id="resetSpend">Reset</button>
     </div>
-    <p class="hint" style="margin-top:6px">
-      Requests stop automatically at your budget. Hard guarantee: keep only $5
-      of prepaid credit with auto-reload off.
-    </p>
   </details>
 </section>
 
@@ -847,7 +838,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 65;
+const WK_VERSION = 66;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -8462,7 +8453,7 @@ document.getElementById("cloneInput").onchange = function (event) {
   event.target.value = "";
   if (!file) return;
   const key = getApiKey();
-  if (!key) { toast("Cloning needs the AI designer — add your API key first"); return; }
+  if (!key) { toast("Cloning needs the full designer — finish Designer setup first"); return; }
   const button = document.getElementById("cloneBtn");
   const reader = new FileReader();
   reader.onload = function () {
