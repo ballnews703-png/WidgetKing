@@ -809,7 +809,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 61;
+const WK_VERSION = 62;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -3354,7 +3354,31 @@ function themeNeedsCanvas(themeName) {
 // genuine artwork the user picked to identify and open that app.
 const REAL_STYLES = [["original", "🎨 Original"], ["mono", "⚪ Mono"], ["tint", "🎯 Tinted"],
   ["darktile", "⬛ On dark"], ["lighttile", "⬜ On light"],
-  ["logotile", "🔘 Logo tile"], ["logoglitter", "✨ Glitter logo"], ["logoline", "◻️ Outline logo"]];
+  ["logotile", "🔘 Logo tile"], ["logoglitter", "✨ Glitter logo"], ["logoline", "🌈 Gradient outline"],
+  ["logocircle", "🔵 Brand button"], ["logocloud", "☁️ Cloud cute"]];
+function hueShiftHex(hex, degrees) {
+  const rgb = hexToRgb(hex).map(function (v) { return v / 255; });
+  const mx = Math.max(rgb[0], rgb[1], rgb[2]), mn = Math.min(rgb[0], rgb[1], rgb[2]);
+  const l = (mx + mn) / 2;
+  const d = mx - mn;
+  let h = 0;
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  if (d !== 0) {
+    if (mx === rgb[0]) h = ((rgb[1] - rgb[2]) / d) % 6;
+    else if (mx === rgb[1]) h = (rgb[2] - rgb[0]) / d + 2;
+    else h = (rgb[0] - rgb[1]) / d + 4;
+    h *= 60;
+  }
+  h = (h + degrees + 360) % 360;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x2 = c * (1 - Math.abs((h / 60) % 2 - 1));
+  const m = l - c / 2;
+  let rp = [0, 0, 0];
+  if (h < 60) rp = [c, x2, 0]; else if (h < 120) rp = [x2, c, 0];
+  else if (h < 180) rp = [0, c, x2]; else if (h < 240) rp = [0, x2, c];
+  else if (h < 300) rp = [x2, 0, c]; else rp = [c, 0, x2];
+  return rgbToHex(rp.map(function (v) { return (v + m) * 255; }));
+}
 const realStyleCache = {};
 function loadCrossImage(url) {
   return new Promise(function (resolve) {
@@ -3429,13 +3453,61 @@ async function styledRealIcon(url, styleKey, tintHex, px) {
   const img = await loadCrossImage(url);
   if (!img) { realStyleCache[key] = null; return null; }
   try {
-    if (styleKey === "logotile" || styleKey === "logoglitter" || styleKey === "logoline") {
+    if (styleKey === "logocloud") {
+      // Doodle clouds behind the original icon — extraction-free, so it
+      // works on every app including photographic icons.
+      const c3 = tileBase(px, "#F7FBF8", 0.24);
+      const x3 = c3.getContext("2d");
+      const puff = function (cx, cy, s, fill, outline) {
+        x3.beginPath();
+        x3.arc(cx - s * 0.7, cy, s * 0.55, 0, Math.PI * 2);
+        x3.arc(cx, cy - s * 0.35, s * 0.7, 0, Math.PI * 2);
+        x3.arc(cx + s * 0.7, cy, s * 0.55, 0, Math.PI * 2);
+        x3.closePath();
+        x3.fillStyle = fill;
+        x3.fill();
+        if (outline) { x3.strokeStyle = outline; x3.lineWidth = Math.max(1, px * 0.012); x3.stroke(); }
+      };
+      puff(px * 0.3, px * 0.36, px * 0.2, "#CDEBE4");
+      puff(px * 0.74, px * 0.7, px * 0.16, "#CDEBE4");
+      const inset = px * 0.26;
+      x3.save();
+      x3.beginPath();
+      if (x3.roundRect) x3.roundRect(inset, inset * 0.85, px - 2 * inset, px - 2 * inset, px * 0.11);
+      else x3.rect(inset, inset * 0.85, px - 2 * inset, px - 2 * inset);
+      x3.clip();
+      x3.drawImage(img, inset, inset * 0.85, px - 2 * inset, px - 2 * inset);
+      x3.restore();
+      x3.strokeStyle = "#3E4A46";
+      x3.lineWidth = Math.max(1, px * 0.012);
+      x3.beginPath();
+      if (x3.roundRect) x3.roundRect(inset, inset * 0.85, px - 2 * inset, px - 2 * inset, px * 0.11);
+      x3.stroke();
+      puff(px * 0.24, px * 0.66, px * 0.11, "#FFFFFF", "#3E4A46");
+      realStyleCache[key] = c3.toDataURL("image/png");
+      return realStyleCache[key];
+    }
+    if (styleKey === "logotile" || styleKey === "logoglitter" || styleKey === "logoline" || styleKey === "logocircle") {
       const marked = extractMark(img, px);
       if (!marked) { realStyleCache[key] = null; return null; }
       const accent = tintHex || "#8F52FA";
-      const c2 = tileBase(px, styleKey === "logoline" ? "#FBF8F3" : accent, 0.24);
+      const tileFill = styleKey === "logoline" ? "#FBF8F3"
+        : styleKey === "logocircle" ? marked.bg : accent;
+      const c2 = tileBase(px, tileFill, styleKey === "logocircle" ? 0.5 : 0.24);
       const x2 = c2.getContext("2d");
-      if (styleKey === "logotile") {
+      if (styleKey === "logocircle") {
+        // The flat-button classic: the mark in white (or dark, on light
+        // brands) on a circle of the icon's OWN detected brand color.
+        const markColor = luminanceOf(marked.bg) > 0.72 ? "#1B1B1E" : "#FFFFFF";
+        const fill = document.createElement("canvas");
+        fill.width = px; fill.height = px;
+        const fx = fill.getContext("2d");
+        fx.fillStyle = markColor;
+        fx.fillRect(0, 0, px, px);
+        fx.globalCompositeOperation = "destination-in";
+        fx.drawImage(marked.mask, 0, 0);
+        x2.drawImage(fill, px * 0.2, px * 0.2, px * 0.6, px * 0.6);
+      } else if (styleKey === "logotile") {
         // Mark recolored for contrast against the chosen tile.
         const markColor = luminanceOf(accent) > 0.6 ? "#1B1B1E" : "#FFFFFF";
         const fill = document.createElement("canvas");
@@ -3482,7 +3554,13 @@ async function styledRealIcon(url, styleKey, tintHex, px) {
         rx.globalCompositeOperation = "destination-out";
         rx.drawImage(marked.mask, 0, 0);
         rx.globalCompositeOperation = "source-in";
-        rx.fillStyle = luminanceOf(accent) > 0.85 ? "#1B1B1E" : accent;
+        // Gradient stroke, like the outline packs: chosen color flowing into
+        // its hue-shifted partner (teal->blue, pink->violet, ...).
+        const gradFill = rx.createLinearGradient(0, 0, px, px);
+        const base = luminanceOf(accent) > 0.85 ? "#3EC98F" : accent;
+        gradFill.addColorStop(0, base);
+        gradFill.addColorStop(1, hueShiftHex(base, 55));
+        rx.fillStyle = gradFill;
         rx.fillRect(0, 0, px, px);
         x2.drawImage(ring, px * 0.14, px * 0.14, px * 0.72, px * 0.72);
       }
@@ -3730,7 +3808,7 @@ function launcherStyleOf(design) {
     labels: style.labels !== false,
     columns: Math.min(Math.max(Math.round(Number(style.columns) || 0), 0), 6),
     iconTheme: (ICON_THEMES[style.iconTheme] || String(style.iconTheme || "").indexOf("pack:") === 0) ? style.iconTheme : "real",
-    realStyle: ["mono", "tint", "darktile", "lighttile", "logotile", "logoglitter", "logoline"].indexOf(style.realStyle) >= 0 ? style.realStyle : "original",
+    realStyle: ["mono", "tint", "darktile", "lighttile", "logotile", "logoglitter", "logoline", "logocircle", "logocloud"].indexOf(style.realStyle) >= 0 ? style.realStyle : "original",
     tintHex: /^#[0-9a-fA-F]{6}$/.test(style.tintHex || "") ? style.tintHex : "#8F52FA"
   };
 }
@@ -3904,7 +3982,7 @@ function normalizeDesign(design) {
         if (scheme) el.url = scheme;
       }
       if (el.iconTheme != null && !ICON_THEMES[el.iconTheme] && String(el.iconTheme).indexOf("pack:") !== 0) delete el.iconTheme;
-      if (el.realStyle != null && ["mono", "tint", "darktile", "lighttile", "logotile", "logoglitter", "logoline"].indexOf(el.realStyle) < 0) delete el.realStyle;
+      if (el.realStyle != null && ["mono", "tint", "darktile", "lighttile", "logotile", "logoglitter", "logoline", "logocircle", "logocloud"].indexOf(el.realStyle) < 0) delete el.realStyle;
       if (el.tintHex != null && !/^#[0-9a-fA-F]{6}$/.test(el.tintHex)) delete el.tintHex;
     }
     if (el.font != null && !FONT_CSS[el.font]) delete el.font;
