@@ -30,14 +30,16 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 69;
+const WK_VERSION = 70;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
 // the newer renderer, splice this script's own designs back in, and rewrite
 // this file in place. Runs only inside the Scriptable app, never in widgets.
-async function checkForUpdates(manual) {
+async function checkForUpdates(manual, silent) {
   function say(title, message) {
+    // Widgets can't present alerts — silent mode updates the file and says nothing.
+    if (silent) return Promise.resolve();
     const a = new Alert();
     a.title = title;
     a.message = message;
@@ -99,7 +101,8 @@ const THEMES = {
   rosegold: ["#9F5F6F", "#E8B4B8"], lavender: ["#6D5BBA", "#B49FDC"],
   sage: ["#3E5C4A", "#A3C9A8"], blush: ["#B24592", "#F15F79"],
   mocha: ["#3E2723", "#8D6E63"], navy: ["#0F2027", "#2C5364"],
-  aurora: ["#1D976C", "#59C9A5"], cosmos: ["#0F0C29", "#764BA2"]
+  aurora: ["#1D976C", "#59C9A5"], cosmos: ["#0F0C29", "#764BA2"],
+  liquidglass: ["#AFC2DC", "#8299BC"], glassnoir: ["#2E3442", "#161B27"]
 };
 const SYMBOL_EMOJI = {
   "star.fill": "⭐", "heart.fill": "❤️", "bolt.fill": "⚡",
@@ -568,7 +571,50 @@ async function liveDataFor(design) {
     }));
     live.reminders = await fetchReminders(maxR);
   }
+  const newsEls = els.filter(function (e) { return e.kind === "news"; });
+  if (newsEls.length) {
+    const maxN = Math.max.apply(null, newsEls.map(function (e) {
+      return Math.min(Math.max(Number(e.count) || 1, 1), 4);
+    }));
+    live.news = await fetchNews(maxN);
+  }
   return live;
+}
+async function fetchNews(count) {
+  const fm = FileManager.local();
+  const cachePath = fm.joinPath(fm.documentsDirectory(), "widgetking-news.json");
+  try {
+    if (fm.fileExists(cachePath)) {
+      const cached = JSON.parse(fm.readString(cachePath));
+      if (cached && (Date.now() - cached.at) < 30 * 60 * 1000 && Array.isArray(cached.titles)) {
+        return cached.titles.slice(0, count);
+      }
+    }
+  } catch (e) {}
+  try {
+    const xml = await new Request("https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en").loadString();
+    const titles = [];
+    const re = new RegExp("<title>(?:<!\\[CDATA\\[)?([^<]*?)(?:\\]\\]>)?</" + "title>", "g");
+    let m;
+    while ((m = re.exec(xml)) && titles.length < 7) {
+      const t = m[1].replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&apos;/g, "'")
+        .replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+      if (t) titles.push(t);
+    }
+    titles.shift(); // the first <title> is the feed's own name
+    try { fm.writeString(cachePath, JSON.stringify({ at: Date.now(), titles: titles })); } catch (e) {}
+    return titles.slice(0, count);
+  } catch (e) { return null; }
+}
+function newsText(el, titles) {
+  const n = Math.min(Math.max(Number(el.count) || 1, 1), 4);
+  if (!titles) return "News unavailable";
+  if (!titles.length) return "No headlines right now";
+  return titles.slice(0, n).map(function (t) {
+    const cut = t.lastIndexOf(" - ");
+    const s = cut > 20 ? t.slice(0, cut) : t;
+    return "▪ " + (s.length > 46 ? s.slice(0, 45) + "…" : s);
+  }).join("\n");
 }
 function progressPct(el) {
   const src = el.source || "day";
@@ -1086,6 +1132,7 @@ function drawFreestyle(design, family, bgImg, live) {
     }
     else if (el.kind === "worldclock") { text = worldClockText(el, new Date()); }
     else if (el.kind === "reminders") { text = remindersText(el, live ? live.reminders : null); }
+    else if (el.kind === "news") { text = newsText(el, live ? live.news : null); }
     else if (el.kind === "greeting") { text = greetingText(el); }
     else if (el.kind === "week") { text = "Week " + weekNumber(new Date()); }
     else { text = el.text || "Text"; }
@@ -1106,7 +1153,7 @@ function drawFreestyle(design, family, bgImg, live) {
       ctx.drawTextInRect(text, new Rect(px - boxW / 2, py - fs * 0.72, boxW, H));
     } else {
       ctx.setTextAlignedCenter();
-      const lines = (el.kind === "calendar" || el.kind === "reminders")
+      const lines = (el.kind === "calendar" || el.kind === "reminders" || el.kind === "news")
         ? Math.min(Math.max(Number(el.count) || 1, 1), 4) : 1;
       ctx.drawTextInRect(text, new Rect(px - W / 2, py - fs * 0.72, W, fs * 1.7 * lines));
     }
@@ -2041,6 +2088,12 @@ if (config.runsInWidget || runPreview) {
     // Position priority: typed in the Parameter > saved inside the design.
     const w = await buildWidget(design, widgetPosition || design.position || playlistPosition || "");
     if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentMedium(); }
+  }
+  // Once a day (shared 20h gate), a widget refresh quietly fetches the site
+  // and rewrites this script with the newest renderer — designs untouched.
+  // The updated code takes over on the next widget refresh.
+  if (config.runsInWidget) {
+    try { await checkForUpdates(false, true); } catch (e) {}
   }
 }
 Script.complete();

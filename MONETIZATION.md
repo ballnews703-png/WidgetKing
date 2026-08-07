@@ -23,6 +23,10 @@ that build.
 - **3 AI builds per month** (resets monthly; drives re-engagement)
 - **4 active widgets per device**, counting Home Screen and Lock Screen widgets
   together
+  - **Untouched starter designs are exempt.** The app seeds a few badged
+    "Starter" examples on first run so the first phone sync isn't blank; they
+    count toward the cap only once the user edits and saves one (which removes
+    the badge and makes it theirs).
   - Why 4: an iPhone page is a 4×6 grid; large + medium + two smalls is a
     complete, gorgeous page. 4 covers every realistic one-page setup while
     making a second page impossible without Pro. (6 was considered and

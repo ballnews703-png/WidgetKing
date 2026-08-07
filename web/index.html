@@ -622,6 +622,8 @@
 
 <section id="librarySection" class="pane pane-widgets">
   <h2>My Widgets</h2>
+  <div id="backupNudge" style="display:none;border-radius:14px;padding:10px 12px;margin-bottom:8px;background:rgba(240,196,69,.14);font-size:13px;cursor:pointer">💾 <b>Protect your work</b> — your designs live only in this browser. Tap to save a backup file.</div>
+  <input type="text" id="librarySearch" placeholder="🔍 Search your widgets…" style="margin-bottom:8px">
   <div class="chips" id="libFolders" style="margin-bottom:4px"></div>
   <div class="row" id="libSortRow" style="margin-bottom:8px"></div>
   <div id="library"></div>
@@ -842,14 +844,16 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 69;
+const WK_VERSION = 70;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
 // the newer renderer, splice this script's own designs back in, and rewrite
 // this file in place. Runs only inside the Scriptable app, never in widgets.
-async function checkForUpdates(manual) {
+async function checkForUpdates(manual, silent) {
   function say(title, message) {
+    // Widgets can't present alerts — silent mode updates the file and says nothing.
+    if (silent) return Promise.resolve();
     const a = new Alert();
     a.title = title;
     a.message = message;
@@ -911,7 +915,8 @@ const THEMES = {
   rosegold: ["#9F5F6F", "#E8B4B8"], lavender: ["#6D5BBA", "#B49FDC"],
   sage: ["#3E5C4A", "#A3C9A8"], blush: ["#B24592", "#F15F79"],
   mocha: ["#3E2723", "#8D6E63"], navy: ["#0F2027", "#2C5364"],
-  aurora: ["#1D976C", "#59C9A5"], cosmos: ["#0F0C29", "#764BA2"]
+  aurora: ["#1D976C", "#59C9A5"], cosmos: ["#0F0C29", "#764BA2"],
+  liquidglass: ["#AFC2DC", "#8299BC"], glassnoir: ["#2E3442", "#161B27"]
 };
 const SYMBOL_EMOJI = {
   "star.fill": "⭐", "heart.fill": "❤️", "bolt.fill": "⚡",
@@ -1380,7 +1385,50 @@ async function liveDataFor(design) {
     }));
     live.reminders = await fetchReminders(maxR);
   }
+  const newsEls = els.filter(function (e) { return e.kind === "news"; });
+  if (newsEls.length) {
+    const maxN = Math.max.apply(null, newsEls.map(function (e) {
+      return Math.min(Math.max(Number(e.count) || 1, 1), 4);
+    }));
+    live.news = await fetchNews(maxN);
+  }
   return live;
+}
+async function fetchNews(count) {
+  const fm = FileManager.local();
+  const cachePath = fm.joinPath(fm.documentsDirectory(), "widgetking-news.json");
+  try {
+    if (fm.fileExists(cachePath)) {
+      const cached = JSON.parse(fm.readString(cachePath));
+      if (cached && (Date.now() - cached.at) < 30 * 60 * 1000 && Array.isArray(cached.titles)) {
+        return cached.titles.slice(0, count);
+      }
+    }
+  } catch (e) {}
+  try {
+    const xml = await new Request("https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en").loadString();
+    const titles = [];
+    const re = new RegExp("<title>(?:<!\\[CDATA\\[)?([^<]*?)(?:\\]\\]>)?</" + "title>", "g");
+    let m;
+    while ((m = re.exec(xml)) && titles.length < 7) {
+      const t = m[1].replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&apos;/g, "'")
+        .replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+      if (t) titles.push(t);
+    }
+    titles.shift(); // the first <title> is the feed's own name
+    try { fm.writeString(cachePath, JSON.stringify({ at: Date.now(), titles: titles })); } catch (e) {}
+    return titles.slice(0, count);
+  } catch (e) { return null; }
+}
+function newsText(el, titles) {
+  const n = Math.min(Math.max(Number(el.count) || 1, 1), 4);
+  if (!titles) return "News unavailable";
+  if (!titles.length) return "No headlines right now";
+  return titles.slice(0, n).map(function (t) {
+    const cut = t.lastIndexOf(" - ");
+    const s = cut > 20 ? t.slice(0, cut) : t;
+    return "▪ " + (s.length > 46 ? s.slice(0, 45) + "…" : s);
+  }).join("\n");
 }
 function progressPct(el) {
   const src = el.source || "day";
@@ -1898,6 +1946,7 @@ function drawFreestyle(design, family, bgImg, live) {
     }
     else if (el.kind === "worldclock") { text = worldClockText(el, new Date()); }
     else if (el.kind === "reminders") { text = remindersText(el, live ? live.reminders : null); }
+    else if (el.kind === "news") { text = newsText(el, live ? live.news : null); }
     else if (el.kind === "greeting") { text = greetingText(el); }
     else if (el.kind === "week") { text = "Week " + weekNumber(new Date()); }
     else { text = el.text || "Text"; }
@@ -1918,7 +1967,7 @@ function drawFreestyle(design, family, bgImg, live) {
       ctx.drawTextInRect(text, new Rect(px - boxW / 2, py - fs * 0.72, boxW, H));
     } else {
       ctx.setTextAlignedCenter();
-      const lines = (el.kind === "calendar" || el.kind === "reminders")
+      const lines = (el.kind === "calendar" || el.kind === "reminders" || el.kind === "news")
         ? Math.min(Math.max(Number(el.count) || 1, 1), 4) : 1;
       ctx.drawTextInRect(text, new Rect(px - W / 2, py - fs * 0.72, W, fs * 1.7 * lines));
     }
@@ -2854,6 +2903,12 @@ if (config.runsInWidget || runPreview) {
     const w = await buildWidget(design, widgetPosition || design.position || playlistPosition || "");
     if (config.runsInWidget) { Script.setWidget(w); } else { await w.presentMedium(); }
   }
+  // Once a day (shared 20h gate), a widget refresh quietly fetches the site
+  // and rewrites this script with the newest renderer — designs untouched.
+  // The updated code takes over on the next widget refresh.
+  if (config.runsInWidget) {
+    try { await checkForUpdates(false, true); } catch (e) {}
+  }
 }
 Script.complete();
 </script>
@@ -2874,7 +2929,8 @@ const THEMES = {
   rosegold: ["#9F5F6F", "#E8B4B8"], lavender: ["#6D5BBA", "#B49FDC"],
   sage: ["#3E5C4A", "#A3C9A8"], blush: ["#B24592", "#F15F79"],
   mocha: ["#3E2723", "#8D6E63"], navy: ["#0F2027", "#2C5364"],
-  aurora: ["#1D976C", "#59C9A5"], cosmos: ["#0F0C29", "#764BA2"]
+  aurora: ["#1D976C", "#59C9A5"], cosmos: ["#0F0C29", "#764BA2"],
+  liquidglass: ["#AFC2DC", "#8299BC"], glassnoir: ["#2E3442", "#161B27"]
 };
 const KINDS = [
   ["clock", "🕐 Clock"], ["date", "📅 Date"], ["countdown", "⏳ Countdown"],
@@ -4023,7 +4079,7 @@ function normalizeDesign(design) {
       el.name = el.name.slice(0, 16);
       if (el.emoji !== false) el.emoji = true;
     }
-    if (el.kind === "calendar" || el.kind === "reminders") {
+    if (el.kind === "calendar" || el.kind === "reminders" || el.kind === "news") {
       el.count = Math.min(Math.max(Math.round(Number(el.count) || 1), 1), 4);
     }
     if (el.kind === "astro") {
@@ -4116,6 +4172,25 @@ function normalizeDesign(design) {
 }
 
 let designs = loadDesigns();
+// First run: seed a few polished examples so the very first phone sync shows
+// real widgets instead of a blank slate. Starters are badged, live in their
+// own folder, and only become the user's own design (badge removed — and,
+// once metering exists, only then counting toward any cap) when saved.
+if (!designs.length && !localStorage.getItem("widgetking.starterseeded")) {
+  try {
+    const starterSizes = { "Daily Brief": "medium", "Weather Pro": "small", "Focus Today": "small" };
+    for (const t of buildTemplates()) {
+      if (!(t.design.name in starterSizes)) continue;
+      const d = normalizeDesign(JSON.parse(JSON.stringify(t.design)));
+      d.id = uid();
+      d.starter = true;
+      d.folder = "Starters";
+      d.fitSize = t.size || starterSizes[t.design.name];
+      designs.push(d);
+    }
+    if (designs.length) { localStorage.setItem("widgetking.starterseeded", "1"); persist(); }
+  } catch (e) {}
+}
 let current = newDesign();
 let previewSize = "small";
 let selectedElId = null;
@@ -4418,7 +4493,7 @@ const AI_SCHEMA = {
       items: {
         type: "object",
         properties: {
-          kind: { type: "string", "enum": ["text", "clock", "date", "emoji", "icon", "shape", "battery", "countdown", "app", "weather", "calendar", "progress", "ring", "sleeper", "sleeperlogo", "month", "art", "astro", "stock", "worldclock", "reminders", "greeting", "week"] },
+          kind: { type: "string", "enum": ["text", "clock", "date", "emoji", "icon", "shape", "battery", "countdown", "app", "weather", "calendar", "progress", "ring", "sleeper", "sleeperlogo", "month", "art", "astro", "stock", "worldclock", "reminders", "news", "greeting", "week"] },
           text: { type: "string", description: "Text or emoji content; for kind=icon a single glyph like ★ ♥ ● ▲ ☾ ⚡ ✈ ⚙ →; empty for other kinds" },
           label: { type: "string", description: "App name for kind=app; empty otherwise" },
           url: { type: "string", description: "URL scheme to open for kind=app (e.g. spotify://); empty otherwise" },
@@ -4618,7 +4693,7 @@ function specToDesign(spec) {
     return { emoji: app.emoji || "🌐", label: (app.label || "App").slice(0, 12), url: app.url || "" };
   });
   design.canvasElements = (spec.canvasElements || []).slice(0, 24).map(function (el) {
-    const kind = ["text","clock","date","emoji","icon","shape","battery","countdown","app","weather","calendar","progress","ring","sleeper","sleeperlogo","month","art","astro","stock","worldclock","reminders","greeting","week"].includes(el.kind) ? el.kind : "text";
+    const kind = ["text","clock","date","emoji","icon","shape","battery","countdown","app","weather","calendar","progress","ring","sleeper","sleeperlogo","month","art","astro","stock","worldclock","reminders","news","greeting","week"].includes(el.kind) ? el.kind : "text";
     const rawW = Number(el.w) || 0;
     const out = {
       id: uid(),
@@ -4666,7 +4741,7 @@ function specToDesign(spec) {
       out.wmode = ["now","hilo","full","cond","rain","tomorrow","hourly"].includes(el.mode) ? el.mode : "now";
     }
     if (kind === "greeting") { out.name = ""; out.emoji = true; }
-    if (kind === "calendar" || kind === "reminders") out.count = Math.min(Math.max(Math.round(Number(el.count) || 1), 1), 4);
+    if (kind === "calendar" || kind === "reminders" || kind === "news") out.count = Math.min(Math.max(Math.round(Number(el.count) || 1), 1), 4);
     if (kind === "astro") out.mode = ["sun","sunrise","sunset","moon","moonicon"].includes(el.mode) ? el.mode : "sun";
     if (kind === "stock") {
       out.symbol = String(el.text || "AAPL").trim().toUpperCase().slice(0, 12);
@@ -5119,6 +5194,12 @@ function renderFreestyleInto(node, design, w, h, interactive) {
       else if (el.kind === "reminders") {
         const n = Math.min(Math.max(Number(el.count) || 1, 1), 4);
         div.textContent = ["○ Buy groceries · today", "○ Call the bank · tomorrow", "○ Pack for the trip · in 3d", "○ Water the plants"].slice(0, n).join("\n");
+        div.style.whiteSpace = "pre-line";
+        div.style.lineHeight = "1.55";
+      }
+      else if (el.kind === "news") {
+        const n = Math.min(Math.max(Number(el.count) || 1, 1), 4);
+        div.textContent = ["▪ Markets rally into the weekend", "▪ Storm system moves up the coast", "▪ Local team clinches playoff spot", "▪ New park opens downtown"].slice(0, n).join("\n");
         div.style.whiteSpace = "pre-line";
         div.style.lineHeight = "1.55";
       }
@@ -5586,7 +5667,7 @@ window.addEventListener("pointerdown", function (event) {
 // ==================== Freestyle palette & inspector ====================
 const ELEMENT_PALETTE = [["text", "Text"], ["photo", "🖼 Photo"], ["app", "📲 App icon"],
   ["clock", "🕐 Clock"], ["date", "📅 Date"], ["greeting", "👋 Greeting"], ["weather", "☀️ Weather"], ["calendar", "📆 Calendar"], ["month", "🗓 Month"], ["week", "🔢 Week #"],
-  ["reminders", "✅ Reminders"], ["worldclock", "🌍 World clock"], ["stock", "📈 Stocks"], ["astro", "🌗 Sun & moon"],
+  ["reminders", "✅ Reminders"], ["news", "📰 News"], ["worldclock", "🌍 World clock"], ["stock", "📈 Stocks"], ["astro", "🌗 Sun & moon"],
   ["progress", "▬ Progress"], ["ring", "◯ Ring"], ["sleeper", "🏈 Fantasy"], ["sleeperlogo", "🛡 Team logo"], ["icon", "◆ Icon"], ["emoji", "✨ Emoji"],
   ["shape", "▢ Shape"], ["art", "🌀 Art"], ["battery", "🔋 Battery"], ["countdown", "⏳ Countdown"]];
 
@@ -5714,7 +5795,7 @@ function addElement(kind) {
       : kind === "calendar" ? 12 : kind === "progress" ? 8 : kind === "ring" ? 7
       : kind === "sleeper" ? 24 : kind === "month" ? 9 : kind === "art" ? 15
       : kind === "worldclock" ? 16 : kind === "stock" ? 16 : kind === "astro" ? 14
-      : kind === "reminders" ? 12 : kind === "greeting" ? 16 : kind === "week" ? 12 : 18,
+      : kind === "reminders" ? 12 : kind === "news" ? 11 : kind === "greeting" ? 16 : kind === "week" ? 12 : 18,
     colorHex: "#FFFFFF", opacity: kind === "shape" ? 0.25 : 1
   };
   if (kind === "shape") { el.shape = "rect"; el.w = 0.5; el.h = 0.25; }
@@ -5728,6 +5809,7 @@ function addElement(kind) {
   if (kind === "art") { el.artType = "arc"; el.text = "curved text"; el.w = 0.7; el.size = 15; el.angle = 0; el.color2Hex = "#8F52FA"; el.flip = false; }
   if (kind === "calendar") { el.count = 1; }
   if (kind === "reminders") { el.count = 2; }
+  if (kind === "news") { el.count = 2; }
   if (kind === "astro") { el.mode = "sun"; }
   if (kind === "stock") { el.symbol = "AAPL"; el.mode = "both"; el.autoColor = true; }
   if (kind === "worldclock") { el.city = "Tokyo"; el.tz = "Asia/Tokyo"; el.offsetMin = 540; el.showCity = true; }
@@ -5814,6 +5896,7 @@ function labelForElement(el) {
   if (el.kind === "week") return "🔢 Week #";
   if (el.kind === "calendar") return "📆 Events ×" + (el.count || 1);
   if (el.kind === "reminders") return "✅ To-dos ×" + (el.count || 1);
+  if (el.kind === "news") return "📰 News ×" + (el.count || 1);
   if (el.kind === "astro") return el.mode === "moon" || el.mode === "moonicon" ? "🌗 Moon" : "🌅 Sun";
   if (el.kind === "stock") return "📈 " + (el.symbol || "Stock");
   if (el.kind === "worldclock") return "🌍 " + (el.city || "City");
@@ -5837,7 +5920,7 @@ function labelForElement(el) {
 const PALETTE_GROUPS = [
   ["Basics", ["text", "photo", "shape", "icon", "emoji", "art", "app"]],
   ["Live info", ["clock", "date", "greeting", "weather", "calendar", "month", "week",
-    "reminders", "worldclock", "stock", "astro", "battery", "countdown", "progress", "ring"]],
+    "reminders", "news", "worldclock", "stock", "astro", "battery", "countdown", "progress", "ring"]],
   ["Sports", ["sleeper", "sleeperlogo"]]
 ];
 function buildPalette(container) {
@@ -6175,6 +6258,29 @@ function buildInspectorContent(inspector) {
     remHint.className = "hint";
     remHint.textContent = "Your real iOS Reminders — overdue and soonest-due first. Scriptable asks for Reminders access on first run.";
     inspector.appendChild(remHint);
+  }
+
+  if (el.kind === "news") {
+    const newsRow = document.createElement("div");
+    newsRow.className = "row";
+    const newsLabel = document.createElement("span");
+    newsLabel.textContent = "Stories";
+    newsLabel.style.cssText = "font-size:12px;color:var(--muted);width:52px";
+    const newsSel = document.createElement("select");
+    for (const n of [1, 2, 3, 4]) {
+      const option = document.createElement("option");
+      option.value = String(n);
+      option.textContent = n === 1 ? "Top story only" : "Top " + n + " stories (list)";
+      newsSel.appendChild(option);
+    }
+    newsSel.value = String(Math.min(Math.max(Number(el.count) || 1, 1), 4));
+    newsSel.onchange = function () { el.count = Number(newsSel.value); refreshEditors(); };
+    newsRow.append(newsLabel, newsSel);
+    inspector.appendChild(newsRow);
+    const newsHint = document.createElement("p");
+    newsHint.className = "hint";
+    newsHint.textContent = "Live top headlines — free, no key, refreshes about every 30 minutes.";
+    inspector.appendChild(newsHint);
   }
 
   if (el.kind === "astro") {
@@ -7369,6 +7475,44 @@ function buildTemplates() {
       { kind: "shape", shape: "rect", x: 0.5, y: 0.78, w: 0.5, h: 0.006, size: 0, colorHex: "#FFFFFF", opacity: 0.25 },
       { kind: "weather", wmode: "tomorrow", unit: "f", x: 0.5, y: 0.88, size: 10, colorHex: "#D7F0FF", opacity: 0.9 }
     ] } },
+    // 🫧 Liquid Glass — frosted panels over soft gradients, matching the
+    // current iOS design language. Panels are ordinary translucent shapes,
+    // so both renderers draw them identically.
+    { category: "Glass", pack: "Glass", size: "small", design: { name: "Glass Clock", kind: "freestyle", themeID: "liquidglass", fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.5, w: 0.86, h: 0.86, radius: 22, colorHex: "#FFFFFF", opacity: 0.17, border: 1, borderHex: "#FFFFFF" },
+      { kind: "shape", shape: "rect", x: 0.34, y: 0.26, w: 0.44, h: 0.09, radius: 12, angle: -18, colorHex: "#FFFFFF", opacity: 0.14 },
+      { kind: "clock", x: 0.5, y: 0.46, size: 26, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "date", x: 0.5, y: 0.68, size: 10, colorHex: "#EAF1FA", opacity: 0.9 }
+    ] } },
+    { category: "Glass", pack: "Glass", size: "medium", design: { name: "Frost Brief", kind: "freestyle", themeID: "liquidglass", fontStyle: "avenir", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
+      { kind: "shape", shape: "rect", x: 0.27, y: 0.5, w: 0.44, h: 0.84, radius: 20, colorHex: "#FFFFFF", opacity: 0.16, border: 1, borderHex: "#FFFFFF" },
+      { kind: "shape", shape: "rect", x: 0.75, y: 0.5, w: 0.42, h: 0.84, radius: 20, colorHex: "#FFFFFF", opacity: 0.16, border: 1, borderHex: "#FFFFFF" },
+      { kind: "greeting", name: "", emoji: true, x: 0.27, y: 0.24, size: 14, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "date", x: 0.27, y: 0.42, size: 10, colorHex: "#EAF1FA", opacity: 0.9 },
+      { kind: "calendar", count: 2, x: 0.27, y: 0.68, size: 10, colorHex: "#FFFFFF", opacity: 0.92 },
+      { kind: "weather", wmode: "now", unit: "f", x: 0.75, y: 0.34, size: 26, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "weather", wmode: "hilo", unit: "f", x: 0.75, y: 0.58, size: 11, colorHex: "#EAF1FA", opacity: 0.92 },
+      { kind: "weather", wmode: "rain", unit: "f", x: 0.75, y: 0.76, size: 10, colorHex: "#CFE3F7", opacity: 0.9 }
+    ] } },
+    { category: "Glass", pack: "Glass", size: "small", design: { name: "Smoke Clock", kind: "freestyle", themeID: "glassnoir", fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.5, w: 0.86, h: 0.86, radius: 22, colorHex: "#FFFFFF", opacity: 0.09, border: 1, borderHex: "#FFFFFF" },
+      { kind: "clock", x: 0.5, y: 0.42, size: 26, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "date", x: 0.5, y: 0.63, size: 10, colorHex: "#B9C2D4", opacity: 0.9 },
+      { kind: "battery", x: 0.5, y: 0.82, size: 10, colorHex: "#8FD3A8", opacity: 0.9 }
+    ] } },
+    { category: "Glass", pack: "Glass", size: "small", design: { name: "Crystal Countdown", kind: "freestyle", themeID: "liquidglass", fontStyle: "serif", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.5, w: 0.86, h: 0.86, radius: 22, colorHex: "#FFFFFF", opacity: 0.17, border: 1, borderHex: "#FFFFFF" },
+      { kind: "shape", shape: "rect", x: 0.66, y: 0.24, w: 0.4, h: 0.08, radius: 10, angle: 16, colorHex: "#FFFFFF", opacity: 0.13 },
+      { kind: "text", text: "New Year", x: 0.5, y: 0.3, size: 12, colorHex: "#EAF1FA", opacity: 0.95 },
+      { kind: "countdown", dateISO: "2027-01-01", x: 0.5, y: 0.55, size: 20, colorHex: "#FFFFFF", opacity: 1, bold: true }
+    ] } },
+    { category: "Glass", pack: "Glass", size: "medium", design: { name: "Glass Dock", kind: "freestyle", themeID: "glassnoir", fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
+      { kind: "shape", shape: "pill", x: 0.5, y: 0.5, w: 0.92, h: 0.62, colorHex: "#FFFFFF", opacity: 0.1, border: 1, borderHex: "#FFFFFF" },
+      { kind: "app", label: "Phone", url: "tel://", x: 0.17, y: 0.5, size: 34, opacity: 1 },
+      { kind: "app", label: "Messages", url: "sms://", x: 0.39, y: 0.5, size: 34, opacity: 1 },
+      { kind: "app", label: "Camera", url: "camera://", x: 0.61, y: 0.5, size: 34, opacity: 1 },
+      { kind: "app", label: "Music", url: "music://", x: 0.83, y: 0.5, size: 34, opacity: 1 }
+    ] } },
     { category: "Picks", pack: "Picks", size: "small", design: { name: "Sun & Moon", kind: "freestyle", themeID: "cosmos", fontStyle: "optima", textColorHex: "#F5EFFF", canvasElements: [
       { kind: "astro", mode: "moonicon", x: 0.5, y: 0.34, size: 44, colorHex: "#FFFFFF", opacity: 1 },
       { kind: "astro", mode: "moon", x: 0.5, y: 0.6, size: 11, colorHex: "#D8C9F5", opacity: 0.95 },
@@ -7586,7 +7730,7 @@ function buildTemplates() {
   ];
 }
 let activePack = "all";
-const PACK_CHIPS = [["all", "✨ All"], ["Picks", "👑 Picks"], ["Cute", "🌸 Cute"], ["Minimal", "▫️ Minimal"],
+const PACK_CHIPS = [["all", "✨ All"], ["Picks", "👑 Picks"], ["Glass", "🫧 Glass"], ["Cute", "🌸 Cute"], ["Minimal", "▫️ Minimal"],
   ["Zen", "🍃 Zen"], ["Sports", "🏈 Sports"], ["Work", "💼 Work"],
   ["Neon", "⚡ Neon"], ["Live", "🌤 Live"], ["Pro", "💎 Pro"]];
 function renderTemplates() {
@@ -8075,8 +8219,21 @@ function setDesignFolder(design) {
   wrap.onclick = function (event) { if (event.target === wrap) wrap.remove(); };
   document.body.appendChild(wrap);
 }
+function renderBackupNudge() {
+  const nudge = document.getElementById("backupNudge");
+  let marker = {};
+  try { marker = JSON.parse(localStorage.getItem("widgetking.lastbackup") || "{}"); } catch (e) {}
+  const grown = designs.length - (Number(marker.count) || 0) >= 10;
+  const stale = Date.now() - (Number(marker.time) || 0) > 7 * 24 * 3600 * 1000;
+  nudge.style.display = designs.length >= 5 && (grown || stale) ? "block" : "none";
+}
+function markBackedUp() {
+  localStorage.setItem("widgetking.lastbackup", JSON.stringify({ count: designs.length, time: Date.now() }));
+  renderBackupNudge();
+}
 function renderLibrary() {
   renderShortcutGuide();
+  renderBackupNudge();
   const folderRow = document.getElementById("libFolders");
   const sortRow = document.getElementById("libSortRow");
   folderRow.innerHTML = "";
@@ -8123,6 +8280,12 @@ function renderLibrary() {
     }
   }
   let shown = designs.filter(function (d) { return !libFolder || d.folder === libFolder; });
+  const query = (document.getElementById("librarySearch").value || "").trim().toLowerCase();
+  if (query) {
+    shown = shown.filter(function (d) {
+      return ((d.name || "") + " " + (d.kind || "") + " " + (d.folder || "")).toLowerCase().includes(query);
+    });
+  }
   if (libSort === "az") shown = shown.slice().sort(function (a, b) { return (a.name || "").localeCompare(b.name || ""); });
   else if (libSort === "kind") shown = shown.slice().sort(function (a, b) { return (a.kind || "").localeCompare(b.kind || "") || (a.name || "").localeCompare(b.name || ""); });
   else shown = shown.slice().reverse(); // newest saves last in the array
@@ -8135,7 +8298,9 @@ function renderLibrary() {
     item.appendChild(makeThumb(design, 0.3));
     const meta = document.createElement("div");
     meta.className = "meta";
-    meta.innerHTML = '<div class="name">' + esc(design.name) + '</div><div class="kind">' +
+    meta.innerHTML = '<div class="name">' + esc(design.name) +
+      (design.starter ? ' <span style="font-size:10px;background:rgba(240,196,69,.25);border-radius:8px;padding:2px 6px">✨ Starter</span>' : '') +
+      '</div><div class="kind">' +
       (KIND_ICONS[design.kind] || "🧩") + ' ' + esc(design.kind) +
       (design.folder ? ' · 📁 ' + esc(design.folder) : '') + '</div>';
     const editButton = document.createElement("button");
@@ -8170,9 +8335,13 @@ function renderLibrary() {
       persist();
       renderLibrary();
     };
+    const cardButton = document.createElement("button");
+    cardButton.textContent = "📤";
+    cardButton.title = "Share as an image card";
+    cardButton.onclick = function () { shareCard(design); };
     const actions = document.createElement("div");
     actions.className = "actions";
-    actions.append(editButton, dupButton, shareButton, folderButton, deleteButton);
+    actions.append(editButton, dupButton, shareButton, cardButton, folderButton, deleteButton);
     item.append(meta, actions);
     library.appendChild(item);
   }
@@ -8212,7 +8381,17 @@ document.getElementById("quoteText").oninput = function (e) { current.primaryTex
 document.getElementById("quoteAuthor").oninput = function (e) { current.secondaryText = e.target.value; renderPreview(); };
 document.getElementById("noteText").oninput = function (e) { current.primaryText = e.target.value; renderPreview(); };
 
+document.getElementById("librarySearch").oninput = function () { renderLibrary(); };
+document.getElementById("backupNudge").onclick = function () {
+  document.getElementById("backupBtn").click();
+};
 document.getElementById("saveBtn").onclick = function () {
+  // A starter becomes the user's own design the moment they save a change
+  // (and, when metering exists, only then counts toward any widget cap).
+  if (current.starter) {
+    delete current.starter;
+    if (current.folder === "Starters") delete current.folder;
+  }
   const rawName = document.getElementById("nameInput").value || "My Widget";
   current.name = dedupedName(rawName, current.id);
   document.getElementById("nameInput").value = current.name;
@@ -8879,6 +9058,7 @@ document.getElementById("backupBtn").onclick = function () {
   try { pages = JSON.parse(localStorage.getItem("widgetking.pages") || "[]"); } catch (e) {}
   const backup = { app: "WidgetKing", version: 1, exportedAt: new Date().toISOString(), designs: designs, pages: pages };
   download("widgetking-backup-" + stamp + ".json", JSON.stringify(backup, null, 2), "application/json");
+  markBackedUp();
   toast("Backup saved — keep it in Files/iCloud. Restore any time with 📂");
 };
 function download(name, content, type) {
@@ -9010,6 +9190,87 @@ async function designToLink(design) {
   const base = location.origin.startsWith("http") ? location.origin + location.pathname
     : "https://ballnews703-png.github.io/WidgetKing/";
   return { url: base + "#d=" + mode + b64urlEncode(bytes), hadPhotos: hadPhotos };
+}
+// Share a design as a social-ready image card: the widget rendered on a soft
+// gradient with a small credit line. The widget itself is the live DOM
+// renderer serialized through an SVG foreignObject — remote icons can't load
+// inside SVG-as-image, so designs relying on them fall back to a text card.
+async function shareCard(design) {
+  const sizeKey = SIZES[design.fitSize] ? design.fitSize : "small";
+  const dims = SIZES[sizeKey];
+  const W = 1080, H = 1350;
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const x = c.getContext("2d");
+  const [t1, t2] = THEMES[design.themeID] || THEMES.midnight;
+  const g = x.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, t1); g.addColorStop(1, t2);
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  x.globalAlpha = 0.14; x.fillStyle = "#FFFFFF";
+  for (const [bx, by, br] of [[0.15, 0.2, 260], [0.85, 0.75, 320], [0.7, 0.12, 150]]) {
+    x.beginPath(); x.arc(W * bx, H * by, br, 0, 7); x.fill();
+  }
+  x.globalAlpha = 1;
+  const scale = Math.min((W * 0.72) / dims[0], (H * 0.5) / dims[1]);
+  let widgetDrawn = false;
+  try {
+    const node = renderDesignNode(normalizeDesign(JSON.parse(JSON.stringify(design))), sizeKey);
+    const holder = document.createElement("div");
+    holder.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+    holder.style.cssText = "width:" + dims[0] + "px;height:" + dims[1] + "px;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif";
+    holder.appendChild(node);
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + dims[0] + '" height="' + dims[1] + '">' +
+      '<foreignObject width="100%" height="100%">' + new XMLSerializer().serializeToString(holder) + '</foreignObject></svg>';
+    const img = new Image();
+    await new Promise(function (resolve, reject) {
+      img.onload = resolve; img.onerror = reject;
+      img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+    });
+    const dw = dims[0] * scale, dh = dims[1] * scale;
+    const dx = (W - dw) / 2, dy = (H - dh) / 2 - 60;
+    x.save();
+    x.shadowColor = "rgba(0,0,0,0.4)"; x.shadowBlur = 60; x.shadowOffsetY = 24;
+    const r = 40 * scale / 2.2;
+    x.beginPath();
+    x.moveTo(dx + r, dy);
+    x.arcTo(dx + dw, dy, dx + dw, dy + dh, r);
+    x.arcTo(dx + dw, dy + dh, dx, dy + dh, r);
+    x.arcTo(dx, dy + dh, dx, dy, r);
+    x.arcTo(dx, dy, dx + dw, dy, r);
+    x.closePath();
+    x.fillStyle = "#000"; x.fill();
+    x.shadowColor = "transparent";
+    x.clip();
+    x.drawImage(img, dx, dy, dw, dh);
+    x.restore();
+    widgetDrawn = true;
+  } catch (e) {}
+  if (!widgetDrawn) {
+    x.fillStyle = "rgba(255,255,255,0.15)";
+    x.beginPath(); x.arc(W / 2, H / 2 - 80, 200, 0, 7); x.fill();
+    x.font = "160px -apple-system, sans-serif"; x.textAlign = "center";
+    x.fillText(KIND_ICONS[design.kind] || "🧩", W / 2, H / 2 - 20);
+  }
+  x.textAlign = "center";
+  x.fillStyle = "#FFFFFF";
+  x.font = "bold 58px -apple-system, 'Helvetica Neue', sans-serif";
+  x.fillText(design.name || "My Widget", W / 2, H - 300);
+  x.globalAlpha = 0.75;
+  x.font = "34px -apple-system, 'Helvetica Neue', sans-serif";
+  x.fillText("👑 Made with WidgetKing", W / 2, H - 150);
+  x.globalAlpha = 1;
+  let dataUrl;
+  try { dataUrl = c.toDataURL("image/png"); }
+  catch (e) { toast("⚠️ This design's photos block image export — try 🔗 share instead"); return; }
+  const blob = await (await fetch(dataUrl)).blob();
+  const file = new File([blob], "widgetking-" + (design.name || "widget").replace(/\W+/g, "-").toLowerCase() + ".png", { type: "image/png" });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); return; } catch (e) { if (e && e.name === "AbortError") return; }
+  }
+  const a = document.createElement("a");
+  a.href = dataUrl; a.download = file.name;
+  a.click();
+  toast("📤 Card saved to your photos/downloads");
 }
 async function shareDesign(design) {
   try {
