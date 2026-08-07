@@ -844,7 +844,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 71;
+const WK_VERSION = 72;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -2128,7 +2128,7 @@ const ICON_THEMES = {
   duo:    { colors: ["#5B2C98", "#1A2980", "#B0345C", "#134E5E", "#7A3803"], glyph: "#FFFFFF",
             duo: ["#B06AB3", "#26D0CE", "#F09819", "#71B280", "#FFD300"] },
   frost:  { colors: ["#FFFFFF"], glyph: "#FFFFFF", frost: true },
-  retro:  { colors: ["#1B1B2E"], glyph: "#FF6B6B", lineCycle: true,
+  retro:  { colors: ["#1B1B2E"], glyph: "#FF6B6B", lineCycle: true, lettersOnly: true,
             glyphCycle: ["#FF6B6B", "#FFD93D", "#6BCB77", "#4D96FF"] },
   candy:  { colors: ["#FF9A9E", "#A18CD1", "#7FD8BE", "#F6C90E", "#8FD3F4"], glyph: "#FFFFFF", radius: 0.3 },
   basic:  { colors: ["#3A3A44"], glyph: "#FFFFFF", emojiTile: true },
@@ -2389,6 +2389,13 @@ function themedIconTile(app, themeName, index, pt) {
       ctx.setTextAlignedCenter();
       ctx.drawTextInRect((app.label || "A").trim().charAt(0).toLowerCase(), new Rect(0, S * (theme.ring ? 0.32 : 0.2), S, S * 0.64));
     }
+    return ctx.getImage();
+  }
+  // Letters are the fallback, not the aesthetic — recognized apps get their
+  // vector glyph (retro monograms and emoji tiles opt out via flags).
+  const symStrokes = (theme.emojiTile || theme.lettersOnly) ? null : vglyphFor(app.label);
+  if (symStrokes) {
+    strokeVGlyph(ctx, symStrokes, S / 2, S / 2, S * 0.6, Math.max(2, S * 0.055), glyphColor, null, 1);
     return ctx.getImage();
   }
   const glyph = iconGlyph(app, themeName);
@@ -3257,7 +3264,7 @@ const ICON_THEMES = {
   duo:    { name: "🌈 Duotone", colors: ["#5B2C98", "#1A2980", "#B0345C", "#134E5E", "#7A3803"], glyph: "#FFFFFF",
             duo: ["#B06AB3", "#26D0CE", "#F09819", "#71B280", "#FFD300"] },
   frost:  { name: "🧊 Frosted", colors: ["#FFFFFF"], glyph: "#FFFFFF", frost: true },
-  retro:  { name: "🕹 Retro", colors: ["#1B1B2E"], glyph: "#FF6B6B", lineCycle: true,
+  retro:  { name: "🕹 Retro", colors: ["#1B1B2E"], glyph: "#FF6B6B", lineCycle: true, lettersOnly: true,
             glyphCycle: ["#FF6B6B", "#FFD93D", "#6BCB77", "#4D96FF"] },
   candy:  { name: "🍬 Candy", colors: ["#FF9A9E", "#A18CD1", "#7FD8BE", "#F6C90E", "#8FD3F4"], glyph: "#FFFFFF", radius: 0.3 },
   basic:  { name: "😀 Basic (emoji)", colors: ["#3A3A44"], glyph: "#FFFFFF", emojiTile: true },
@@ -3327,6 +3334,15 @@ function paintThemeTile(x, S, app, themeName, index, fullBleed) {
   x.beginPath();
   if (r > 0 && x.roundRect) x.roundRect(0, 0, S, S, r); else x.rect(0, 0, S, S);
   x.clip();
+  if (theme.frost && fullBleed) {
+    // Standalone (maker grid, Home Screen export): frost needs something to
+    // frost over — launchers get this from the widget background instead.
+    const backdrop = x.createLinearGradient(0, 0, S, S);
+    backdrop.addColorStop(0, "#2C3444");
+    backdrop.addColorStop(1, "#141926");
+    x.fillStyle = backdrop;
+    x.fillRect(0, 0, S, S);
+  }
   x.fillStyle = theme.frost ? "rgba(255,255,255,.25)" : bg;
   x.fillRect(0, 0, S, S);
   if (theme.neu) {
@@ -3409,13 +3425,21 @@ function paintThemeTile(x, S, app, themeName, index, fullBleed) {
     }
     x.shadowBlur = 0;
   } else {
-    const glyph = iconGlyph(app, themeName);
-    x.fillStyle = glyphColor;
-    x.font = (theme.emojiTile ? "400 " : "700 ") + Math.round(S * (theme.emojiTile ? 0.5 : 0.42)) +
-      "px -apple-system, 'Segoe UI Emoji', sans-serif";
-    x.textAlign = "center";
-    x.textBaseline = "middle";
-    x.fillText(glyph, S / 2, S * 0.54);
+    // Letters are the fallback, not the aesthetic: recognized apps get their
+    // vector glyph so filled tiles read as icons, not initials. Themes that
+    // are letters on purpose (retro monograms, emoji) opt out via flags.
+    const symStrokes = (theme.emojiTile || theme.lettersOnly) ? null : vglyphFor(app.label);
+    if (symStrokes) {
+      drawVGlyph(x, symStrokes, S / 2, S / 2, S * 0.6, Math.max(1.4, S * 0.055), glyphColor, null);
+    } else {
+      const glyph = iconGlyph(app, themeName);
+      x.fillStyle = glyphColor;
+      x.font = (theme.emojiTile ? "400 " : "700 ") + Math.round(S * (theme.emojiTile ? 0.5 : 0.42)) +
+        "px -apple-system, 'Segoe UI Emoji', sans-serif";
+      x.textAlign = "center";
+      x.textBaseline = "middle";
+      x.fillText(glyph, S / 2, S * 0.54);
+    }
   }
   x.restore();
 }
@@ -3430,10 +3454,12 @@ function themeTilePng(app, themeName, index, px) {
   tileCache[key] = url;
   return url;
 }
-// Themes whose look needs real drawing (CSS letter tiles can't show them).
+// Themes whose look needs real drawing. Since recognized apps now get vector
+// glyphs on every tile style, that's everything except the deliberate
+// letter/emoji tiles (retro monograms, basic emoji) — those keep fast CSS.
 function themeNeedsCanvas(themeName) {
   const theme = ICON_THEMES[themeName];
-  return !!(theme && (theme.glyphStyle || theme.wordTile || theme.neu || theme.dots));
+  return !!(theme && !theme.emojiTile && !theme.lettersOnly);
 }
 
 // ==================== Real-icon restyler ====================

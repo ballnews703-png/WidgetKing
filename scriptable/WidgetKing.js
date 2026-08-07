@@ -30,7 +30,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 71;
+const WK_VERSION = 72;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -1314,7 +1314,7 @@ const ICON_THEMES = {
   duo:    { colors: ["#5B2C98", "#1A2980", "#B0345C", "#134E5E", "#7A3803"], glyph: "#FFFFFF",
             duo: ["#B06AB3", "#26D0CE", "#F09819", "#71B280", "#FFD300"] },
   frost:  { colors: ["#FFFFFF"], glyph: "#FFFFFF", frost: true },
-  retro:  { colors: ["#1B1B2E"], glyph: "#FF6B6B", lineCycle: true,
+  retro:  { colors: ["#1B1B2E"], glyph: "#FF6B6B", lineCycle: true, lettersOnly: true,
             glyphCycle: ["#FF6B6B", "#FFD93D", "#6BCB77", "#4D96FF"] },
   candy:  { colors: ["#FF9A9E", "#A18CD1", "#7FD8BE", "#F6C90E", "#8FD3F4"], glyph: "#FFFFFF", radius: 0.3 },
   basic:  { colors: ["#3A3A44"], glyph: "#FFFFFF", emojiTile: true },
@@ -1575,6 +1575,13 @@ function themedIconTile(app, themeName, index, pt) {
       ctx.setTextAlignedCenter();
       ctx.drawTextInRect((app.label || "A").trim().charAt(0).toLowerCase(), new Rect(0, S * (theme.ring ? 0.32 : 0.2), S, S * 0.64));
     }
+    return ctx.getImage();
+  }
+  // Letters are the fallback, not the aesthetic — recognized apps get their
+  // vector glyph (retro monograms and emoji tiles opt out via flags).
+  const symStrokes = (theme.emojiTile || theme.lettersOnly) ? null : vglyphFor(app.label);
+  if (symStrokes) {
+    strokeVGlyph(ctx, symStrokes, S / 2, S / 2, S * 0.6, Math.max(2, S * 0.055), glyphColor, null, 1);
     return ctx.getImage();
   }
   const glyph = iconGlyph(app, themeName);
