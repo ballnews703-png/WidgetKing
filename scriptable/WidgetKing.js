@@ -30,7 +30,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 72;
+const WK_VERSION = 73;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -1338,6 +1338,44 @@ const ICON_THEMES = {
 // Vector line glyphs (mirrors the designer's VGLYPHS — normalized strokes;
 // ["c",cx,cy,r] circles and ["a",cx,cy,r,a0,a1] arcs expand to segments).
 const VGLYPHS = {
+  tv: [[[0.2,0.3],[0.8,0.3],[0.8,0.66],[0.2,0.66],[0.2,0.3]],
+    [[0.5,0.66],[0.5,0.74]], [[0.38,0.74],[0.62,0.74]]],
+  car: [[[0.16,0.62],[0.18,0.52],[0.28,0.5],[0.35,0.39],[0.63,0.39],[0.72,0.5],[0.82,0.52],[0.84,0.62],[0.16,0.62]],
+    [[0.28,0.5],[0.72,0.5]], [[0.49,0.39],[0.49,0.5]],
+    [["c",0.32,0.66,0.055]], [["c",0.68,0.66,0.055]]],
+  fork: [[[0.34,0.48],[0.34,0.76]], [[0.26,0.26],[0.26,0.4],[0.42,0.4],[0.42,0.26]],
+    [[0.34,0.26],[0.34,0.4]], [[0.26,0.4],[0.34,0.48],[0.42,0.4]],
+    [[0.66,0.26],[0.66,0.76]], [[0.66,0.27],[0.74,0.36],[0.74,0.48],[0.66,0.54]]],
+  dumbbell: [[[0.34,0.5],[0.66,0.5]],
+    [[0.3,0.36],[0.3,0.64]], [[0.22,0.42],[0.22,0.58]],
+    [[0.7,0.36],[0.7,0.64]], [[0.78,0.42],[0.78,0.58]]],
+  bell: [[["a",0.5,0.47,0.19,3.14,6.28]],
+    [[0.31,0.47],[0.29,0.62],[0.71,0.62],[0.69,0.47]],
+    [[0.5,0.24],[0.5,0.28]], [["c",0.5,0.7,0.04]]],
+  bolt: [[[0.56,0.22],[0.4,0.52],[0.51,0.52],[0.44,0.78],[0.65,0.46],[0.53,0.46],[0.56,0.22]]],
+  leaf: [[[0.3,0.72],[0.28,0.52],[0.36,0.35],[0.52,0.26],[0.71,0.25],[0.73,0.44],[0.66,0.6],[0.5,0.7],[0.3,0.72]],
+    [[0.24,0.78],[0.3,0.72]], [[0.33,0.67],[0.65,0.33]]],
+  news: [[[0.22,0.28],[0.7,0.28],[0.7,0.74],[0.22,0.74],[0.22,0.28]],
+    [[0.7,0.38],[0.78,0.38],[0.78,0.72],[0.7,0.72]],
+    [[0.29,0.4],[0.63,0.4]], [[0.29,0.5],[0.63,0.5]], [[0.29,0.6],[0.5,0.6]]],
+  wallet: [[[0.2,0.34],[0.8,0.34],[0.8,0.7],[0.2,0.7],[0.2,0.34]],
+    [[0.2,0.34],[0.28,0.27],[0.72,0.27],[0.8,0.34]],
+    [[0.64,0.48],[0.8,0.48],[0.8,0.58],[0.64,0.58],[0.64,0.48]]],
+  lock: [[[0.3,0.48],[0.7,0.48],[0.7,0.76],[0.3,0.76],[0.3,0.48]],
+    [["a",0.5,0.48,0.14,3.14,6.28]], [["c",0.5,0.61,0.04]]],
+  mic: [[["a",0.5,0.36,0.1,3.14,6.28]], [[0.4,0.36],[0.4,0.48]], [[0.6,0.36],[0.6,0.48]],
+    [["a",0.5,0.48,0.1,0,3.14]], [["a",0.5,0.48,0.17,0.35,2.79]],
+    [[0.5,0.65],[0.5,0.74]], [[0.42,0.74],[0.58,0.74]]],
+  ticket: [[[0.2,0.36],[0.8,0.36],[0.8,0.64],[0.2,0.64],[0.2,0.36]],
+    [[0.5,0.4],[0.5,0.45]], [[0.5,0.5],[0.5,0.55]], [[0.5,0.6],[0.5,0.62]]],
+  paw: [[["c",0.5,0.63,0.115]],
+    [["c",0.3,0.46,0.05]], [["c",0.43,0.36,0.05]], [["c",0.57,0.36,0.05]], [["c",0.7,0.46,0.05]]],
+  chart: [[[0.24,0.26],[0.24,0.74],[0.78,0.74]],
+    [[0.3,0.62],[0.44,0.46],[0.56,0.56],[0.72,0.34]],
+    [[0.63,0.34],[0.72,0.34],[0.72,0.43]]],
+  cap: [[[0.5,0.28],[0.8,0.4],[0.5,0.52],[0.2,0.4],[0.5,0.28]],
+    [["a",0.5,0.5,0.15,0.35,2.79]],
+    [[0.8,0.4],[0.8,0.56]], [["c",0.8,0.6,0.025]]],
   phone: [[["a",0.317,0.223,0.52,0.25,1.69]], [["a",0.351,0.273,0.26,0.05,1.89]],
     [[0.821,0.352],[0.611,0.286]], [[0.255,0.739],[0.270,0.520]]],
   mail: [[[0.2,0.32],[0.8,0.32],[0.8,0.68],[0.2,0.68],[0.2,0.32]],
@@ -1410,6 +1448,26 @@ const VGLYPHS = {
     [[0.5,0.22],[0.5,0.78]]]
 };
 const VGLYPH_FOR = [
+  // Newer, more specific matches first — this list is first-match-wins, and
+  // some guards matter (instacart before car, fitness before fit, tv before
+  // the video->play entries further down).
+  ["instacart", "cart"],
+  ["netflix", "tv"], ["hulu", "tv"], ["disney", "tv"], ["hbo", "tv"], ["paramount", "tv"], ["peacock", "tv"], ["apple tv", "tv"], ["appletv", "tv"], ["tv", "tv"],
+  ["uber eat", "fork"], ["ubereats", "fork"], ["doordash", "fork"], ["grubhub", "fork"], ["yelp", "fork"], ["restaurant", "fork"], ["pizza", "fork"], ["burger", "fork"], ["taco", "fork"], ["mcdonald", "fork"], ["chipotle", "fork"], ["dining", "fork"],
+  ["uber", "car"], ["lyft", "car"], ["tesla", "car"], ["parking", "car"], ["carplay", "car"], ["car", "car"],
+  ["gym", "dumbbell"], ["workout", "dumbbell"], ["peloton", "dumbbell"], ["fitness", "dumbbell"], ["exercise", "dumbbell"], ["lifting", "dumbbell"],
+  ["doorbell", "bell"], ["ring", "bell"], ["notification", "bell"], ["alert", "bell"], ["bell", "bell"],
+  ["bolt", "bolt"], ["energy", "bolt"], ["electric", "bolt"], ["charge", "bolt"],
+  ["headspace", "leaf"], ["calm", "leaf"], ["meditat", "leaf"], ["mindful", "leaf"], ["plant", "leaf"], ["garden", "leaf"], ["leaf", "leaf"],
+  ["news", "news"],
+  ["wallet", "wallet"], ["passes", "wallet"],
+  ["1password", "lock"], ["password", "lock"], ["lastpass", "lock"], ["vpn", "lock"], ["authenticat", "lock"], ["secure", "lock"], ["lock", "lock"],
+  ["voice memo", "mic"], ["recorder", "mic"], ["karaoke", "mic"], ["dictation", "mic"], ["mic", "mic"],
+  ["ticketmaster", "ticket"], ["fandango", "ticket"], ["stubhub", "ticket"], ["ticket", "ticket"], ["movie", "ticket"], ["cinema", "ticket"],
+  ["chewy", "paw"], ["petco", "paw"], ["pet", "paw"], ["dog", "paw"], ["paw", "paw"],
+  ["robinhood", "chart"], ["coinbase", "chart"], ["crypto", "chart"], ["invest", "chart"], ["trading", "chart"], ["stocks", "chart"], ["stock", "chart"], ["chart", "chart"],
+  ["duolingo", "cap"], ["school", "cap"], ["study", "cap"], ["learn", "cap"], ["canvas", "cap"], ["grades", "cap"],
+  ["facetime", "camera"], ["zoom", "camera"],
   ["headphone", "headphones"], ["audible", "headphones"], ["podcast", "headphones"],
   ["diamond", "diamond"], ["vip", "diamond"], ["jewel", "diamond"],
   ["gift", "gift"], ["present", "gift"], ["wishlist", "gift"],
