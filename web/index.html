@@ -13,19 +13,19 @@
 <meta name="theme-color" content="#131318">
 <style>
   :root {
-    --bg: #101014;
-    --card: #1a1a21;
-    --card2: #23232c;
+    --bg: #0d0d11;
+    --card: #17171e;
+    --card2: #21212b;
     --text: #f2f2f5;
     --muted: #9a9aa5;
     --accent: #8f52fa;
     --accent-text: #ffffff;
-    --border: #34343f;
-    --line: #26262e;
-    --stage-a: #1b1b22;
-    --stage-b: #17171d;
-    --shadow: rgba(0,0,0,.45);
-    --radius: 16px;
+    --border: #2c2c38;
+    --line: #24242e;
+    --stage-a: #191920;
+    --stage-b: #14141a;
+    --shadow: rgba(0,0,0,.5);
+    --radius: 20px;
   }
   body.light {
     --bg: #f5f1ec;
@@ -844,7 +844,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 73;
+const WK_VERSION = 74;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -4337,7 +4337,7 @@ let current = newDesign();
 let previewSize = "small";
 let selectedElId = null;
 let multiSelect = null; // Set of element ids while "group items" picking is on
-let snapGuides = { x: false, y: false };
+let snapGuides = { x: null, y: null };
 
 function loadDesigns() {
   try {
@@ -4696,6 +4696,24 @@ const AI_EX_HERO = {
   ]
 };
 
+const AI_EX_BENTO = {
+  name: "Hello Card", kind: "freestyle", themeID: "custom", fontStyle: "rounded",
+  textColorHex: "#FFFFFF", primaryText: "", secondaryText: "", targetDate: "",
+  background: "gradient", glassTint: "dark", bgOpacity: 1,
+  backgroundColors: ["#4318D9", "#C9B8F4"], tapUrl: "", apps: [],
+  canvasElements: [
+    { kind: "text", text: "hello", label: "", url: "", font: "script", x: 0.27, y: 0.3, size: 22, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
+    { kind: "shape", text: "", label: "", url: "", font: "", x: 0.63, y: 0.3, size: 0, colorHex: "#FFFFFF", opacity: 0.25, shape: "pill", w: 0.3, h: 0.2, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
+    { kind: "shape", text: "", label: "", url: "", font: "", x: 0.545, y: 0.3, size: 0, colorHex: "#E8756D", opacity: 1, shape: "pill", w: 0.11, h: 0.2, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
+    { kind: "date", text: "", label: "", url: "", font: "", x: 0.63, y: 0.3, size: 11, colorHex: "#241456", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
+    { kind: "text", text: "It's", label: "", url: "", font: "", x: 0.23, y: 0.68, size: 15, colorHex: "#FFFFFF", opacity: 0.95, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
+    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.43, y: 0.68, size: 17, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
+    { kind: "shape", text: "", label: "", url: "", font: "", x: 0.75, y: 0.68, size: 0, colorHex: "#FFFFFF", opacity: 0.25, shape: "pill", w: 0.26, h: 0.22, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
+    { kind: "weather", text: "", label: "", url: "", font: "", x: 0.72, y: 0.68, size: 13, colorHex: "#241456", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "now", source: "", dateISO: "" },
+    { kind: "icon", text: "☀", label: "", url: "", font: "", x: 0.84, y: 0.675, size: 12, colorHex: "#F0C445", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" }
+  ]
+};
+
 function aiSystemPrompt() {
   const today = new Date().toISOString().slice(0, 10);
   return "You are WidgetKing's expert widget designer. Design at the level of the most beautiful Home Screen setups people share online: intentional composition, real hierarchy, restraint. The user describes a widget; return a spec.\n" +
@@ -4709,10 +4727,15 @@ function aiSystemPrompt() {
     "5 Corner Anchor (asymmetric): main element at x .34 y .42; small satellites (icon 12-16pt) near corners x/y .12 and .88.\n" +
     "6 Monogram: one letter or glyph size 50-60 centered with a ring w .72 around it.\n" +
     "7 Photo Feature: photo placeholder + translucent caption card (pill opacity .25) overlapping its lower edge.\n" +
+    "9 Bento Board (the premium look — DEFAULT for dashboards/briefs on dark themes): near-black canvas (custom #121218 to #1A1A22), then NOTHING floats — every stat lives in a container. Sub-cards: rect shapes radius 16-20, white opacity .07-.10, optional border 1 borderHex #FFFFFF, arranged with even gutters (.04). One stat per card: a hero number 20-28pt + a muted 9pt label, or a pill. 2 cards on small, 3-4 on medium.\n" +
+    "10 Pill Line (conversational): a sentence mixing plain text with live data set in capsules — 'It's [clock] , [temp pill]'. Reads like handwriting + chips.\n" +
     "8 Matchup Card (fantasy sports): sleeper score element as hero (size 22-28, shadow duplicate behind) at y .42, microlabel 'YOU  ·  OPP' 8-9pt above it, a second sleeper element mode omitted (defaults to score) — use ONE score + one record line 9-10pt, divider, plus a day ring or countdown in a side column. kind=sleeper shows the user's LIVE fantasy matchup (they link their league afterward — leave its config fields empty). Also available: mode myteam/opponent on sleeper = the TEAM NAMES, and kind=sleeperlogo (mode myteam/opponent) = circular team LOGOS 30-38pt — flank the score with both logos and put the names 8-9pt beneath them for a broadcast-style matchup card. Use these whenever fantasy football/Sleeper is mentioned.\n" +
     "CRAFT TRICKS the renderer supports:\n" +
     "- Shadow: duplicate the SAME element first in near-black (#141018, opacity .3-.35) offset +.02 x, +.025 y, then the real one on top. ONLY on the one hero element, NEVER on text under 20pt — small/tight shadow offsets read as blurry double-vision, not depth.\n" +
     "- Glow: duplicate first in the accent color, opacity .2-.25, size +8, then the real element. Neon moods only; skip it everywhere else — crisp beats glowy.\n" +
+    "- Data pill (the single highest-craft move — use for ALL small live data): a pill shape h .18-.24, w sized to the text +.08 padding, DIRECTLY UNDER a 10-13pt bold data element centered on it (same x/y). On dark canvases: pill white opacity .2-.3 with dark text #17171C — or a solid colored pill (mint #7FD8A8, coral #E8756D, gold #F0C445, lavender #B9A8F0) with dark text. Never let a bare 10pt weather/date/battery float when it could sit in a pill.\n" +
+    "- Two-tone accent capsule: TWO pills side by side forming one capsule (solid accent pill + translucent pill), data text spanning them — the month-vs-day date chip look.\n" +
+    "- Two-tone numerals: give the hero clock/number the base color, and set its companion (date, caption, second stat) in the single accent — white 12:31 with an orange date reads premium.\n" +
     "- Dividers: skinny rect shapes (h .005-.008) at opacity .25-.35 to separate rows.\n" +
     "- Layered cards: two shapes slightly offset with opacities .12 and .22 for depth.\n" +
     "- Shapes support radius (rect corner pt, 0 = sharp), border (stroke pt) + borderHex; opacity 0 + border = outline-only frame.\n" +
@@ -4729,6 +4752,7 @@ function aiSystemPrompt() {
     "For long text set w ~0.8 on the text element so it wraps (w=0 = single line).\n" +
     "Example — 'battery dashboard, cool blue' -> " + JSON.stringify(AI_EX_RING) + "\n" +
     "Example — 'a dreamy sunset clock' -> " + JSON.stringify(AI_EX_HERO) + "\n" +
+    "Example — 'a cute purple hello widget with the time and weather' -> " + JSON.stringify(AI_EX_BENTO) + "\n" +
     "Today is " + today + ". Resolve relative dates to yyyy-MM-dd. Names under 24 chars. Fill unused fields with empty strings, 0, or empty arrays. Compose like a designer, not a form-filler: every element should earn its place.";
 }
 async function callClaudeOnce(messages, key, schema) {
@@ -5365,16 +5389,16 @@ function renderFreestyleInto(node, design, w, h, interactive) {
     if (interactive) attachDrag(div, el);
     node.appendChild(div);
   }
-  if (interactive && snapGuides.x) {
+  if (interactive && snapGuides.x != null) {
     const guide = document.createElement("div");
     guide.className = "snap-guide";
-    guide.style.cssText += "left:50%;top:0;width:1px;height:100%";
+    guide.style.cssText += "left:" + (snapGuides.x * 100) + "%;top:0;width:1px;height:100%";
     node.appendChild(guide);
   }
-  if (interactive && snapGuides.y) {
+  if (interactive && snapGuides.y != null) {
     const guide = document.createElement("div");
     guide.className = "snap-guide";
-    guide.style.cssText += "top:50%;left:0;height:1px;width:100%";
+    guide.style.cssText += "top:" + (snapGuides.y * 100) + "%;left:0;height:1px;width:100%";
     node.appendChild(guide);
   }
 }
@@ -5627,7 +5651,7 @@ function cancelGesture() {
   if (!gesture) return;
   clearTimeout(gesture.longTimer);
   gesture = null;
-  snapGuides = { x: false, y: false };
+  snapGuides = { x: null, y: null };
   window.removeEventListener("pointermove", gestureMove);
   window.removeEventListener("pointerup", gestureUp);
   window.removeEventListener("pointercancel", gestureUp);
@@ -5640,7 +5664,7 @@ function startPinchPointer(event) {
   gesture.mode = "pinch";
   gesture.baseDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
   gesture.base = scaleBaseFor([gesture.el].concat(groupMembersOf(gesture.el)));
-  snapGuides = { x: false, y: false };
+  snapGuides = { x: null, y: null };
 }
 function gestureMove(ev) {
   if (!gesture || !gesture.pointers.has(ev.pointerId)) return;
@@ -5661,10 +5685,23 @@ function gestureMove(ev) {
   const rect = gesture.rect;
   let nx = (ev.clientX - rect.left) / rect.width - gesture.grabX;
   let ny = (ev.clientY - rect.top) / rect.height - gesture.grabY;
-  snapGuides.x = Math.abs(nx - 0.5) < 0.03;
-  snapGuides.y = Math.abs(ny - 0.5) < 0.03;
-  if (snapGuides.x) nx = 0.5;
-  if (snapGuides.y) ny = 0.5;
+  // Snap to the canvas center, quarter lines, and every OTHER element's
+  // x/y — dragging near a sibling's axis aligns to it with a guide line,
+  // the move that makes layouts read designed instead of nearly-aligned.
+  const dragIds = {};
+  dragIds[el.id] = true;
+  for (const s of gesture.members) dragIds[s.m.id] = true;
+  const xCands = [0.5, 0.25, 0.75], yCands = [0.5, 0.25, 0.75];
+  for (const other of current.canvasElements) {
+    if (dragIds[other.id]) continue;
+    xCands.push(other.x); yCands.push(other.y);
+  }
+  snapGuides = { x: null, y: null };
+  let bestX = 0.025, bestY = 0.025;
+  for (const c of xCands) if (Math.abs(nx - c) < bestX) { bestX = Math.abs(nx - c); snapGuides.x = c; }
+  for (const c of yCands) if (Math.abs(ny - c) < bestY) { bestY = Math.abs(ny - c); snapGuides.y = c; }
+  if (snapGuides.x != null) nx = snapGuides.x;
+  if (snapGuides.y != null) ny = snapGuides.y;
   el.x = Math.min(Math.max(nx, 0), 1);
   el.y = Math.min(Math.max(ny, 0), 1);
   const dx = el.x - gesture.startX;
@@ -5682,7 +5719,7 @@ function gestureUp(ev) {
   if (gesture.pointers.size > 0) return; // wait until every finger lifts
   const pinched = gesture.mode === "pinch";
   gesture = null;
-  snapGuides = { x: false, y: false };
+  snapGuides = { x: null, y: null };
   window.removeEventListener("pointermove", gestureMove);
   window.removeEventListener("pointerup", gestureUp);
   window.removeEventListener("pointercancel", gestureUp);
@@ -6065,10 +6102,71 @@ const PALETTE_GROUPS = [
     "reminders", "news", "worldclock", "stock", "astro", "battery", "countdown", "progress", "ring"]],
   ["Sports", ["sleeper", "sleeperlogo"]]
 ];
+// Smart Pieces: pre-styled multi-element inserts (the bento grammar as
+// one-tap buttons). Each returns grouped elements so they move as one.
+const SMART_PIECES = [
+  ["pill", "💊 Data pill", function () {
+    return [
+      { kind: "shape", shape: "pill", x: 0.5, y: 0.5, w: 0.42, h: 0.19, colorHex: "#7FD8A8", opacity: 1 },
+      { kind: "date", x: 0.5, y: 0.5, size: 10, colorHex: "#12241A", opacity: 1, bold: true }
+    ];
+  }],
+  ["card", "🍱 Bento card", function () {
+    return [
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.5, w: 0.44, h: 0.5, radius: 18, colorHex: "#FFFFFF", opacity: 0.08 },
+      { kind: "clock", x: 0.5, y: 0.44, size: 20, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "text", text: "label", x: 0.5, y: 0.62, size: 9, colorHex: "#9AA0AE", opacity: 1 }
+    ];
+  }],
+  ["gauge", "◎ Ring gauge", function () {
+    return [
+      { kind: "ring", source: "battery", x: 0.5, y: 0.5, w: 0.36, size: 6, colorHex: "#B9A8F0", opacity: 1 },
+      { kind: "battery", x: 0.5, y: 0.5, size: 11, colorHex: "#FFFFFF", opacity: 1, bold: true }
+    ];
+  }],
+  ["twotone", "🕐 Clock + accent", function () {
+    return [
+      { kind: "clock", x: 0.5, y: 0.44, size: 30, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "shape", shape: "pill", x: 0.5, y: 0.66, w: 0.5, h: 0.15, colorHex: "#E8756D", opacity: 1 },
+      { kind: "date", x: 0.5, y: 0.66, size: 9, colorHex: "#2A1210", opacity: 1, bold: true }
+    ];
+  }]
+];
+function insertSmartPiece(makeEls) {
+  const groupId = uid();
+  let firstId = null;
+  for (const raw of makeEls()) {
+    const el = raw;
+    el.id = uid();
+    el.groupId = groupId;
+    current.canvasElements.push(el);
+    if (!firstId) firstId = el.id;
+  }
+  current.canvasElements = normalizeDesign(current).canvasElements;
+  selectedElId = current.canvasElements[current.canvasElements.length - 1].id;
+  recordHistory();
+  refreshEditors();
+  toast("Piece added — drag to place, pinch to resize (it moves as one)");
+}
 function buildPalette(container) {
   container.innerHTML = "";
   const byKey = {};
   ELEMENT_PALETTE.forEach(function (p) { byKey[p[0]] = p[1]; });
+  const pieceHead = document.createElement("div");
+  pieceHead.className = "pal-head";
+  pieceHead.textContent = "Pieces — styled combos";
+  container.appendChild(pieceHead);
+  const pieceGrid = document.createElement("div");
+  pieceGrid.className = "pal-grid";
+  for (const piece of SMART_PIECES) {
+    const parts = piece[1].split(" ");
+    const ico = parts.shift();
+    const button = document.createElement("button");
+    button.innerHTML = '<span class="pal-ico">' + ico + '</span><span class="pal-name">' + parts.join(" ") + "</span>";
+    button.onclick = function () { insertSmartPiece(piece[2]); };
+    pieceGrid.appendChild(button);
+  }
+  container.appendChild(pieceGrid);
   for (const [title, keys] of PALETTE_GROUPS) {
     const head = document.createElement("div");
     head.className = "pal-head";
@@ -7617,6 +7715,58 @@ function buildTemplates() {
       { kind: "shape", shape: "rect", x: 0.5, y: 0.78, w: 0.5, h: 0.006, size: 0, colorHex: "#FFFFFF", opacity: 0.25 },
       { kind: "weather", wmode: "tomorrow", unit: "f", x: 0.5, y: 0.88, size: 10, colorHex: "#D7F0FF", opacity: 0.9 }
     ] } },
+    // 🍱 Bento — the Koco-grade grammar: near-black canvas, nothing floats.
+    // Every stat lives in a container (sub-card, pill, or ring), one accent,
+    // muted labels, two-tone numerals. These double as the AI's style bar.
+    { category: "Bento", pack: "Bento", size: "medium", design: { name: "Hello Card", kind: "freestyle", themeID: "custom", customColors: ["#4318D9", "#C9B8F4"], fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
+      { kind: "text", text: "hello", font: "script", x: 0.27, y: 0.3, size: 22, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "shape", shape: "pill", x: 0.63, y: 0.3, w: 0.3, h: 0.2, colorHex: "#FFFFFF", opacity: 0.25 },
+      { kind: "shape", shape: "pill", x: 0.545, y: 0.3, w: 0.11, h: 0.2, colorHex: "#E8756D", opacity: 1 },
+      { kind: "date", x: 0.63, y: 0.3, size: 11, colorHex: "#241456", opacity: 1, bold: true },
+      { kind: "text", text: "It's", x: 0.23, y: 0.68, size: 15, colorHex: "#FFFFFF", opacity: 0.95 },
+      { kind: "clock", x: 0.43, y: 0.68, size: 17, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "shape", shape: "pill", x: 0.75, y: 0.68, w: 0.26, h: 0.22, colorHex: "#FFFFFF", opacity: 0.25 },
+      { kind: "weather", wmode: "now", unit: "f", x: 0.72, y: 0.68, size: 13, colorHex: "#241456", opacity: 1, bold: true },
+      { kind: "icon", text: "☀", x: 0.84, y: 0.675, size: 12, colorHex: "#F0C445", opacity: 1 }
+    ] } },
+    { category: "Bento", pack: "Bento", size: "medium", design: { name: "Bento Board", kind: "freestyle", themeID: "custom", customColors: ["#121218", "#1A1A22"], fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
+      { kind: "shape", shape: "rect", x: 0.27, y: 0.5, w: 0.44, h: 0.86, radius: 18, colorHex: "#FFFFFF", opacity: 0.08 },
+      { kind: "shape", shape: "rect", x: 0.75, y: 0.29, w: 0.42, h: 0.44, radius: 18, colorHex: "#FFFFFF", opacity: 0.08 },
+      { kind: "shape", shape: "rect", x: 0.75, y: 0.77, w: 0.42, h: 0.4, radius: 18, colorHex: "#FFFFFF", opacity: 0.08 },
+      { kind: "greeting", name: "", emoji: true, x: 0.27, y: 0.26, size: 13, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "clock", x: 0.27, y: 0.48, size: 26, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "shape", shape: "pill", x: 0.27, y: 0.72, w: 0.3, h: 0.17, colorHex: "#7FD8A8", opacity: 1 },
+      { kind: "date", x: 0.27, y: 0.72, size: 10, colorHex: "#12241A", opacity: 1, bold: true },
+      { kind: "weather", wmode: "now", unit: "f", x: 0.7, y: 0.26, size: 20, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "icon", text: "☀", x: 0.86, y: 0.25, size: 13, colorHex: "#F0C445", opacity: 1 },
+      { kind: "shape", shape: "pill", x: 0.75, y: 0.77, w: 0.3, h: 0.17, colorHex: "#B9A8F0", opacity: 1 },
+      { kind: "battery", x: 0.75, y: 0.77, size: 10, colorHex: "#1D1430", opacity: 1, bold: true }
+    ] } },
+    { category: "Bento", pack: "Bento", size: "medium", design: { name: "Horizon", kind: "freestyle", themeID: "custom", customColors: ["#15151C", "#1D1D26"], fontStyle: "avenir", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
+      { kind: "weather", wmode: "cond", unit: "f", x: 0.3, y: 0.2, size: 13, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "weather", wmode: "now", unit: "f", x: 0.82, y: 0.2, size: 24, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "weather", wmode: "hilo", unit: "f", x: 0.3, y: 0.36, size: 10, colorHex: "#9AA0AE", opacity: 1 },
+      { kind: "ring", source: "battery", x: 0.2, y: 0.68, w: 0.34, size: 6, colorHex: "#B9A8F0", opacity: 1 },
+      { kind: "battery", x: 0.2, y: 0.68, size: 11, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "ring", source: "day", x: 0.5, y: 0.68, w: 0.34, size: 6, colorHex: "#E8756D", opacity: 1 },
+      { kind: "clock", x: 0.5, y: 0.68, size: 10, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "ring", source: "year", x: 0.8, y: 0.68, w: 0.34, size: 6, colorHex: "#7FD8A8", opacity: 1 },
+      { kind: "week", x: 0.8, y: 0.68, size: 9, colorHex: "#FFFFFF", opacity: 1, bold: true }
+    ] } },
+    { category: "Bento", pack: "Bento", size: "small", design: { name: "Two-Tone Clock", kind: "freestyle", themeID: "custom", customColors: ["#121218", "#1A1A22"], fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "clock", x: 0.5, y: 0.4, size: 32, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "shape", shape: "pill", x: 0.5, y: 0.66, w: 0.56, h: 0.16, colorHex: "#E8756D", opacity: 1 },
+      { kind: "date", x: 0.5, y: 0.66, size: 10, colorHex: "#2A1210", opacity: 1, bold: true },
+      { kind: "weather", wmode: "hilo", unit: "f", x: 0.5, y: 0.86, size: 10, colorHex: "#9AA0AE", opacity: 1 }
+    ] } },
+    { category: "Bento", pack: "Bento", size: "small", design: { name: "Pill Stack", kind: "freestyle", themeID: "custom", customColors: ["#121218", "#1A1A22"], fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "shape", shape: "pill", x: 0.5, y: 0.22, w: 0.76, h: 0.19, colorHex: "#B9A8F0", opacity: 1 },
+      { kind: "date", x: 0.5, y: 0.22, size: 10, colorHex: "#1D1430", opacity: 1, bold: true },
+      { kind: "shape", shape: "pill", x: 0.5, y: 0.5, w: 0.76, h: 0.19, colorHex: "#7FD8A8", opacity: 1 },
+      { kind: "weather", wmode: "full", unit: "f", x: 0.5, y: 0.5, size: 10, colorHex: "#12241A", opacity: 1, bold: true },
+      { kind: "shape", shape: "pill", x: 0.5, y: 0.78, w: 0.76, h: 0.19, colorHex: "#F0C445", opacity: 1 },
+      { kind: "battery", x: 0.5, y: 0.78, size: 10, colorHex: "#2A230F", opacity: 1, bold: true }
+    ] } },
     // 🫧 Liquid Glass — the real thing: background "glass" shows the user's
     // actual wallpaper through a blur + frost (both renderers already do
     // this), with hairline borders and white translucent content on top.
@@ -7872,7 +8022,7 @@ function buildTemplates() {
   ];
 }
 let activePack = "all";
-const PACK_CHIPS = [["all", "✨ All"], ["Picks", "👑 Picks"], ["Glass", "🫧 Glass"], ["Cute", "🌸 Cute"], ["Minimal", "▫️ Minimal"],
+const PACK_CHIPS = [["all", "✨ All"], ["Picks", "👑 Picks"], ["Bento", "🍱 Bento"], ["Glass", "🫧 Glass"], ["Cute", "🌸 Cute"], ["Minimal", "▫️ Minimal"],
   ["Zen", "🍃 Zen"], ["Sports", "🏈 Sports"], ["Work", "💼 Work"],
   ["Neon", "⚡ Neon"], ["Live", "🌤 Live"], ["Pro", "💎 Pro"]];
 function renderTemplates() {
