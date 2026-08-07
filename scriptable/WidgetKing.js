@@ -30,7 +30,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 76;
+const WK_VERSION = 77;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -125,7 +125,12 @@ const FONT_NAMES = {
   script: ["SnellRoundhand", "SnellRoundhand-Bold"],
   copperplate: ["Copperplate", "Copperplate-Bold"],
   optima: ["Optima-Regular", "Optima-Bold"],
-  palatino: ["Palatino-Roman", "Palatino-Bold"]
+  palatino: ["Palatino-Roman", "Palatino-Bold"],
+  bodoni: ["BodoniSvtyTwoITCTT-Book", "BodoniSvtyTwoITCTT-Bold"],
+  gillsans: ["GillSans", "GillSans-Bold"],
+  hoefler: ["HoeflerText-Regular", "HoeflerText-Black"],
+  cochin: ["Cochin", "Cochin-Bold"],
+  zapfino: ["Zapfino", "Zapfino"]
 };
 function fontFor(style, size, bold) {
   const names = FONT_NAMES[style];

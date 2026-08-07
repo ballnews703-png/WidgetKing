@@ -844,7 +844,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 76;
+const WK_VERSION = 77;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -939,7 +939,12 @@ const FONT_NAMES = {
   script: ["SnellRoundhand", "SnellRoundhand-Bold"],
   copperplate: ["Copperplate", "Copperplate-Bold"],
   optima: ["Optima-Regular", "Optima-Bold"],
-  palatino: ["Palatino-Roman", "Palatino-Bold"]
+  palatino: ["Palatino-Roman", "Palatino-Bold"],
+  bodoni: ["BodoniSvtyTwoITCTT-Book", "BodoniSvtyTwoITCTT-Bold"],
+  gillsans: ["GillSans", "GillSans-Bold"],
+  hoefler: ["HoeflerText-Regular", "HoeflerText-Black"],
+  cochin: ["Cochin", "Cochin-Bold"],
+  zapfino: ["Zapfino", "Zapfino"]
 };
 function fontFor(style, size, bold) {
   const names = FONT_NAMES[style];
@@ -3042,7 +3047,12 @@ const FONT_CSS = {
   script: "'Snell Roundhand', 'Brush Script MT', cursive",
   copperplate: "Copperplate, 'Trajan Pro', serif",
   optima: "Optima, Candara, 'Segoe UI', sans-serif",
-  palatino: "Palatino, 'Palatino Linotype', 'Book Antiqua', serif"
+  palatino: "Palatino, 'Palatino Linotype', 'Book Antiqua', serif",
+  bodoni: "'Bodoni 72', 'Bodoni MT', Didot, serif",
+  gillsans: "'Gill Sans', 'Gill Sans MT', Calibri, sans-serif",
+  hoefler: "'Hoefler Text', 'Times New Roman', serif",
+  cochin: "Cochin, Georgia, serif",
+  zapfino: "Zapfino, 'Brush Script MT', cursive"
 };
 const FONT_LABELS = {
   classic: "Classic (SF)", rounded: "Rounded", serif: "Serif (Georgia)", mono: "Mono",
@@ -3050,7 +3060,10 @@ const FONT_LABELS = {
   baskerville: "Baskerville — book", typewriter: "Typewriter", marker: "Marker Felt",
   chalkboard: "Chalkboard", noteworthy: "Noteworthy — handwritten",
   script: "Script — calligraphy", copperplate: "Copperplate — engraved",
-  optima: "Optima — elegant", palatino: "Palatino — classic serif"
+  optima: "Optima — elegant", palatino: "Palatino — classic serif",
+  bodoni: "Bodoni 72 — editorial", gillsans: "Gill Sans — clean humanist",
+  hoefler: "Hoefler — literary", cochin: "Cochin — romantic",
+  zapfino: "Zapfino — dramatic script"
 };
 // Monochrome glyphs for the "clean icon" element — unlike emoji these tint
 // to any color in both the preview and the Scriptable renderer.
@@ -4714,7 +4727,102 @@ const AI_EX_BENTO = {
   ]
 };
 
-function aiSystemPrompt() {
+// The design skill's reference library: tagged, compact, gold-standard specs.
+// Compact = only meaningful fields; structured output still forces the model
+// to emit the full schema. Routing samples 2 matching + 1 wildcard reference
+// per request so similar prompts see DIFFERENT references (variety by design).
+const AI_EXEMPLARS = [
+  { tags: ["dashboard", "battery", "data", "stats", "blue", "productivity"], spec: AI_EX_RING },
+  { tags: ["dreamy", "sunset", "clock", "warm", "romantic", "evening", "cozy"], spec: AI_EX_HERO },
+  { tags: ["cute", "purple", "greeting", "hello", "pill", "friendly"], spec: AI_EX_BENTO },
+  { tags: ["cute", "pink", "morning", "soft", "pastel", "girly"], spec: { name: "Peach Morning", kind: "freestyle", size: "small", themeID: "custom", backgroundColors: ["#FBE3DA", "#F6CFC4"], fontStyle: "rounded", textColorHex: "#5A3A33", canvasElements: [
+    { kind: "greeting", x: 0.5, y: 0.24, size: 13, colorHex: "#5A3A33", opacity: 1 },
+    { kind: "clock", x: 0.5, y: 0.5, size: 26, colorHex: "#5A3A33", opacity: 1, bold: true },
+    { kind: "shape", shape: "pill", x: 0.5, y: 0.76, w: 0.56, h: 0.16, colorHex: "#FFFFFF", opacity: 0.55 },
+    { kind: "date", x: 0.5, y: 0.76, size: 9, colorHex: "#B06A5A", opacity: 1, bold: true },
+    { kind: "icon", text: "❀", x: 0.85, y: 0.15, size: 12, colorHex: "#E29A87", opacity: 0.9 }
+  ] } },
+  { tags: ["cute", "countdown", "party", "birthday", "celebration", "playful"], spec: { name: "Confetti Count", kind: "freestyle", size: "small", themeID: "candy", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
+    { kind: "countdown", dateISO: "2026-12-25", x: 0.5, y: 0.44, size: 30, colorHex: "#FFFFFF", opacity: 1, bold: true },
+    { kind: "text", text: "til the big day", x: 0.5, y: 0.66, size: 11, colorHex: "#FFE3F0", opacity: 0.95 },
+    { kind: "icon", text: "✦", x: 0.16, y: 0.18, size: 11, colorHex: "#FFD9EB", opacity: 0.9 },
+    { kind: "icon", text: "✦", x: 0.84, y: 0.8, size: 9, colorHex: "#FFD9EB", opacity: 0.7 },
+    { kind: "shape", shape: "pill", x: 0.5, y: 0.87, w: 0.44, h: 0.13, colorHex: "#FFFFFF", opacity: 0.25 },
+    { kind: "date", x: 0.5, y: 0.87, size: 8, colorHex: "#FFFFFF", opacity: 1, bold: true }
+  ] } },
+  { tags: ["editorial", "elegant", "serif", "fashion", "magazine", "light", "minimal"], spec: { name: "Front Page", kind: "freestyle", size: "medium", themeID: "paper", fontStyle: "bodoni", textColorHex: "#26221E", canvasElements: [
+    { kind: "date", x: 0.3, y: 0.26, size: 24, colorHex: "#26221E", opacity: 1, bold: true },
+    { kind: "shape", shape: "rect", x: 0.3, y: 0.42, w: 0.42, h: 0.006, colorHex: "#26221E", opacity: 0.7 },
+    { kind: "weather", mode: "cond", x: 0.3, y: 0.56, size: 11, colorHex: "#6E675E", opacity: 1 },
+    { kind: "shape", shape: "rect", x: 0.62, y: 0.5, w: 0.004, h: 0.6, colorHex: "#26221E", opacity: 0.25 },
+    { kind: "calendar", count: 3, x: 0.81, y: 0.5, size: 10, colorHex: "#26221E", opacity: 0.9 },
+    { kind: "week", x: 0.3, y: 0.8, size: 9, colorHex: "#9A9184", opacity: 1 }
+  ] } },
+  { tags: ["literary", "quote", "book", "reading", "calm", "serif", "cozy"], spec: { name: "Reading Nook", kind: "freestyle", size: "small", themeID: "custom", backgroundColors: ["#2B211C", "#3E2E26"], fontStyle: "hoefler", textColorHex: "#EFE3D0", canvasElements: [
+    { kind: "text", text: "“Not all those who wander are lost.”", w: 0.84, x: 0.5, y: 0.42, size: 13, colorHex: "#EFE3D0", opacity: 1 },
+    { kind: "shape", shape: "rect", x: 0.5, y: 0.68, w: 0.3, h: 0.005, colorHex: "#C8A87E", opacity: 0.8 },
+    { kind: "icon", text: "☾", x: 0.5, y: 0.82, size: 12, colorHex: "#C8A87E", opacity: 0.9 }
+  ] } },
+  { tags: ["bento", "dark", "dashboard", "brief", "night", "sleek", "modern"], spec: { name: "Night Desk", kind: "freestyle", size: "medium", themeID: "custom", backgroundColors: ["#121218", "#1A1A22"], fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
+    { kind: "shape", shape: "rect", x: 0.27, y: 0.5, w: 0.44, h: 0.86, radius: 18, colorHex: "#FFFFFF", opacity: 0.08 },
+    { kind: "clock", x: 0.27, y: 0.42, size: 26, colorHex: "#FFFFFF", opacity: 1, bold: true },
+    { kind: "shape", shape: "pill", x: 0.27, y: 0.68, w: 0.3, h: 0.16, colorHex: "#7FD8A8", opacity: 1 },
+    { kind: "date", x: 0.27, y: 0.68, size: 9, colorHex: "#12241A", opacity: 1, bold: true },
+    { kind: "ring", source: "battery", x: 0.68, y: 0.5, w: 0.4, size: 6, colorHex: "#B9A8F0", opacity: 1 },
+    { kind: "battery", x: 0.68, y: 0.5, size: 11, colorHex: "#FFFFFF", opacity: 1, bold: true },
+    { kind: "reminders", count: 2, x: 0.86, y: 0.78, size: 9, colorHex: "#9AA0AE", opacity: 1 }
+  ] } },
+  { tags: ["sports", "fantasy", "football", "game", "matchup", "sleeper"], spec: { name: "Game Ready", kind: "freestyle", size: "medium", themeID: "custom", backgroundColors: ["#101418", "#1B2430"], fontStyle: "futura", textColorHex: "#FFFFFF", canvasElements: [
+    { kind: "sleeperlogo", mode: "myteam", x: 0.2, y: 0.4, size: 34, opacity: 1 },
+    { kind: "sleeperlogo", mode: "opponent", x: 0.8, y: 0.4, size: 34, opacity: 1 },
+    { kind: "sleeper", x: 0.5, y: 0.42, size: 24, colorHex: "#FFFFFF", opacity: 1, bold: true },
+    { kind: "text", text: "YOU · OPP", x: 0.5, y: 0.22, size: 8, colorHex: "#8CA0B8", opacity: 1, bold: true },
+    { kind: "shape", shape: "pill", x: 0.5, y: 0.78, w: 0.4, h: 0.16, colorHex: "#F0C445", opacity: 1 },
+    { kind: "countdown", dateISO: "2026-09-10", x: 0.5, y: 0.78, size: 9, colorHex: "#2A230F", opacity: 1, bold: true }
+  ] } },
+  { tags: ["glass", "transparent", "frosted", "clean", "minimal", "wallpaper"], spec: { name: "Fog Light", kind: "freestyle", size: "small", background: "glass", glassTint: "light", bgOpacity: 0.55, themeID: "liquidglass", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
+    { kind: "shape", shape: "rect", x: 0.5, y: 0.5, w: 0.93, h: 0.93, radius: 24, colorHex: "#FFFFFF", opacity: 0.07, border: 1, borderHex: "#FFFFFF" },
+    { kind: "clock", x: 0.5, y: 0.45, size: 26, colorHex: "#FFFFFF", opacity: 1, bold: true },
+    { kind: "date", x: 0.5, y: 0.68, size: 10, colorHex: "#FFFFFF", opacity: 0.75 }
+  ] } },
+  { tags: ["neon", "arcade", "cyber", "glow", "dark", "gaming", "retro"], spec: { name: "Arcade Time", kind: "freestyle", size: "small", themeID: "custom", backgroundColors: ["#0B0B14", "#141024"], fontStyle: "mono", textColorHex: "#7EF9E2", canvasElements: [
+    { kind: "clock", x: 0.52, y: 0.47, size: 27, colorHex: "#7EF9E2", opacity: 0.22 },
+    { kind: "clock", x: 0.5, y: 0.45, size: 26, colorHex: "#7EF9E2", opacity: 1, bold: true },
+    { kind: "text", text: "PLAYER ONE", x: 0.5, y: 0.68, size: 9, colorHex: "#FF2E92", opacity: 1, bold: true },
+    { kind: "icon", text: "▲", x: 0.14, y: 0.85, size: 8, colorHex: "#FF2E92", opacity: 0.7 },
+    { kind: "icon", text: "●", x: 0.86, y: 0.14, size: 8, colorHex: "#7EF9E2", opacity: 0.7 }
+  ] } },
+  { tags: ["minimal", "quiet", "simple", "light", "zen", "date"], spec: { name: "Quiet Day", kind: "freestyle", size: "small", themeID: "custom", backgroundColors: ["#F4F1EB", "#EAE5DC"], fontStyle: "gillsans", textColorHex: "#3A362F", canvasElements: [
+    { kind: "date", x: 0.5, y: 0.44, size: 22, colorHex: "#3A362F", opacity: 1, bold: true },
+    { kind: "shape", shape: "rect", x: 0.5, y: 0.62, w: 0.22, h: 0.006, colorHex: "#3A362F", opacity: 0.4 },
+    { kind: "weather", mode: "now", x: 0.5, y: 0.76, size: 11, colorHex: "#8B857A", opacity: 1 }
+  ] } },
+  { tags: ["romantic", "script", "anniversary", "love", "wedding", "elegant"], spec: { name: "Ever After", kind: "freestyle", size: "small", themeID: "custom", backgroundColors: ["#2E1F2A", "#4A2E3E"], fontStyle: "zapfino", textColorHex: "#F5E6EC", canvasElements: [
+    { kind: "text", text: "always", x: 0.5, y: 0.3, size: 15, colorHex: "#F5E6EC", opacity: 1 },
+    { kind: "countdown", dateISO: "2027-06-12", x: 0.5, y: 0.62, size: 20, colorHex: "#E8B4C8", opacity: 1, bold: true },
+    { kind: "text", text: "days together", x: 0.5, y: 0.82, size: 9, colorHex: "#C9A0B0", opacity: 0.9 }
+  ] } }
+];
+function routedExemplars(requestText) {
+  const text = String(requestText || "").toLowerCase();
+  const scored = AI_EXEMPLARS.map(function (ex) {
+    let hits = 0;
+    for (const tag of ex.tags) if (text.includes(tag)) hits++;
+    return { ex: ex, hits: hits, r: Math.random() };
+  });
+  // Sample among matches (not always the same ones), then add one wildcard
+  // from a different mood — cross-pollination is where "special" comes from.
+  const matches = scored.filter(function (s) { return s.hits > 0; })
+    .sort(function (a, b) { return b.hits - a.hits || a.r - b.r; }).slice(0, 4)
+    .sort(function (a, b) { return a.r - b.r; }).slice(0, 2);
+  const chosen = matches.map(function (s) { return s.ex; });
+  const rest = scored.filter(function (s) { return chosen.indexOf(s.ex) < 0; })
+    .sort(function (a, b) { return a.r - b.r; });
+  while (chosen.length < 3 && rest.length) chosen.push(rest.shift().ex);
+  return chosen;
+}
+
+function aiSystemPrompt(requestText) {
   const today = new Date().toISOString().slice(0, 10);
   return "You are WidgetKing's expert widget designer. Design at the level of the most beautiful Home Screen setups people share online: intentional composition, real hierarchy, restraint. The user describes a widget; return a spec.\n" +
     "Kinds: clock (time+date), date (big day), countdown, quote, note, launcher (tappable app grid), battery, freestyle (a canvas of elements — PREFER freestyle for anything creative; simple kinds are only for plain requests).\n" +
@@ -4750,10 +4858,22 @@ function aiSystemPrompt() {
     "Backgrounds: glass = frosted wallpaper (glassTint dark/light); clear = fully transparent on the wallpaper — use when the user says transparent/frosted/blend; bgOpacity below 1 makes a gradient see-through like tinted glass. Otherwise gradient.\n" +
     "Launchers: set tapUrl when the whole widget should open one app. Common schemes: instagram://, spotify://, youtube://, tiktok://, twitter://, snapchat://, whatsapp://, fb://, fb-messenger://, discord://, reddit://, googlegmail://, slack://, zoomus://, nflx://, music://, maps://, calshow://, tel://, sms://, mailto:.\n" +
     "For long text set w ~0.8 on the text element so it wraps (w=0 = single line).\n" +
-    "Example — 'battery dashboard, cool blue' -> " + JSON.stringify(AI_EX_RING) + "\n" +
-    "Example — 'a dreamy sunset clock' -> " + JSON.stringify(AI_EX_HERO) + "\n" +
-    "Example — 'a cute purple greeting widget with the time and weather' -> " + JSON.stringify(AI_EX_BENTO) + "\n" +
+    "STYLE REFERENCES — these set the QUALITY BAR; they are never the answer. Hard rules: (1) recombine ideas, never restate a reference; (2) your design must differ from every reference shown in at least palette, arrangement, AND hero element; (3) if the request resembles a reference, deliberately choose a different composition at the same quality. References omit empty fields for brevity — your output must still fill every schema field.\n" +
+    routedExemplars(requestText).map(function (ex) {
+      return "Reference [" + ex.tags.slice(0, 3).join(", ") + "]: " + JSON.stringify(ex.spec);
+    }).join("\n") + "\n" +
+    "VARIETY: similar requests must NOT produce similar widgets. Rotate archetypes, pick a fresh palette (never a reference's), vary the hero (clock vs date vs ring vs type), and add one unexpected-but-tasteful touch per design — an unusual font pairing, an off-center anchor, a two-tone capsule, a wildcard accent.\n" +
     "Today is " + today + ". Resolve relative dates to yyyy-MM-dd. Names under 24 chars. Fill unused fields with empty strings, 0, or empty arrays. Compose like a designer, not a form-filler: every element should earn its place.";
+}
+function messagesText(messages) {
+  let out = "";
+  for (const m of messages || []) {
+    if (typeof m.content === "string") out += " " + m.content;
+    else if (Array.isArray(m.content)) {
+      for (const block of m.content) if (block.type === "text") out += " " + (block.text || "");
+    }
+  }
+  return out;
 }
 async function callClaudeOnce(messages, key, schema) {
   if (getSpend() >= getBudget()) {
@@ -4771,7 +4891,7 @@ async function callClaudeOnce(messages, key, schema) {
     body: JSON.stringify({
       model: model,
       max_tokens: 16000,
-      system: aiSystemPrompt(),
+      system: aiSystemPrompt(messagesText(messages)),
       output_config: { format: { type: "json_schema", schema: schema || AI_SCHEMA } },
       messages: messages
     })
