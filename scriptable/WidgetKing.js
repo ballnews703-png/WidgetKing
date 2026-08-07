@@ -30,7 +30,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 77;
+const WK_VERSION = 78;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -923,6 +923,21 @@ function drawFreestyle(design, family, bgImg, live) {
         ctx.fillRect(new Rect(Math.floor((W * i) / steps), 0, Math.ceil(W / steps) + 1, H));
       } else {
         ctx.fillRect(new Rect(0, Math.floor((H * i) / steps), W, Math.ceil(H / steps) + 1));
+      }
+    }
+    if (design.gradientDir === "mesh") {
+      // Dreamy blob mesh: DrawContext has no gradients, so each blob is a
+      // stack of concentric circles at low alpha — reads as a soft glow.
+      const blobs = [[0.2, 0.22, 0.6, c2], [0.85, 0.18, 0.5, c1], [0.68, 0.85, 0.65, c2]];
+      for (const blob of blobs) {
+        const R = Math.max(W, H) * blob[2];
+        const glow = blob[3].map(function (v) { return Math.round(v * 0.55 + 255 * 0.45); });
+        const rings = 22;
+        for (let r = rings; r >= 1; r--) {
+          const frac = r / rings;
+          ctx.setFillColor(new Color(rgbToHex(glow), 0.05));
+          ctx.fillEllipse(new Rect(blob[0] * W - R * frac, blob[1] * H - R * frac, R * frac * 2, R * frac * 2));
+        }
       }
     }
   }
