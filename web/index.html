@@ -847,7 +847,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 78;
+const WK_VERSION = 79;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -4721,8 +4721,8 @@ const AI_EX_HERO = {
   background: "gradient", glassTint: "dark", bgOpacity: 1,
   backgroundColors: ["#2A1A34", "#B0626A"], tapUrl: "", apps: [],
   canvasElements: [
-    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.51, y: 0.462, size: 46, colorHex: "#141018", opacity: 0.45, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
-    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.5, y: 0.45, size: 46, colorHex: "#FFF6EC", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
+    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.508, y: 0.46, size: 34, colorHex: "#141018", opacity: 0.3, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
+    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.5, y: 0.45, size: 34, colorHex: "#FFF6EC", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
     { kind: "text", text: "golden hour", label: "", url: "", font: "script", x: 0.5, y: 0.66, size: 13, colorHex: "#F2B694", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
     { kind: "icon", text: "\u2600", label: "", url: "", font: "", x: 0.86, y: 0.16, size: 14, colorHex: "#F2B694", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" }
   ]
@@ -4784,7 +4784,7 @@ const AI_EXEMPLARS = [
   ] } },
   { tags: ["bento", "dark", "dashboard", "brief", "night", "sleek", "modern"], spec: { name: "Night Desk", kind: "freestyle", size: "medium", themeID: "custom", backgroundColors: ["#121218", "#1A1A22"], fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
     { kind: "shape", shape: "rect", x: 0.27, y: 0.5, w: 0.44, h: 0.86, radius: 18, colorHex: "#FFFFFF", opacity: 0.08 },
-    { kind: "clock", x: 0.27, y: 0.42, size: 26, colorHex: "#FFFFFF", opacity: 1, bold: true },
+    { kind: "clock", x: 0.28, y: 0.42, size: 18, colorHex: "#FFFFFF", opacity: 1, bold: true },
     { kind: "shape", shape: "pill", x: 0.27, y: 0.68, w: 0.3, h: 0.16, colorHex: "#7FD8A8", opacity: 1 },
     { kind: "date", x: 0.27, y: 0.68, size: 9, colorHex: "#12241A", opacity: 1, bold: true },
     { kind: "ring", source: "battery", x: 0.68, y: 0.5, w: 0.4, size: 6, colorHex: "#B9A8F0", opacity: 1 },
@@ -4858,7 +4858,7 @@ function aiSystemPrompt(requestText) {
     "10 Pill Line (conversational): a sentence mixing plain text with live data set in capsules — 'It's [clock] , [temp pill]'. Reads like handwriting + chips.\n" +
     "8 Matchup Card (fantasy sports): sleeper score element as hero (size 22-28, shadow duplicate behind) at y .42, microlabel 'YOU  ·  OPP' 8-9pt above it, a second sleeper element mode omitted (defaults to score) — use ONE score + one record line 9-10pt, divider, plus a day ring or countdown in a side column. kind=sleeper shows the user's LIVE fantasy matchup (they link their league afterward — leave its config fields empty). Also available: mode myteam/opponent on sleeper = the TEAM NAMES, and kind=sleeperlogo (mode myteam/opponent) = circular team LOGOS 30-38pt — flank the score with both logos and put the names 8-9pt beneath them for a broadcast-style matchup card. Use these whenever fantasy football/Sleeper is mentioned.\n" +
     "CRAFT TRICKS the renderer supports:\n" +
-    "- Shadow: duplicate the SAME element first in near-black (#141018, opacity .3-.35) offset +.02 x, +.025 y, then the real one on top. ONLY on the one hero element, NEVER on text under 20pt — small/tight shadow offsets read as blurry double-vision, not depth.\n" +
+    "- Shadow: duplicate the SAME element first in near-black (#141018, opacity .25-.3) offset +.008-.012 x, +.01-.014 y, then the real one on top. ONLY on the one hero element, NEVER on text under 20pt, and NEVER on serif/display fonts (didot, bodoni, hoefler) — visible offsets read as double-printing, not depth.\n" +
     "- Glow: duplicate first in the accent color, opacity .2-.25, size +8, then the real element. Neon moods only; skip it everywhere else — crisp beats glowy.\n" +
     "- Data pill (the single highest-craft move — use for ALL small live data): a pill shape h .18-.24, w sized to the text +.08 padding, DIRECTLY UNDER a 10-13pt bold data element centered on it (same x/y). On dark canvases: pill white opacity .2-.3 with dark text #17171C — or a solid colored pill (mint #7FD8A8, coral #E8756D, gold #F0C445, lavender #B9A8F0) with dark text. Never let a bare 10pt weather/date/battery float when it could sit in a pill.\n" +
     "- Two-tone accent capsule: TWO pills side by side forming one capsule (solid accent pill + translucent pill), data text spanning them — the month-vs-day date chip look.\n" +
@@ -4871,7 +4871,7 @@ function aiSystemPrompt(requestText) {
     "- Color discipline: ONE accent color used 2-3 times (ring, caption, glyph); everything else white/near-black at varied opacities. Text must contrast the background.\n" +
     "SPACING: keep everything inside x/y .08-.92; give the hero room; captions sit .12-.16 below their hero; fewer, larger elements beat many small ones.\n" +
     "SIZE: set the top-level size field to the widget size the layout is drawn for — small 158x158pt, medium 338x158, large 338x354. x/y fractions map onto THAT canvas; a row of three columns or a launcher of 6+ apps needs medium, a full dashboard large.\n" +
-    "FIT — nothing may spill past an edge: a text's width in x-fraction is roughly fontPt × 0.55 × charCount / 158 (so a 44pt clock spans ~0.8 — it MUST sit at x .5). Any text over 30pt stays centered at x .45-.55; on medium widgets cap the hero at 40pt unless it is very short. Dividers/bars w ≤ .7 centered under their text.\n" +
+    "FIT — nothing may spill past an edge. Multi-line lists (calendar/reminders/news count 2-4) grow DOWNWARD ~0.11 per extra line on small/medium (0.05 large): anchor y + span must stay under .84, and a label above a list needs a y-gap of at least .14. Two texts in one column need a y-gap of at least (sizeA+sizeB)/280. a text's width in x-fraction is roughly fontPt × 0.55 × charCount / 158 (so a 44pt clock spans ~0.8 — it MUST sit at x .5). Any text over 30pt stays centered at x .45-.55; on medium widgets cap the hero at 40pt unless it is very short. Dividers/bars w ≤ .7 centered under their text.\n" +
     "Fonts (fontStyle or per-element font): " + Object.keys(FONT_CSS).join(", ") + ".\n" +
     "Themes: " + Object.keys(THEMES).join(", ") + ". 'paper' is light (use dark text #333333); others are dark (use light text). For specific moods prefer TWO custom backgroundColors (e.g. dusk plum #2A1A34 to terracotta #B0626A) over presets.\n" +
     "Backgrounds: glass = frosted wallpaper (glassTint dark/light); clear = fully transparent on the wallpaper — use when the user says transparent/frosted/blend; bgOpacity below 1 makes a gradient see-through like tinted glass. gradientDir mesh (freestyle only) = dreamy multi-color blob glow — reach for it on soft, aesthetic, or minimal moods. Otherwise gradient.\n" +
@@ -4964,7 +4964,7 @@ async function callClaude(messages, key) {
           { role: "assistant", content: JSON.stringify(spec) },
           { role: "user", content: [
             { type: "image", source: { type: "base64", media_type: "image/png", data: png.split(",")[1] } },
-            { type: "text", text: "This image is YOUR design, rendered exactly as the widget will draw it. Review it like a demanding art director: fix anything misaligned, cramped, spilling past an edge, low-contrast, or floating uncontained; tighten spacing; strengthen the hierarchy; keep everything that already works. Return the corrected spec (full schema). If it is already excellent, return it with only refinements." }
+            { type: "text", text: "This image is YOUR design, rendered exactly as the widget will draw it. Review it like a demanding art director. Checklist in order: (1) DOUBLE-VISION — any text appearing twice slightly offset (a shadow twin gone wrong): shrink the offset to near-invisible or delete the twin; (2) COLLISIONS — any two texts overlapping or touching: separate them; (3) CLIPPING — anything cut off by an edge (especially a list's last line): move it inward or shorten the list; (4) then general polish — alignment, spacing, contrast, containment, hierarchy. Keep everything that already works. Return the corrected spec (full schema). If it is already excellent, return it with only refinements." }
           ] }
         ]), key);
       }
@@ -5014,6 +5014,53 @@ function archiveExemplar(idea) {
   return out;
 }
 
+// Deterministic guardrails for AI layouts — fixes the three classic defects
+// prompts alone can't fully prevent: shadow twins offset so far they read as
+// double-printing, multi-line lists clipping the bottom edge, and two texts
+// colliding at the same spot. Adjusts, never deletes.
+function polishLayout(design) {
+  try {
+    const els = design.canvasElements || [];
+    const H = design.fitSize === "large" ? 354 : 158;
+    const textKinds = ["text", "clock", "date", "greeting", "weather", "calendar", "countdown", "battery", "week", "reminders", "news", "stock", "worldclock", "astro", "sleeper"];
+    // 1. Shadow twins: same kind + size, lower opacity, tiny offset intended.
+    for (let i = 0; i < els.length - 1; i++) {
+      const a = els[i], b = els[i + 1];
+      if (a.kind === b.kind && textKinds.includes(a.kind) &&
+          Math.abs((a.size || 0) - (b.size || 0)) <= 2 &&
+          (a.opacity || 1) < 0.6 && (b.opacity || 1) >= 0.9 &&
+          Math.abs(a.x - b.x) < 0.06 && Math.abs(a.y - b.y) < 0.06) {
+        a.x = b.x + Math.max(-0.012, Math.min(0.012, a.x - b.x));
+        a.y = b.y + Math.max(-0.014, Math.min(0.014, a.y - b.y));
+        if ((a.opacity || 1) > 0.35) a.opacity = 0.3;
+      }
+    }
+    // 2. Lists must not clip the bottom edge.
+    for (const el of els) {
+      const lines = (el.kind === "calendar" || el.kind === "reminders" || el.kind === "news")
+        ? Math.min(Math.max(Number(el.count) || 1, 1), 4) : 1;
+      if (lines > 1) {
+        const bottom = el.y + ((el.size || 10) * 1.7 * (lines - 1) + (el.size || 10) * 0.9) / H;
+        if (bottom > 0.94) el.y = Math.max(0.08, el.y - (bottom - 0.94));
+      }
+    }
+    // 3. Distinct texts sitting on top of each other: nudge apart vertically.
+    for (let i = 0; i < els.length; i++) {
+      for (let j = i + 1; j < els.length; j++) {
+        const a = els[i], b = els[j];
+        if (!textKinds.includes(a.kind) || !textKinds.includes(b.kind)) continue;
+        if (a.kind === b.kind && Math.abs((a.size || 0) - (b.size || 0)) <= 2 && (a.opacity || 1) < 0.6) continue; // shadow pair
+        if (Math.abs(a.x - b.x) < 0.16 && Math.abs(a.y - b.y) < 0.045) {
+          const needed = (((a.size || 10) + (b.size || 10)) * 0.55) / H + 0.012;
+          const lower = a.y >= b.y ? a : b;
+          const upper = lower === a ? b : a;
+          lower.y = Math.min(0.92, upper.y + needed);
+        }
+      }
+    }
+  } catch (e) {}
+  return design;
+}
 function specToDesign(spec) {
   const design = newDesign();
   design.name = (spec.name || "My Widget").slice(0, 24);
@@ -5128,7 +5175,8 @@ function specToDesign(spec) {
     if (el.font && FONT_CSS[el.font]) out.font = el.font;
     return out;
   });
-  return normalizeDesign(design);
+  const normalized = normalizeDesign(design);
+  return normalized.kind === "freestyle" ? polishLayout(normalized) : normalized;
 }
 
 // Fill in real App Store icons for launcher apps the AI (or parser) produced.
@@ -7955,6 +8003,77 @@ function buildTemplates() {
       { kind: "shape", shape: "pill", x: 0.5, y: 0.78, w: 0.76, h: 0.19, colorHex: "#F0C445", opacity: 1 },
       { kind: "battery", x: 0.5, y: 0.78, size: 10, colorHex: "#2A230F", opacity: 1, bold: true }
     ] } },
+    // ✨ 2026 refresh — premades at the current quality bar: containment,
+    // pills, mesh glows, editorial type. Spread across the existing packs.
+    { category: "Cute", pack: "Cute", size: "small", design: { name: "Dreamy Hours", kind: "freestyle", themeID: "candy", gradientDir: "mesh", fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "clock", x: 0.5, y: 0.42, size: 24, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "shape", shape: "pill", x: 0.5, y: 0.68, w: 0.58, h: 0.16, colorHex: "#FFFFFF", opacity: 0.3 },
+      { kind: "date", x: 0.5, y: 0.68, size: 10, colorHex: "#5A2A4A", opacity: 1, bold: true },
+      { kind: "icon", text: "❀", x: 0.85, y: 0.14, size: 11, colorHex: "#FFE3F0", opacity: 0.9 }
+    ] } },
+    { category: "Minimal", pack: "Minimal", size: "small", design: { name: "Ink Date", kind: "freestyle", themeID: "paper", fontStyle: "gillsans", textColorHex: "#2C2925", fitSize: "small", canvasElements: [
+      { kind: "date", x: 0.5, y: 0.42, size: 20, colorHex: "#2C2925", opacity: 1, bold: true },
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.58, w: 0.24, h: 0.006, colorHex: "#2C2925", opacity: 0.45 },
+      { kind: "weather", wmode: "now", unit: "f", x: 0.5, y: 0.72, size: 12, colorHex: "#8B857A", opacity: 1 }
+    ] } },
+    { category: "Minimal", pack: "Minimal", size: "small", design: { name: "Mono Stack", kind: "freestyle", themeID: "custom", customColors: ["#131316", "#1B1B20"], fontStyle: "mono", textColorHex: "#E8E8EC", fitSize: "small", canvasElements: [
+      { kind: "clock", x: 0.5, y: 0.28, size: 20, colorHex: "#E8E8EC", opacity: 1, bold: true },
+      { kind: "date", x: 0.5, y: 0.5, size: 10, colorHex: "#8A8A94", opacity: 1 },
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.63, w: 0.5, h: 0.005, colorHex: "#E8E8EC", opacity: 0.2 },
+      { kind: "battery", x: 0.5, y: 0.78, size: 11, colorHex: "#7FD8A8", opacity: 1, bold: true }
+    ] } },
+    { category: "Zen", pack: "Zen", size: "small", design: { name: "Still Water", kind: "freestyle", themeID: "mist", gradientDir: "mesh", fontStyle: "optima", textColorHex: "#F2F4F6", fitSize: "small", canvasElements: [
+      { kind: "text", text: "breathe", x: 0.5, y: 0.38, size: 17, colorHex: "#F2F4F6", opacity: 1 },
+      { kind: "shape", shape: "pill", x: 0.5, y: 0.64, w: 0.5, h: 0.15, colorHex: "#FFFFFF", opacity: 0.18 },
+      { kind: "week", x: 0.5, y: 0.64, size: 9, colorHex: "#F2F4F6", opacity: 0.95, bold: true },
+      { kind: "astro", mode: "sunset", x: 0.5, y: 0.85, size: 9, colorHex: "#D8DEE6", opacity: 0.8 }
+    ] } },
+    { category: "Work", pack: "Work", size: "medium", design: { name: "Desk Brief", kind: "freestyle", themeID: "custom", customColors: ["#14161B", "#1C1F26"], fontStyle: "avenir", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
+      { kind: "shape", shape: "rect", x: 0.26, y: 0.5, w: 0.42, h: 0.84, radius: 18, colorHex: "#FFFFFF", opacity: 0.08 },
+      { kind: "clock", x: 0.26, y: 0.36, size: 24, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "shape", shape: "pill", x: 0.26, y: 0.62, w: 0.28, h: 0.16, colorHex: "#8FB8F0", opacity: 1 },
+      { kind: "date", x: 0.26, y: 0.62, size: 9, colorHex: "#101B2A", opacity: 1, bold: true },
+      { kind: "text", text: "TODAY", x: 0.71, y: 0.16, size: 8, colorHex: "#8A93A3", opacity: 1, bold: true },
+      { kind: "calendar", count: 2, x: 0.71, y: 0.38, size: 9, colorHex: "#FFFFFF", opacity: 0.95 },
+      { kind: "shape", shape: "rect", x: 0.71, y: 0.62, w: 0.34, h: 0.005, colorHex: "#FFFFFF", opacity: 0.2 },
+      { kind: "reminders", count: 1, x: 0.71, y: 0.78, size: 9, colorHex: "#C9D2E0", opacity: 0.9 }
+    ] } },
+    { category: "Neon", pack: "Neon", size: "medium", design: { name: "Night Drive", kind: "freestyle", themeID: "custom", customColors: ["#0B0B14", "#161028"], fontStyle: "futura", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
+      { kind: "clock", x: 0.32, y: 0.44, size: 34, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "date", x: 0.32, y: 0.7, size: 11, colorHex: "#FF2E92", opacity: 1, bold: true },
+      { kind: "shape", shape: "pill", x: 0.76, y: 0.32, w: 0.3, h: 0.18, colorHex: "#7EF9E2", opacity: 1 },
+      { kind: "weather", wmode: "now", unit: "f", x: 0.76, y: 0.32, size: 11, colorHex: "#062A22", opacity: 1, bold: true },
+      { kind: "shape", shape: "pill", x: 0.76, y: 0.58, w: 0.3, h: 0.18, colorHex: "#FF2E92", opacity: 1 },
+      { kind: "battery", x: 0.76, y: 0.58, size: 11, colorHex: "#2A0616", opacity: 1, bold: true }
+    ] } },
+    { category: "Live", pack: "Live", size: "small", design: { name: "Sky Stack", kind: "freestyle", themeID: "custom", customColors: ["#16202E", "#1D2A3C"], fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "shape", shape: "pill", x: 0.5, y: 0.22, w: 0.78, h: 0.19, colorHex: "#8FD3FE", opacity: 1 },
+      { kind: "weather", wmode: "full", unit: "f", x: 0.5, y: 0.22, size: 10, colorHex: "#0E2236", opacity: 1, bold: true },
+      { kind: "shape", shape: "pill", x: 0.5, y: 0.5, w: 0.78, h: 0.19, colorHex: "#B9A8F0", opacity: 1 },
+      { kind: "weather", wmode: "rain", unit: "f", x: 0.5, y: 0.5, size: 10, colorHex: "#1D1430", opacity: 1, bold: true },
+      { kind: "shape", shape: "pill", x: 0.5, y: 0.78, w: 0.78, h: 0.19, colorHex: "#F2B694", opacity: 1 },
+      { kind: "weather", wmode: "tomorrow", unit: "f", x: 0.5, y: 0.78, size: 10, colorHex: "#33200F", opacity: 1, bold: true }
+    ] } },
+    { category: "Pro", pack: "Pro", size: "medium", design: { name: "Editor's Desk", kind: "freestyle", themeID: "paper", fontStyle: "bodoni", textColorHex: "#26221E", fitSize: "medium", canvasElements: [
+      { kind: "date", x: 0.26, y: 0.28, size: 22, colorHex: "#26221E", opacity: 1, bold: true },
+      { kind: "shape", shape: "rect", x: 0.26, y: 0.46, w: 0.36, h: 0.007, colorHex: "#26221E", opacity: 0.7 },
+      { kind: "weather", wmode: "cond", unit: "f", x: 0.26, y: 0.6, size: 10, colorHex: "#6E675E", opacity: 1 },
+      { kind: "week", x: 0.26, y: 0.78, size: 9, colorHex: "#9A9184", opacity: 1 },
+      { kind: "shape", shape: "rect", x: 0.52, y: 0.5, w: 0.004, h: 0.64, colorHex: "#26221E", opacity: 0.25 },
+      { kind: "text", text: "THE LATEST", x: 0.76, y: 0.18, size: 8, colorHex: "#9A9184", opacity: 1, bold: true },
+      { kind: "news", count: 3, x: 0.76, y: 0.52, size: 9, colorHex: "#26221E", opacity: 0.92 }
+    ] } },
+    { category: "Picks", pack: "Picks", size: "small", design: { name: "Crown Jewel", kind: "freestyle", themeID: "custom", customColors: ["#2A1650", "#6B3FC4"], gradientDir: "mesh", fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "icon", text: "♛", x: 0.5, y: 0.2, size: 14, colorHex: "#F0C445", opacity: 1 },
+      { kind: "clock", x: 0.5, y: 0.46, size: 26, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "shape", shape: "pill", x: 0.5, y: 0.72, w: 0.56, h: 0.16, colorHex: "#F0C445", opacity: 1 },
+      { kind: "date", x: 0.5, y: 0.72, size: 9, colorHex: "#2A230F", opacity: 1, bold: true }
+    ] } },
+    { category: "Vibes", pack: "Cute", size: "small", design: { name: "Love Note", kind: "freestyle", themeID: "custom", customColors: ["#3A2030", "#5C2E44"], gradientDir: "mesh", fontStyle: "cochin", textColorHex: "#F5E6EC", fitSize: "small", canvasElements: [
+      { kind: "text", text: "you & me", x: 0.5, y: 0.34, size: 15, colorHex: "#F5E6EC", opacity: 1 },
+      { kind: "countdown", dateISO: "2027-02-14", x: 0.5, y: 0.58, size: 19, colorHex: "#E8A0B8", opacity: 1, bold: true },
+      { kind: "text", text: "days to celebrate", x: 0.5, y: 0.78, size: 9, colorHex: "#C9A0B0", opacity: 0.9 }
+    ] } },
     // 🫧 Liquid Glass — the real thing: background "glass" shows the user's
     // actual wallpaper through a blur + frost (both renderers already do
     // this), with hairline borders and white translucent content on top.
@@ -8058,14 +8177,14 @@ function buildTemplates() {
       { kind: "progress", source: "day", x: 0.72, y: 0.7, w: 0.3, size: 5, colorHex: "#8FD3FE", opacity: 1 }
     ] } },
     { category: "Pro", pack: "Pro", design: { name: "Golden Hour", kind: "freestyle", themeID: "custom", customColors: ["#2A1A34", "#B0626A"], fontStyle: "didot", textColorHex: "#FFF6EC", canvasElements: [
-      { kind: "clock", x: 0.51, y: 0.462, size: 46, colorHex: "#141018", opacity: 0.45 },
-      { kind: "clock", x: 0.5, y: 0.45, size: 46, colorHex: "#FFF6EC", opacity: 1 },
+      { kind: "clock", x: 0.508, y: 0.46, size: 34, colorHex: "#141018", opacity: 0.3 },
+      { kind: "clock", x: 0.5, y: 0.45, size: 34, colorHex: "#FFF6EC", opacity: 1 },
       { kind: "text", text: "golden hour", font: "script", x: 0.5, y: 0.66, size: 13, colorHex: "#F2B694", opacity: 1, w: 0, align: "center", bold: true },
       { kind: "icon", text: "☀", x: 0.86, y: 0.16, size: 14, colorHex: "#F2B694", opacity: 0.9 }
     ] } },
     { category: "Pro", pack: "Pro", design: { name: "Split Card", kind: "freestyle", themeID: "cosmos", fontStyle: "futura", textColorHex: "#FFFFFF", canvasElements: [
       { kind: "shape", shape: "rect", x: 0.27, y: 0.5, w: 0.44, h: 0.92, size: 0, colorHex: "#FFFFFF", opacity: 0.14 },
-      { kind: "clock", x: 0.27, y: 0.42, size: 26, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "clock", x: 0.28, y: 0.42, size: 18, colorHex: "#FFFFFF", opacity: 1 },
       { kind: "date", x: 0.27, y: 0.58, size: 10, colorHex: "#C7A6FF", opacity: 0.95 },
       { kind: "weather", x: 0.74, y: 0.3, size: 17, colorHex: "#FFFFFF", opacity: 1, unit: "f" },
       { kind: "shape", shape: "rect", x: 0.74, y: 0.47, w: 0.32, h: 0.006, size: 0, colorHex: "#FFFFFF", opacity: 0.3 },
@@ -8084,7 +8203,7 @@ function buildTemplates() {
       { kind: "text", text: "est. 2026", x: 0.5, y: 0.85, size: 9, colorHex: "#FFD75E", opacity: 0.85, w: 0, align: "center", bold: false }
     ] } },
     { category: "Pro", pack: "Pro", design: { name: "Neon Glow", kind: "freestyle", themeID: "custom", customColors: ["#0B0018", "#2B0A4E"], fontStyle: "mono", textColorHex: "#FFFFFF", canvasElements: [
-      { kind: "clock", x: 0.5, y: 0.46, size: 40, colorHex: "#FF2079", opacity: 0.3 },
+      { kind: "clock", x: 0.5, y: 0.46, size: 34, colorHex: "#FF2079", opacity: 0.3 },
       { kind: "clock", x: 0.5, y: 0.45, size: 34, colorHex: "#FFFFFF", opacity: 1 },
       { kind: "text", text: "S T A Y  E L E C T R I C", x: 0.5, y: 0.68, size: 9, colorHex: "#00F0FF", opacity: 1, w: 0, align: "center", bold: true },
       { kind: "icon", text: "⚡", x: 0.14, y: 0.16, size: 14, colorHex: "#FF2079", opacity: 1 }
