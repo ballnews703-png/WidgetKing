@@ -844,7 +844,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 74;
+const WK_VERSION = 75;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -4697,19 +4697,19 @@ const AI_EX_HERO = {
 };
 
 const AI_EX_BENTO = {
-  name: "Hello Card", kind: "freestyle", themeID: "custom", fontStyle: "rounded",
+  name: "Violet Greeting", kind: "freestyle", themeID: "custom", fontStyle: "rounded",
   textColorHex: "#FFFFFF", primaryText: "", secondaryText: "", targetDate: "",
   background: "gradient", glassTint: "dark", bgOpacity: 1,
-  backgroundColors: ["#4318D9", "#C9B8F4"], tapUrl: "", apps: [],
+  backgroundColors: ["#2A1650", "#8F52FA"], tapUrl: "", apps: [],
   canvasElements: [
     { kind: "text", text: "hello", label: "", url: "", font: "script", x: 0.27, y: 0.3, size: 22, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
     { kind: "shape", text: "", label: "", url: "", font: "", x: 0.63, y: 0.3, size: 0, colorHex: "#FFFFFF", opacity: 0.25, shape: "pill", w: 0.3, h: 0.2, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
-    { kind: "shape", text: "", label: "", url: "", font: "", x: 0.545, y: 0.3, size: 0, colorHex: "#E8756D", opacity: 1, shape: "pill", w: 0.11, h: 0.2, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
-    { kind: "date", text: "", label: "", url: "", font: "", x: 0.63, y: 0.3, size: 11, colorHex: "#241456", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
+    { kind: "shape", text: "", label: "", url: "", font: "", x: 0.545, y: 0.3, size: 0, colorHex: "#F0C445", opacity: 1, shape: "pill", w: 0.11, h: 0.2, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
+    { kind: "date", text: "", label: "", url: "", font: "", x: 0.63, y: 0.3, size: 11, colorHex: "#2A230F", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
     { kind: "text", text: "It's", label: "", url: "", font: "", x: 0.23, y: 0.68, size: 15, colorHex: "#FFFFFF", opacity: 0.95, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
     { kind: "clock", text: "", label: "", url: "", font: "", x: 0.43, y: 0.68, size: 17, colorHex: "#FFFFFF", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
     { kind: "shape", text: "", label: "", url: "", font: "", x: 0.75, y: 0.68, size: 0, colorHex: "#FFFFFF", opacity: 0.25, shape: "pill", w: 0.26, h: 0.22, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
-    { kind: "weather", text: "", label: "", url: "", font: "", x: 0.72, y: 0.68, size: 13, colorHex: "#241456", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "now", source: "", dateISO: "" },
+    { kind: "weather", text: "", label: "", url: "", font: "", x: 0.72, y: 0.68, size: 13, colorHex: "#2A230F", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "now", source: "", dateISO: "" },
     { kind: "icon", text: "☀", label: "", url: "", font: "", x: 0.84, y: 0.675, size: 12, colorHex: "#F0C445", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" }
   ]
 };
@@ -4752,7 +4752,7 @@ function aiSystemPrompt() {
     "For long text set w ~0.8 on the text element so it wraps (w=0 = single line).\n" +
     "Example — 'battery dashboard, cool blue' -> " + JSON.stringify(AI_EX_RING) + "\n" +
     "Example — 'a dreamy sunset clock' -> " + JSON.stringify(AI_EX_HERO) + "\n" +
-    "Example — 'a cute purple hello widget with the time and weather' -> " + JSON.stringify(AI_EX_BENTO) + "\n" +
+    "Example — 'a cute purple greeting widget with the time and weather' -> " + JSON.stringify(AI_EX_BENTO) + "\n" +
     "Today is " + today + ". Resolve relative dates to yyyy-MM-dd. Names under 24 chars. Fill unused fields with empty strings, 0, or empty arrays. Compose like a designer, not a form-filler: every element should earn its place.";
 }
 async function callClaudeOnce(messages, key, schema) {
@@ -7718,16 +7718,14 @@ function buildTemplates() {
     // 🍱 Bento — the Koco-grade grammar: near-black canvas, nothing floats.
     // Every stat lives in a container (sub-card, pill, or ring), one accent,
     // muted labels, two-tone numerals. These double as the AI's style bar.
-    { category: "Bento", pack: "Bento", size: "medium", design: { name: "Hello Card", kind: "freestyle", themeID: "custom", customColors: ["#4318D9", "#C9B8F4"], fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
-      { kind: "text", text: "hello", font: "script", x: 0.27, y: 0.3, size: 22, colorHex: "#FFFFFF", opacity: 1 },
-      { kind: "shape", shape: "pill", x: 0.63, y: 0.3, w: 0.3, h: 0.2, colorHex: "#FFFFFF", opacity: 0.25 },
-      { kind: "shape", shape: "pill", x: 0.545, y: 0.3, w: 0.11, h: 0.2, colorHex: "#E8756D", opacity: 1 },
-      { kind: "date", x: 0.63, y: 0.3, size: 11, colorHex: "#241456", opacity: 1, bold: true },
-      { kind: "text", text: "It's", x: 0.23, y: 0.68, size: 15, colorHex: "#FFFFFF", opacity: 0.95 },
-      { kind: "clock", x: 0.43, y: 0.68, size: 17, colorHex: "#FFFFFF", opacity: 1, bold: true },
-      { kind: "shape", shape: "pill", x: 0.75, y: 0.68, w: 0.26, h: 0.22, colorHex: "#FFFFFF", opacity: 0.25 },
-      { kind: "weather", wmode: "now", unit: "f", x: 0.72, y: 0.68, size: 13, colorHex: "#241456", opacity: 1, bold: true },
-      { kind: "icon", text: "☀", x: 0.84, y: 0.675, size: 12, colorHex: "#F0C445", opacity: 1 }
+    { category: "Bento", pack: "Bento", size: "medium", design: { name: "Royal Greeting", kind: "freestyle", themeID: "custom", customColors: ["#2A1650", "#8F52FA"], fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
+      { kind: "greeting", name: "", emoji: true, font: "script", x: 0.32, y: 0.26, size: 18, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "icon", text: "\u265b", x: 0.87, y: 0.24, size: 15, colorHex: "#F0C445", opacity: 1 },
+      { kind: "shape", shape: "pill", x: 0.3, y: 0.7, w: 0.4, h: 0.22, colorHex: "#FFFFFF", opacity: 0.18 },
+      { kind: "clock", x: 0.3, y: 0.7, size: 16, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "shape", shape: "pill", x: 0.72, y: 0.7, w: 0.34, h: 0.22, colorHex: "#F0C445", opacity: 1 },
+      { kind: "weather", wmode: "hilo", unit: "f", x: 0.72, y: 0.7, size: 11, colorHex: "#2A230F", opacity: 1, bold: true },
+      { kind: "date", x: 0.5, y: 0.46, size: 10, colorHex: "#D9C8FF", opacity: 0.95 }
     ] } },
     { category: "Bento", pack: "Bento", size: "medium", design: { name: "Bento Board", kind: "freestyle", themeID: "custom", customColors: ["#121218", "#1A1A22"], fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
       { kind: "shape", shape: "rect", x: 0.27, y: 0.5, w: 0.44, h: 0.86, radius: 18, colorHex: "#FFFFFF", opacity: 0.08 },
