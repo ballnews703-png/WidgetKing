@@ -844,7 +844,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 70;
+const WK_VERSION = 71;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -7475,39 +7475,39 @@ function buildTemplates() {
       { kind: "shape", shape: "rect", x: 0.5, y: 0.78, w: 0.5, h: 0.006, size: 0, colorHex: "#FFFFFF", opacity: 0.25 },
       { kind: "weather", wmode: "tomorrow", unit: "f", x: 0.5, y: 0.88, size: 10, colorHex: "#D7F0FF", opacity: 0.9 }
     ] } },
-    // 🫧 Liquid Glass — frosted panels over soft gradients, matching the
-    // current iOS design language. Panels are ordinary translucent shapes,
-    // so both renderers draw them identically.
-    { category: "Glass", pack: "Glass", size: "small", design: { name: "Glass Clock", kind: "freestyle", themeID: "liquidglass", fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
-      { kind: "shape", shape: "rect", x: 0.5, y: 0.5, w: 0.86, h: 0.86, radius: 22, colorHex: "#FFFFFF", opacity: 0.17, border: 1, borderHex: "#FFFFFF" },
-      { kind: "shape", shape: "rect", x: 0.34, y: 0.26, w: 0.44, h: 0.09, radius: 12, angle: -18, colorHex: "#FFFFFF", opacity: 0.14 },
-      { kind: "clock", x: 0.5, y: 0.46, size: 26, colorHex: "#FFFFFF", opacity: 1, bold: true },
-      { kind: "date", x: 0.5, y: 0.68, size: 10, colorHex: "#EAF1FA", opacity: 0.9 }
+    // 🫧 Liquid Glass — the real thing: background "glass" shows the user's
+    // actual wallpaper through a blur + frost (both renderers already do
+    // this), with hairline borders and white translucent content on top.
+    // themeID is only the fallback when no wallpaper photo is set yet.
+    { category: "Glass", pack: "Glass", size: "small", design: { name: "Glass Clock", kind: "freestyle", background: "glass", glassTint: "light", bgOpacity: 0.55, themeID: "liquidglass", fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.5, w: 0.93, h: 0.93, radius: 24, colorHex: "#FFFFFF", opacity: 0.07, border: 1, borderHex: "#FFFFFF" },
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.16, w: 0.8, h: 0.1, radius: 12, colorHex: "#FFFFFF", opacity: 0.12 },
+      { kind: "clock", x: 0.5, y: 0.47, size: 27, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "date", x: 0.5, y: 0.7, size: 10, colorHex: "#FFFFFF", opacity: 0.75 }
     ] } },
-    { category: "Glass", pack: "Glass", size: "medium", design: { name: "Frost Brief", kind: "freestyle", themeID: "liquidglass", fontStyle: "avenir", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
-      { kind: "shape", shape: "rect", x: 0.27, y: 0.5, w: 0.44, h: 0.84, radius: 20, colorHex: "#FFFFFF", opacity: 0.16, border: 1, borderHex: "#FFFFFF" },
-      { kind: "shape", shape: "rect", x: 0.75, y: 0.5, w: 0.42, h: 0.84, radius: 20, colorHex: "#FFFFFF", opacity: 0.16, border: 1, borderHex: "#FFFFFF" },
+    { category: "Glass", pack: "Glass", size: "medium", design: { name: "Frost Brief", kind: "freestyle", background: "glass", glassTint: "light", bgOpacity: 0.5, themeID: "liquidglass", fontStyle: "avenir", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
+      { kind: "shape", shape: "rect", x: 0.27, y: 0.5, w: 0.44, h: 0.86, radius: 18, colorHex: "#FFFFFF", opacity: 0.1, border: 1, borderHex: "#FFFFFF" },
+      { kind: "shape", shape: "rect", x: 0.75, y: 0.5, w: 0.42, h: 0.86, radius: 18, colorHex: "#FFFFFF", opacity: 0.1, border: 1, borderHex: "#FFFFFF" },
       { kind: "greeting", name: "", emoji: true, x: 0.27, y: 0.24, size: 14, colorHex: "#FFFFFF", opacity: 1 },
-      { kind: "date", x: 0.27, y: 0.42, size: 10, colorHex: "#EAF1FA", opacity: 0.9 },
-      { kind: "calendar", count: 2, x: 0.27, y: 0.68, size: 10, colorHex: "#FFFFFF", opacity: 0.92 },
+      { kind: "date", x: 0.27, y: 0.42, size: 10, colorHex: "#FFFFFF", opacity: 0.75 },
+      { kind: "calendar", count: 2, x: 0.27, y: 0.68, size: 10, colorHex: "#FFFFFF", opacity: 0.9 },
       { kind: "weather", wmode: "now", unit: "f", x: 0.75, y: 0.34, size: 26, colorHex: "#FFFFFF", opacity: 1 },
-      { kind: "weather", wmode: "hilo", unit: "f", x: 0.75, y: 0.58, size: 11, colorHex: "#EAF1FA", opacity: 0.92 },
-      { kind: "weather", wmode: "rain", unit: "f", x: 0.75, y: 0.76, size: 10, colorHex: "#CFE3F7", opacity: 0.9 }
+      { kind: "weather", wmode: "hilo", unit: "f", x: 0.75, y: 0.58, size: 11, colorHex: "#FFFFFF", opacity: 0.8 },
+      { kind: "weather", wmode: "rain", unit: "f", x: 0.75, y: 0.76, size: 10, colorHex: "#FFFFFF", opacity: 0.65 }
     ] } },
-    { category: "Glass", pack: "Glass", size: "small", design: { name: "Smoke Clock", kind: "freestyle", themeID: "glassnoir", fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
-      { kind: "shape", shape: "rect", x: 0.5, y: 0.5, w: 0.86, h: 0.86, radius: 22, colorHex: "#FFFFFF", opacity: 0.09, border: 1, borderHex: "#FFFFFF" },
-      { kind: "clock", x: 0.5, y: 0.42, size: 26, colorHex: "#FFFFFF", opacity: 1, bold: true },
-      { kind: "date", x: 0.5, y: 0.63, size: 10, colorHex: "#B9C2D4", opacity: 0.9 },
-      { kind: "battery", x: 0.5, y: 0.82, size: 10, colorHex: "#8FD3A8", opacity: 0.9 }
+    { category: "Glass", pack: "Glass", size: "small", design: { name: "Smoke Clock", kind: "freestyle", background: "glass", glassTint: "dark", bgOpacity: 0.6, themeID: "glassnoir", fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.5, w: 0.93, h: 0.93, radius: 24, colorHex: "#FFFFFF", opacity: 0.05, border: 1, borderHex: "#FFFFFF" },
+      { kind: "clock", x: 0.5, y: 0.43, size: 27, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "date", x: 0.5, y: 0.65, size: 10, colorHex: "#FFFFFF", opacity: 0.7 },
+      { kind: "battery", x: 0.5, y: 0.83, size: 10, colorHex: "#FFFFFF", opacity: 0.6 }
     ] } },
-    { category: "Glass", pack: "Glass", size: "small", design: { name: "Crystal Countdown", kind: "freestyle", themeID: "liquidglass", fontStyle: "serif", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
-      { kind: "shape", shape: "rect", x: 0.5, y: 0.5, w: 0.86, h: 0.86, radius: 22, colorHex: "#FFFFFF", opacity: 0.17, border: 1, borderHex: "#FFFFFF" },
-      { kind: "shape", shape: "rect", x: 0.66, y: 0.24, w: 0.4, h: 0.08, radius: 10, angle: 16, colorHex: "#FFFFFF", opacity: 0.13 },
-      { kind: "text", text: "New Year", x: 0.5, y: 0.3, size: 12, colorHex: "#EAF1FA", opacity: 0.95 },
+    { category: "Glass", pack: "Glass", size: "small", design: { name: "Crystal Countdown", kind: "freestyle", background: "glass", glassTint: "light", bgOpacity: 0.55, themeID: "liquidglass", fontStyle: "serif", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.5, w: 0.93, h: 0.93, radius: 24, colorHex: "#FFFFFF", opacity: 0.07, border: 1, borderHex: "#FFFFFF" },
+      { kind: "text", text: "New Year", x: 0.5, y: 0.3, size: 12, colorHex: "#FFFFFF", opacity: 0.85 },
       { kind: "countdown", dateISO: "2027-01-01", x: 0.5, y: 0.55, size: 20, colorHex: "#FFFFFF", opacity: 1, bold: true }
     ] } },
-    { category: "Glass", pack: "Glass", size: "medium", design: { name: "Glass Dock", kind: "freestyle", themeID: "glassnoir", fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
-      { kind: "shape", shape: "pill", x: 0.5, y: 0.5, w: 0.92, h: 0.62, colorHex: "#FFFFFF", opacity: 0.1, border: 1, borderHex: "#FFFFFF" },
+    { category: "Glass", pack: "Glass", size: "medium", design: { name: "Glass Dock", kind: "freestyle", background: "glass", glassTint: "dark", bgOpacity: 0.55, themeID: "glassnoir", fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
+      { kind: "shape", shape: "pill", x: 0.5, y: 0.5, w: 0.94, h: 0.64, colorHex: "#FFFFFF", opacity: 0.07, border: 1, borderHex: "#FFFFFF" },
       { kind: "app", label: "Phone", url: "tel://", x: 0.17, y: 0.5, size: 34, opacity: 1 },
       { kind: "app", label: "Messages", url: "sms://", x: 0.39, y: 0.5, size: 34, opacity: 1 },
       { kind: "app", label: "Camera", url: "camera://", x: 0.61, y: 0.5, size: 34, opacity: 1 },
