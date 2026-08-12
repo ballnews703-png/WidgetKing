@@ -969,7 +969,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 90;
+const WK_VERSION = 91;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -10338,6 +10338,7 @@ function openEditor() {
 function closeEditor() {
   document.getElementById("editorMode").classList.remove("open");
   document.body.style.overflow = "";
+  studioOpen = false; // stop background canvas re-renders while closed
   renderLibrary();
   renderStatusCard();
 }
@@ -10367,6 +10368,12 @@ function switchTab(name) {
   // Tapping any real tab while editing leaves the editor — the tab bar must
   // always be a way out.
   if (!entering && editorWasOpen) closeEditor();
+  // Leaving Explore frees its ~180 decoded tile images (real memory on
+  // phones); the tile cache makes the rebuild on return nearly instant.
+  if (lastBaseTab === "explore" && name !== "explore") {
+    document.getElementById("exploreList").innerHTML = "";
+    lazyTabRendered.explore = false;
+  }
   lastBaseTab = name;
   localStorage.setItem("widgetking.tab", name);
   document.querySelectorAll(".pane").forEach(function (pane) {
@@ -11163,11 +11170,23 @@ function renderPageFrame() {
     frame.appendChild(div);
   }
 }
+// Typing shield: while the keyboard is up for the page-idea field, the
+// heavy page preview (six live widget previews at 3x) is dropped from the
+// compositor — the iOS keyboard's own memory spike was tipping the page
+// over mid-typing. It re-renders on blur.
+document.getElementById("pageIdea").addEventListener("focus", function () {
+  document.getElementById("pageFrame").style.display = "none";
+});
+document.getElementById("pageIdea").addEventListener("blur", function () {
+  document.getElementById("pageFrame").style.display = "";
+  renderPageFrame();
+});
 let pageResizeTimer = null;
 window.addEventListener("resize", function () {
   clearTimeout(pageResizeTimer);
   pageResizeTimer = setTimeout(function () {
-    if (document.getElementById("pageStudio").classList.contains("open")) renderPageFrame();
+    if (document.getElementById("pageStudio").classList.contains("open") &&
+        document.getElementById("pageFrame").style.display !== "none") renderPageFrame();
   }, 250);
 });
 function openSlotSheet(slot) {
