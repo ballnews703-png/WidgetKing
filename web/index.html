@@ -204,10 +204,12 @@
     flex-wrap: wrap; }
   #studioHead .size-buttons { margin-right: auto; }
   #studioStage { height: min(44vh, 400px); display: flex; align-items: center; justify-content: center;
-    padding: 14px; overflow: hidden; position: relative;
+    padding: 14px; overflow: hidden;
     position: sticky; top: calc(env(safe-area-inset-top) + 52px); z-index: 24;
-    border-radius: 16px;
-    background: repeating-conic-gradient(var(--stage-a) 0% 25%, var(--stage-b) 0% 50%) 0 0 / 22px 22px; }
+    border-radius: 16px; transform: translateZ(0);
+    /* Checkerboard painted as a raster tile by paintStageTile() — a live
+       repeating-conic-gradient repaints on every scroll frame on iOS. */
+    background-color: var(--stage-b); background-repeat: repeat; }
   #studioTools { display: flex; gap: 6px; margin-bottom: 10px; position: sticky; top: 0;
     background: var(--bg); padding: 4px 0; z-index: 3; }
   #studioTools button { flex: 1; border-radius: 12px; font-weight: 600; min-height: 40px; }
@@ -912,7 +914,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 84;
+const WK_VERSION = 85;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -5793,6 +5795,9 @@ function upgradeRealPreviews(root) {
 }
 function renderPreview() {
   recordHistory();
+  // v85 perf: while the Studio surface is the canvas, the preview dock is
+  // hidden — don't pay to paint it on every edit and drag frame.
+  if (studioOpen && current && current.kind === "freestyle") return;
   const canvas = document.getElementById("canvas");
   const dims = SIZES[previewSize];
   canvas.style.width = dims[0] + "px";
@@ -7453,12 +7458,23 @@ function renderFreestyleUI() {
 let studioOpen = false;
 let studioSize = "small";
 
+// Reading stage.clientWidth forces a layout, and this runs on every drag
+// frame — cache per viewport + widget size, invalidated on resize.
+let studioScaleCache = null;
 function studioScaleFor(dims) {
+  const key = dims[0] + "x" + dims[1] + ":" + window.innerWidth + "x" + window.innerHeight;
+  if (studioScaleCache && studioScaleCache.key === key) return studioScaleCache.scale;
   const stage = document.getElementById("studioStage");
   const availW = (stage.clientWidth || window.innerWidth) - 28;
   const availH = (stage.clientHeight || window.innerHeight * 0.4) - 28;
-  return Math.max(0.8, Math.min(availW / dims[0], availH / dims[1], 2.6));
+  const scale = Math.max(0.8, Math.min(availW / dims[0], availH / dims[1], 2.6));
+  studioScaleCache = { key: key, scale: scale };
+  return scale;
 }
+window.addEventListener("resize", function () {
+  studioScaleCache = null;
+  if (studioOpen) renderStudioCanvas();
+});
 function renderStudioCanvas() {
   const canvas = document.getElementById("studioCanvas");
   const dims = SIZES[studioSize];
@@ -10192,10 +10208,15 @@ function a11ySweep() {
     c.setAttribute("role", "img");
   });
 }
+// Throttled to a trailing 300ms and paused mid-gesture: screen readers don't
+// need labels faster than that, and drags mutate the DOM every frame.
 new MutationObserver(function () {
   if (a11yQueued) return;
   a11yQueued = true;
-  requestAnimationFrame(a11ySweep);
+  setTimeout(function () {
+    if (typeof gesture !== "undefined" && gesture) { a11yQueued = false; return; }
+    a11ySweep();
+  }, 300);
 }).observe(document.body, { childList: true, subtree: true });
 a11ySweep();
 
@@ -10212,11 +10233,28 @@ let lastBaseTab = null;
 function openEditor() {
   document.getElementById("editorMode").classList.add("open");
   document.getElementById("editorMode").scrollTop = 0;
+  document.body.style.overflow = "hidden";
 }
 function closeEditor() {
   document.getElementById("editorMode").classList.remove("open");
+  document.body.style.overflow = "";
   renderLibrary();
   renderStatusCard();
+}
+// The stage checkerboard as a cached raster tile (see #studioStage CSS).
+function paintStageTile() {
+  const stage = document.getElementById("studioStage");
+  if (!stage) return;
+  const cs = getComputedStyle(document.body);
+  const a = cs.getPropertyValue("--stage-a").trim() || "#26262E";
+  const b = cs.getPropertyValue("--stage-b").trim() || "#1C1C22";
+  const c = document.createElement("canvas");
+  c.width = 44; c.height = 44;
+  const x = c.getContext("2d");
+  x.fillStyle = b; x.fillRect(0, 0, 44, 44);
+  x.fillStyle = a; x.fillRect(0, 0, 22, 22); x.fillRect(22, 22, 22, 22);
+  stage.style.backgroundImage = "url(" + c.toDataURL("image/png") + ")";
+  stage.style.backgroundSize = "44px 44px";
 }
 function switchTab(name) {
   if (name === "editor") { openEditor(); name = lastBaseTab || localStorage.getItem("widgetking.tab") || "create"; }
@@ -10341,6 +10379,7 @@ document.getElementById("modeToggle").onclick = function () {
   appearance = appearance === "auto" ? "light" : appearance === "light" ? "dark" : "auto";
   localStorage.setItem("widgetking.appearance", appearance);
   applyAppearance(effectiveAppearance());
+  paintStageTile();
   toast(appearance === "auto" ? "🌗 Auto — matches your phone"
     : appearance === "light" ? "☀️ Light and lovely" : "🌙 Back to dark");
 };
@@ -11645,6 +11684,7 @@ renderTemplates();
 renderIconMaker();
 renderStatusCard();
 renderInstallChecklist();
+paintStageTile();
 updateCopyButtons();
 renderShortcutGuide();
 renderLibrary();
