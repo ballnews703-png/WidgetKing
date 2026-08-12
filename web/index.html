@@ -151,6 +151,10 @@
   }
   @keyframes pop { from { transform: scale(.96); } to { transform: scale(1); } }
   #canvas.pop { animation: pop .25s ease; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+    html { scroll-behavior: auto !important; }
+  }
   /* Studio drag-select: rubber-band box for picking several elements at once. */
   .marquee { position: absolute; border: 1.5px dashed var(--accent);
     background: rgba(139, 92, 246, .12); border-radius: 4px;
@@ -335,7 +339,7 @@
   <h1>WidgetKing</h1>
   <span id="appVersion" style="font-size:11px;color:var(--muted);align-self:flex-end;padding-bottom:4px"></span>
   <div class="spacer"></div>
-  <button id="modeToggle" title="Light / dark">🌓</button>
+  <button id="modeToggle" title="Light / dark" aria-label="Switch between light, dark, and automatic appearance">🌓</button>
 </header>
 
 <section id="builderSection" class="pane pane-create">
@@ -410,6 +414,9 @@
       <span id="spendReadout" style="font-size:12px;color:var(--muted);flex:1"></span>
       <button id="resetSpend">Reset</button>
     </div>
+    <div class="row" style="margin-top:8px">
+      <button id="clearKeyBtn" style="flex:1">🧹 Clear key from this device</button>
+    </div>
   </details>
 </section>
 
@@ -417,8 +424,8 @@
   <div id="studioHead">
     <span class="title">🎨 Studio</span>
     <div class="row size-buttons" id="studioSizeButtons" style="margin:0"></div>
-    <button id="studioUndoBtn" disabled>↩︎</button>
-    <button id="studioRedoBtn" disabled>↪︎</button>
+    <button id="studioUndoBtn" disabled aria-label="Undo" title="Undo">↩︎</button>
+    <button id="studioRedoBtn" disabled aria-label="Redo" title="Redo">↪︎</button>
     <button id="studioSaveBtn" class="primary">💾 Save</button>
     <button id="studioCloseBtn">✕ Done</button>
   </div>
@@ -442,7 +449,7 @@
 </div>
 
 <section id="editorSection" class="pane pane-editor">
-  <div class="chips" id="editorSubTabs" style="margin-bottom:10px"></div>
+  <div class="chips" id="editorSubTabs" style="margin-bottom:10px" role="tablist" aria-label="Editor mode"></div>
   <h2 id="editorTitle">Make it yours</h2>
   <div id="previewDock">
     <div id="canvas"></div>
@@ -714,6 +721,9 @@
   <div id="shortcutGuideList"></div>
   <a class="wiz-action" href="shortcuts://" style="margin-top:10px">🚀 Open the Shortcuts app</a>
   </div></details>
+  <p class="hint" style="text-align:center;margin-top:16px">
+    <a href="privacy.html" style="color:var(--muted)">Privacy policy</a> — your designs stay on your device.
+  </p>
 </section>
 
 <div id="setupWizard">
@@ -832,12 +842,12 @@
   </div>
 </div>
 
-<nav id="tabbar">
-  <button data-tab="create" class="active"><span class="tab-ico">✨</span>Create</button>
-  <button data-tab="explore"><span class="tab-ico">🧭</span>Explore</button>
-  <button data-tab="editor"><span class="tab-ico">🎨</span>Editor</button>
-  <button data-tab="widgets"><span class="tab-ico">👑</span>My Widgets</button>
-  <button data-tab="install"><span class="tab-ico">🚀</span>Install</button>
+<nav id="tabbar" role="tablist" aria-label="Main sections">
+  <button data-tab="create" class="active" role="tab" aria-selected="true"><span class="tab-ico" aria-hidden="true">✨</span>Create</button>
+  <button data-tab="explore" role="tab" aria-selected="false"><span class="tab-ico" aria-hidden="true">🧭</span>Explore</button>
+  <button data-tab="editor" role="tab" aria-selected="false"><span class="tab-ico" aria-hidden="true">🎨</span>Editor</button>
+  <button data-tab="widgets" role="tab" aria-selected="false"><span class="tab-ico" aria-hidden="true">👑</span>My Widgets</button>
+  <button data-tab="install" role="tab" aria-selected="false"><span class="tab-ico" aria-hidden="true">🚀</span>Install</button>
 </nav>
 
 <div id="toast"></div>
@@ -847,7 +857,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 81;
+const WK_VERSION = 82;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -4166,6 +4176,11 @@ function gradientAngle(design) {
 // can assume the full model.
 function normalizeDesign(design) {
   if (!design || typeof design !== "object") design = {};
+  // Design format version. Missing = 0 (pre-versioned). Migrate older formats
+  // here — before the lenient defaults below — then stamp the current version.
+  const fromVersion = Number(design.schemaVersion) || 0;
+  if (fromVersion < 1) { /* 0 -> 1: no field changes, leniency covers it */ }
+  design.schemaVersion = 1;
   if (!design.id) design.id = uid();
   if (!design.name) design.name = "My Widget";
   if (!design.kind) design.kind = "clock";
@@ -7873,6 +7888,7 @@ function renderLauncherUI() {
     };
     const remove = document.createElement("button");
     remove.textContent = "✕";
+    remove.title = "Remove " + (app.label || "this app");
     remove.onclick = function () {
       current.apps.splice(index, 1);
       renderLauncherUI();
@@ -8623,6 +8639,7 @@ function renderControls() {
       }
       const removeBtn = document.createElement("button");
       removeBtn.textContent = "✕";
+      removeBtn.title = "Remove this row";
       removeBtn.disabled = current.lockRows.length <= 1;
       removeBtn.onclick = function () { current.lockRows.splice(index, 1); renderAll(); };
       line.appendChild(removeBtn);
@@ -9063,6 +9080,15 @@ document.getElementById("resetSpend").onclick = function () {
   localStorage.setItem("widgetking.spend", "0");
   updateSpendUI();
   toast("Spend counter reset");
+};
+document.getElementById("clearKeyBtn").onclick = function () {
+  if (!getApiKey()) { toast("No key is stored on this device"); return; }
+  if (!confirm("Remove the AI access key from this device?\n\nYour designs stay. AI building stops working here until a key is pasted again.")) return;
+  localStorage.removeItem("widgetking.apikey");
+  apiKeyInput.value = "";
+  updateSpendUI();
+  updateMagicHint();
+  toast("Key removed from this device ✓");
 };
 
 function setCustomColor(index, value) {
@@ -9996,9 +10022,26 @@ async function receiveSharedDesign() {
       if (bundle[1] === "g") bytes = await pipeBytes(bytes, new DecompressionStream("gzip"));
       const parsed = JSON.parse(new TextDecoder().decode(bytes));
       if (!parsed || !Array.isArray(parsed.designs)) throw new Error("bad bundle");
+      // Nothing merges until the person holding the phone says so — a sync
+      // link can replace designs and install an AI key, so spell both out.
+      const incoming = parsed.designs.map(function (raw) { return normalizeDesign(raw); });
+      const replacing = incoming.filter(function (d) {
+        return designs.some(function (x) { return x.id === d.id; });
+      }).length;
+      const adding = incoming.length - replacing;
+      const hasKey = !!(parsed.ai && typeof parsed.ai.key === "string" && parsed.ai.key.trim());
+      const summary = ["This sync link wants to:"];
+      if (adding) summary.push("• add " + adding + " design" + (adding === 1 ? "" : "s"));
+      if (replacing) summary.push("• replace " + replacing + " design" + (replacing === 1 ? "" : "s") + " already on this device");
+      if (hasKey) summary.push("• set up the AI designer with an access key included in the link");
+      summary.push("", "Only continue if this link came from you or someone you trust.");
+      if (!confirm(summary.join("\n"))) {
+        history.replaceState(null, "", location.pathname + location.search);
+        toast("Sync link dismissed — nothing was changed");
+        return;
+      }
       let added = 0, updated = 0;
-      for (const raw of parsed.designs) {
-        const design = normalizeDesign(raw);
+      for (const design of incoming) {
         const index = designs.findIndex(function (d) { return d.id === design.id; });
         if (index >= 0) { preservePhotos(design, designs[index]); designs[index] = design; updated++; }
         else { designs.push(design); added++; }
@@ -10006,7 +10049,7 @@ async function receiveSharedDesign() {
       persist();
       renderLibrary();
       let aiNote = "";
-      if (parsed.ai && typeof parsed.ai.key === "string" && parsed.ai.key.trim()) {
+      if (hasKey) {
         localStorage.setItem("widgetking.apikey", parsed.ai.key.trim());
         if (PRICES[parsed.ai.model]) localStorage.setItem("widgetking.aimodel", parsed.ai.model);
         const budget = Number(parsed.ai.budget);
@@ -10056,6 +10099,34 @@ async function receiveSharedDesign() {
   }
 }
 
+// Screen-reader support for dynamically built UI: the app re-renders lists and
+// toolbars freely, so instead of labeling every creation site, one sweep after
+// each DOM change (a) promotes existing title tooltips to aria-labels on
+// icon-only buttons and images, and (b) marks unlabeled generated images
+// (design previews, icon tiles) as decorative so VoiceOver skips the noise.
+let a11yQueued = false;
+function a11ySweep() {
+  a11yQueued = false;
+  document.querySelectorAll("button[title]:not([aria-label])").forEach(function (b) {
+    b.setAttribute("aria-label", b.title);
+  });
+  document.querySelectorAll("img[title]:not([alt])").forEach(function (img) {
+    img.setAttribute("alt", img.title);
+  });
+  document.querySelectorAll("img:not([alt])").forEach(function (img) {
+    img.setAttribute("alt", "");
+  });
+  document.querySelectorAll("canvas:not([role])").forEach(function (c) {
+    c.setAttribute("role", "img");
+  });
+}
+new MutationObserver(function () {
+  if (a11yQueued) return;
+  a11yQueued = true;
+  requestAnimationFrame(a11ySweep);
+}).observe(document.body, { childList: true, subtree: true });
+a11ySweep();
+
 // Keep clock previews ticking.
 setInterval(function () {
   if (current.kind === "clock" || current.kind === "freestyle") renderPreview();
@@ -10070,6 +10141,7 @@ function switchTab(name) {
   });
   document.querySelectorAll("#tabbar button").forEach(function (b) {
     b.classList.toggle("active", b.dataset.tab === name);
+    b.setAttribute("aria-selected", b.dataset.tab === name ? "true" : "false");
   });
   window.scrollTo({ top: 0 });
 }
@@ -10920,6 +10992,8 @@ function applyEditorSubTab() {
     const chip = document.createElement("button");
     chip.textContent = pair[1];
     chip.className = editorSubTab === pair[0] ? "sel" : "";
+    chip.setAttribute("role", "tab");
+    chip.setAttribute("aria-selected", editorSubTab === pair[0] ? "true" : "false");
     chip.onclick = function () {
       editorSubTab = pair[0];
       localStorage.setItem("widgetking.editorsub", editorSubTab);

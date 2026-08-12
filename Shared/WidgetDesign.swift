@@ -113,6 +113,10 @@ struct CanvasElement: Identifiable, Codable, Hashable {
 /// A single user-created widget design. Stored as JSON in the shared App Group
 /// so both the app and the widget extension can read it.
 struct WidgetDesign: Identifiable, Codable, Hashable {
+    /// Design format version, shared with the web designer. 0 means the
+    /// design predates versioning; bump when a field is renamed or changes
+    /// meaning, and migrate old values in init(from:).
+    var schemaVersion = 1
     var id = UUID()
     var name = "My Widget"
     var kind: WidgetKind = .clock
@@ -140,7 +144,7 @@ struct WidgetDesign: Identifiable, Codable, Hashable {
 
 extension WidgetDesign {
     private enum CodingKeys: String, CodingKey {
-        case id, name, kind, themeID, fontStyle, textColorHex
+        case schemaVersion, id, name, kind, themeID, fontStyle, textColorHex
         case primaryText, secondaryText, targetDate, canvasElements
     }
 
@@ -149,6 +153,9 @@ extension WidgetDesign {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let defaults = WidgetDesign()
+        let fromVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 0
+        // 0 -> 1: no field changes; the lenient defaults below cover it.
+        schemaVersion = max(fromVersion, 1)
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         name = try container.decodeIfPresent(String.self, forKey: .name) ?? defaults.name
         kind = try container.decodeIfPresent(WidgetKind.self, forKey: .kind) ?? defaults.kind

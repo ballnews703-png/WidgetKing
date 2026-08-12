@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WidgetKing — Privacy Policy</title>
+<style>
+  :root { --bg: #FFFFFF; --text: #1C1C22; --muted: #6B6B76; --card: #F4F4F8; --accent: #8B5CF6; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0D0D11; --text: #F2F2F6; --muted: #9A9AA6; --card: #17171E; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "SF Pro Text", Segoe UI, Roboto, sans-serif;
+    padding: 24px 20px 60px; }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 26px; margin: 8px 0 2px; }
+  h2 { font-size: 18px; margin: 28px 0 6px; }
+  p, li { color: var(--text); }
+  .muted { color: var(--muted); font-size: 13px; }
+  .card { background: var(--card); border-radius: 14px; padding: 14px 16px; margin: 14px 0; }
+  a { color: var(--accent); }
+  ul { padding-left: 20px; }
+</style>
+</head>
+<body>
+<main>
+  <p><a href="./">← Back to WidgetKing</a></p>
+  <h1>👑 WidgetKing Privacy Policy</h1>
+  <p class="muted">Effective August 12, 2026</p>
+
+  <p>WidgetKing is built so that your stuff stays yours. There are no accounts,
+  no analytics, no tracking, and no server of ours that receives your data.
+  This page explains exactly what leaves your device, when, and where it goes.</p>
+
+  <div class="card">
+    <strong>The short version:</strong> your designs live on your device.
+    Nothing is sent anywhere unless you use a feature that plainly needs it —
+    AI design (to Anthropic) or live weather (to Open-Meteo) — and even then,
+    only the minimum required, sent directly from your device.
+  </div>
+
+  <h2>Your designs</h2>
+  <p>Widget designs, app-icon packs, photos you add, and settings are stored
+  locally — in your browser's storage for the web designer, and on your phone
+  inside the Scriptable app for installed widgets. We never receive or store a
+  copy. Backups you export are files you keep; they are never uploaded.</p>
+
+  <h2>AI design (optional)</h2>
+  <p>The AI designer only works if you set it up with an access key. When you
+  use it:</p>
+  <ul>
+    <li>Your widget description — and, if you use "Clone a widget" or the
+    design-review feature, an image of the widget being designed — is sent
+    directly from your device to <strong>Anthropic</strong> (the AI provider)
+    to generate the design. See
+    <a href="https://www.anthropic.com/legal/privacy" rel="noopener">Anthropic's
+    privacy policy</a>.</li>
+    <li>Your access key is stored only on your device. It is never sent to us
+    (we have no server), and it is not included in exported backup files.</li>
+  </ul>
+  <p>If you never set up the AI, nothing is ever sent to Anthropic.</p>
+
+  <h2>Weather widgets (optional)</h2>
+  <p>Widgets that show live weather ask your phone for your approximate
+  location (accurate to about a kilometer) and send only those coordinates to
+  <strong>Open-Meteo</strong>, a weather service, to fetch the forecast. See
+  <a href="https://open-meteo.com/en/terms" rel="noopener">Open-Meteo's
+  terms &amp; privacy</a>. The location is kept on your device and results are
+  cached there. Widgets without weather never request your location.</p>
+
+  <h2>Sync and share links</h2>
+  <p>When you create a sync link or share a design, the designs themselves are
+  encoded inside the link — they travel in the link, not through a server. A
+  sync link can optionally include your AI access key so your other device is
+  ready to go. Treat sync links like passwords: only send them to yourself or
+  someone you trust, because anyone who has the link has its contents.
+  Opening a link always shows a summary and asks for confirmation before
+  anything is added to a device.</p>
+
+  <h2>Widget updates</h2>
+  <p>The installed widget script can check this website for a newer version of
+  itself. That check is a plain download — it sends no personal data, and your
+  designs never leave the device during an update.</p>
+
+  <h2>Children</h2>
+  <p>WidgetKing does not knowingly collect personal information from anyone,
+  including children — it has no mechanism to collect personal information at
+  all.</p>
+
+  <h2>Changes</h2>
+  <p>If WidgetKing ever adds features that change what leaves your device (for
+  example, optional accounts for syncing), this policy will be updated first,
+  and the date at the top will change.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about privacy? Open an issue on the
+  <a href="https://github.com/ballnews703-png/WidgetKing" rel="noopener">WidgetKing
+  GitHub repository</a>.</p>
+</main>
+</body>
+</html>

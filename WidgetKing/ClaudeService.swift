@@ -20,10 +20,26 @@ enum ClaudeServiceError: LocalizedError {
 enum ClaudeService {
     static let model = "claude-opus-5"
     static let apiKeyDefaultsKey = "claude_api_key"
+    private static let apiKeyAccount = "anthropic-api-key"
 
+    /// The key lives in the Keychain. Early builds kept it in UserDefaults
+    /// (unencrypted, included in backups); the first read migrates any legacy
+    /// copy into the Keychain and deletes the plain-text original.
     static var apiKey: String {
-        UserDefaults.standard.string(forKey: apiKeyDefaultsKey)?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        get {
+            if let legacy = UserDefaults.standard.string(forKey: apiKeyDefaultsKey),
+               !legacy.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                KeychainStore.write(legacy.trimmingCharacters(in: .whitespacesAndNewlines),
+                                    account: apiKeyAccount)
+                UserDefaults.standard.removeObject(forKey: apiKeyDefaultsKey)
+            }
+            return KeychainStore.read(apiKeyAccount)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        }
+        set {
+            KeychainStore.write(newValue.trimmingCharacters(in: .whitespacesAndNewlines),
+                                account: apiKeyAccount)
+        }
     }
 
     static var isConfigured: Bool { !apiKey.isEmpty }
