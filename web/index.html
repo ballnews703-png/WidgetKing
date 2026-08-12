@@ -669,8 +669,21 @@
   <div id="sheetHandle" role="button" aria-label="Resize the tool drawer" title="Drag to resize"><span></span></div>
   <div id="editorRail" role="tablist" aria-label="Editor tools"></div>
   <div id="sheetBody">
+    <div class="sheet-panel" id="panelWelcome">
+      <h3 style="margin:6px 0 10px;font-size:19px">What should this widget become?</h3>
+      <div class="wk-actions">
+        <button class="primary" id="welcomeMagicBtn" style="flex:1">✨ Design it for me</button>
+        <button id="welcomeTplBtn" style="flex:1">🖼 Start from a template</button>
+        <button id="welcomeBgBtn" style="flex:1">🎨 Pick a background</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <input type="text" id="welcomeIdea" placeholder="…or describe it: a cozy clock with weather" style="flex:1">
+        <button id="welcomeGoBtn">Go</button>
+      </div>
+    </div>
     <div class="sheet-panel" id="panelWidget"></div>
     <div class="sheet-panel" id="panelTemplates">
+      <div id="recentTemplates"></div>
       <div class="chips" id="panelPackChips"></div>
       <div id="panelTemplateRow" class="tpl-row"></div>
     </div>
@@ -969,7 +982,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 91;
+const WK_VERSION = 92;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -6385,6 +6398,7 @@ function progressPctPreview(el) {
 let pendingPhoto = null; // {mode:"new"} or {mode:"replace", el}
 
 function addElement(kind) {
+  recordRecent("elements", kind);
   if (kind === "photo") {
     pendingPhoto = { mode: "new" };
     document.getElementById("photoInput").click();
@@ -8596,6 +8610,7 @@ function renderTemplates(rowEl, chipEl) {
     cat.textContent = template.category + (sizeKey !== "small" ? " · " + sizeKey : "");
     card.append(name, cat);
     card.onclick = function () {
+      recordRecent("templates", template.design.name);
       const copy = normalizeDesign(JSON.parse(JSON.stringify(template.design)));
       copy.id = uid();
       previewSize = sizeKey;
@@ -9459,9 +9474,10 @@ document.getElementById("exploreTabBtn").onclick = function () { switchTab("expl
 document.getElementById("newWidgetBtn").onclick = function () {
   const design = newDesign();
   design.name = dedupedName("My Widget", null);
+  design.kind = "freestyle"; // canvas-first: a new widget starts as a blank canvas
+  design.canvasElements = [];
   loadIntoEditor(design);
   switchTab("editor");
-  toast("Blank canvas ready — pick a type, or go 🎨 Freestyle ✨");
 };
 document.getElementById("cloneBtn").onclick = function () {
   if (!getApiKey()) {
@@ -10331,9 +10347,11 @@ const lazyTabRendered = {};
 function openEditor() {
   document.getElementById("editorMode").classList.add("open");
   document.body.style.overflow = "hidden";
-  // Open ready to edit: canvas tools for freestyle, the widget form for
-  // structured kinds — never a blank sheet waiting for a tool tap.
-  setSheetTool(current && current.kind === "freestyle" ? "pieces" : "widget");
+  // Open ready to edit: a blank canvas greets with three doors (Rule 5),
+  // freestyle lands on canvas tools, structured kinds on the widget form.
+  const blank = current && current.kind === "freestyle" &&
+    (!current.canvasElements || current.canvasElements.length === 0);
+  setSheetTool(blank ? "welcome" : current && current.kind === "freestyle" ? "pieces" : "widget");
 }
 function closeEditor() {
   document.getElementById("editorMode").classList.remove("open");
@@ -10407,7 +10425,7 @@ const RAIL_TOOLS = [
 ];
 const PANEL_FOR = { widget: "panelWidget", templates: "panelTemplates", pieces: "panelPieces",
   text: "panelText", photos: "panelPhotos", background: "panelBackground", apps: "panelApps",
-  data: "panelData", layers: "panelLayers", edit: "panelEdit" };
+  data: "panelData", layers: "panelLayers", edit: "panelEdit", welcome: "panelWelcome" };
 const DATA_ELEMENT_KINDS = ["weather", "calendar", "month", "week", "greeting", "reminders",
   "news", "worldclock", "stock", "astro", "battery", "sleeper", "sleeperlogo"];
 const SHEET_DETENTS = { peek: 0.17, half: 0.42, full: 0.78 };
@@ -10433,7 +10451,9 @@ function buildSheetPanel(tool) {
   if (tool === "templates") {
     renderTemplates(document.getElementById("panelTemplateRow"), document.getElementById("panelPackChips"));
   } else if (tool === "pieces") {
-    buildPalette(document.getElementById("panelPieces"),
+    const panel = document.getElementById("panelPieces");
+    panel.innerHTML = '<div id="recentPieces"></div><div id="piecesTiles"></div>';
+    buildPalette(document.getElementById("piecesTiles"),
       { smart: true, keys: ["shape", "icon", "emoji", "art", "clock", "date", "countdown", "progress", "ring"] });
   } else if (tool === "text") {
     buildPalette(document.getElementById("panelTextTiles"), { keys: ["text"] });
@@ -10470,11 +10490,78 @@ function setSheetTool(name) {
   document.querySelectorAll(".sheet-panel").forEach(function (p) {
     p.classList.toggle("active", p.id === PANEL_FOR[name]);
   });
+  if (name === "pieces" || name === "templates") renderRecents(name);
   applySheetDetent(sheetDetentFor(name));
   const active = document.querySelector("#editorRail button.active");
   if (active && active.scrollIntoView) active.scrollIntoView({ block: "nearest", inline: "nearest" });
   document.getElementById("sheetBody").scrollTop = 0;
 }
+// Rule 7: recents before browsing — a chip row of what was used last.
+function recordRecent(kind, value) {
+  try {
+    const key = "widgetking.recent." + kind;
+    let list = JSON.parse(localStorage.getItem(key) || "[]");
+    list = [value].concat(list.filter(function (v) { return v !== value; })).slice(0, 8);
+    localStorage.setItem(key, JSON.stringify(list));
+  } catch (e) {}
+}
+function renderRecents(tool) {
+  const box = document.getElementById(tool === "pieces" ? "recentPieces" : "recentTemplates");
+  if (!box) return;
+  let list = [];
+  try {
+    list = JSON.parse(localStorage.getItem("widgetking.recent." +
+      (tool === "pieces" ? "elements" : "templates")) || "[]");
+  } catch (e) {}
+  box.innerHTML = "";
+  if (!list.length) return;
+  const head = document.createElement("div");
+  head.className = "pal-head";
+  head.textContent = "Recently used";
+  box.appendChild(head);
+  const row = document.createElement("div");
+  row.className = "chips";
+  const byKey = {};
+  ELEMENT_PALETTE.forEach(function (p) { byKey[p[0]] = p[1]; });
+  for (const value of list) {
+    const chip = document.createElement("button");
+    if (tool === "pieces") {
+      if (!byKey[value]) continue;
+      chip.textContent = byKey[value];
+      chip.onclick = function () {
+        if (current && current.kind !== "freestyle") openStudio();
+        addElement(value);
+      };
+    } else {
+      chip.textContent = value;
+      chip.onclick = function () {
+        const t = buildTemplates().find(function (x) { return x.design.name === value; });
+        if (!t) return;
+        const copy = normalizeDesign(JSON.parse(JSON.stringify(t.design)));
+        copy.id = uid();
+        loadIntoEditor(copy);
+        switchTab("editor");
+      };
+    }
+    row.appendChild(chip);
+  }
+  box.appendChild(row);
+}
+// Empty-state doors (Rule 5): three obvious ways in, plus describe-it.
+document.getElementById("welcomeMagicBtn").onclick = function () {
+  closeEditor();
+  switchTab("create");
+  document.getElementById("builderBtn").click();
+};
+document.getElementById("welcomeTplBtn").onclick = function () { setSheetTool("templates"); };
+document.getElementById("welcomeBgBtn").onclick = function () { setSheetTool("background"); };
+document.getElementById("welcomeGoBtn").onclick = function () {
+  const idea = document.getElementById("welcomeIdea").value.trim();
+  if (!idea) { setSheetTool("pieces"); return; }
+  document.getElementById("magicInput").value = idea;
+  document.getElementById("welcomeIdea").value = "";
+  document.getElementById("magicBtn").click();
+};
 (function buildRail() {
   const rail = document.getElementById("editorRail");
   for (const t of RAIL_TOOLS) {
@@ -11125,6 +11212,7 @@ function renderDesignNode(design, sizeKey) {
   }
   return node;
 }
+let pageSnapCache = {};
 function renderPageFrame() {
   const frame = document.getElementById("pageFrame");
   frame.innerHTML = "";
@@ -11148,21 +11236,35 @@ function renderPageFrame() {
     div.style.height = (rect.h * 100) + "%";
     const design = designs.find(function (d) { return d.id === pageState.slots[key]; });
     if (design) {
-      const inner = renderDesignNode(design, slot.size);
-      // Absolute placement opts the node out of the slot's flex layout —
-      // flex-shrink was squeezing the 158px base width down to slot width
-      // BEFORE the scale transform, shrinking every widget ~30%.
-      inner.style.position = "absolute";
-      inner.style.left = "0";
-      inner.style.top = "0";
-      inner.style.transformOrigin = "top left";
-      inner.style.pointerEvents = "none";
-      div.appendChild(inner);
-      // Scale from the slot's REAL laid-out width (frame width can be stale
-      // while the overlay is still opening).
-      requestAnimationFrame(function () {
-        inner.style.transform = "scale(" + ((div.clientWidth || rect.w * frameW) / SIZES[slot.size][0]) + ")";
-      });
+      // v92: slots show flat PNG snapshots instead of live widget DOM — six
+      // live previews (gradients, shadows) in the compositor was the memory
+      // that crashed phones when the keyboard opened. Cached per design+size.
+      const snapKey = design.id + "|" + slot.size + "|" + (design.schemaVersion || 0);
+      const img = document.createElement("img");
+      img.alt = design.name;
+      img.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none";
+      div.appendChild(img);
+      if (pageSnapCache[snapKey]) {
+        img.src = pageSnapCache[snapKey];
+      } else {
+        renderDesignPng(design, slot.size).then(function (png) {
+          if (png) { pageSnapCache[snapKey] = png; img.src = png; }
+          else {
+            // Snapshot failed (rare) — fall back to the live preview node.
+            img.remove();
+            const inner = renderDesignNode(design, slot.size);
+            inner.style.position = "absolute";
+            inner.style.left = "0";
+            inner.style.top = "0";
+            inner.style.transformOrigin = "top left";
+            inner.style.pointerEvents = "none";
+            div.appendChild(inner);
+            requestAnimationFrame(function () {
+              inner.style.transform = "scale(" + ((div.clientWidth || rect.w * frameW) / SIZES[slot.size][0]) + ")";
+            });
+          }
+        });
+      }
     } else {
       div.textContent = "＋ " + slot.size;
     }
@@ -11269,6 +11371,7 @@ function renderPageStudio() {
   renderPageFrame();
 }
 document.getElementById("pageStudioBtn").onclick = function () {
+  pageSnapCache = {}; // designs may have changed since the last open
   document.getElementById("pageStudio").classList.add("open");
   document.body.style.overflow = "hidden";
   renderPageStudio();
