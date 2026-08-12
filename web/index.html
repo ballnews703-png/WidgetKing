@@ -918,7 +918,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 86;
+const WK_VERSION = 87;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -11126,6 +11126,7 @@ let iconMakerStyle = "real";
 let iconMakerRealStyle = localStorage.getItem("widgetking.realstyle") || "original";
 let iconMakerTint = localStorage.getItem("widgetking.realtint") || "#8F52FA";
 let realTaintWarned = false;
+let iconRenderToken = 0;
 let iconMakerApps = [
   { label: "Messages", emoji: "💬" }, { label: "Phone", emoji: "📞" },
   { label: "Instagram", emoji: "📸" }, { label: "Spotify", emoji: "🎧" },
@@ -11156,8 +11157,12 @@ async function fetchMakerIcons() {
 const MONO_GRADIENTS = [["#2A1A34", "#B0626A"], ["#1A2980", "#26D0CE"], ["#232526", "#5B2C98"],
   ["#134E5E", "#71B280"], ["#3A1C71", "#D76D77"], ["#0F2027", "#2C5364"],
   ["#42275A", "#734B6D"], ["#141E30", "#243B55"]];
-function drawHomeIcon(app, styleName, index) {
-  const S = 1024;
+function drawHomeIcon(app, styleName, index, px) {
+  // Default stays 1024 (full save-to-Photos quality); grid previews pass a
+  // small px — a 1024px tile is ~30x the pixels and was freezing phones.
+  const S = px || 1024;
+  const cacheKey = "home|" + styleName + "|" + (app.label || "") + "|" + (app.emoji || "") + "|" + (index % 8) + "|" + S;
+  if (S <= 256 && tileCache[cacheKey]) return tileCache[cacheKey];
   const c = document.createElement("canvas");
   c.width = S; c.height = S;
   const x = c.getContext("2d");
@@ -11188,12 +11193,16 @@ function drawHomeIcon(app, styleName, index) {
     x.textAlign = "center";
     x.textBaseline = "middle";
     x.fillText(letter, S / 2, S * 0.53);
-    return c.toDataURL("image/png");
+    const monoUrl = c.toDataURL("image/png");
+    if (S <= 256) tileCache[cacheKey] = monoUrl;
+    return monoUrl;
   }
   // Every ICON_THEMES style renders through the shared tile painter,
   // full-bleed (iOS rounds Home Screen icons itself).
   paintThemeTile(x, S, app, styleName, index, true);
-  return c.toDataURL("image/png");
+  const url = c.toDataURL("image/png");
+  if (S <= 256) tileCache[cacheKey] = url;
+  return url;
 }
 // v83: the App Icon Maker lives in the Studio tab; the editor is widget-only.
 function renderIconMaker() {
@@ -11260,6 +11269,15 @@ function renderIconMaker() {
   });
   const grid = document.getElementById("iconGrid");
   grid.innerHTML = "";
+  // v87: previews draw at 192px (crisp at the 84px cell size); the full
+  // 1024px save-to-Photos quality renders only when the "replace real app
+  // icons" flow is open and long-pressing matters. Tiles fill the grid in
+  // time-budgeted chunks, and switching packs/styles cancels a stale fill —
+  // a 1024px synchronous grid was freezing phones for seconds per tap.
+  const tilePx = iconHomeFlowOpen ? 1024 : 192;
+  iconRenderToken += 1;
+  const token = iconRenderToken;
+  const fillers = [];
   iconMakerApps.forEach(function (app, index) {
     const cell = document.createElement("div");
     cell.className = "im-cell";
@@ -11273,7 +11291,8 @@ function renderIconMaker() {
         if (rs !== "original") {
           // Instant CSS preview, then the saveable canvas version swaps in.
           img.style.filter = realStyleCss(rs, iconMakerTint).replace("filter:", "");
-          styledRealIcon(app.iconUrl, rs, iconMakerTint, 1024).then(function (styled) {
+          styledRealIcon(app.iconUrl, rs, iconMakerTint, tilePx).then(function (styled) {
+            if (token !== iconRenderToken) return;
             if (styled) { img.src = styled; img.style.filter = ""; }
             else if (!realTaintWarned) {
               realTaintWarned = true;
@@ -11283,11 +11302,11 @@ function renderIconMaker() {
         }
       } else {
         // Artwork still loading (or not found) — pastel placeholder for now.
-        img.src = drawHomeIcon(app, "pastel", index);
+        fillers.push(function () { img.src = drawHomeIcon(app, "pastel", index, tilePx); });
         if (app.noIcon) cell.title = "Couldn't find this app's icon — check the spelling";
       }
     } else {
-      img.src = drawHomeIcon(app, iconMakerStyle, index);
+      fillers.push(function () { img.src = drawHomeIcon(app, iconMakerStyle, index, tilePx); });
     }
     img.alt = app.label + " icon";
     img.style.cursor = "pointer";
@@ -11307,6 +11326,12 @@ function renderIconMaker() {
     cell.append(img, name);
     grid.appendChild(cell);
   });
+  (function fill(i) {
+    if (token !== iconRenderToken) return; // a newer render superseded this one
+    const started = performance.now();
+    while (i < fillers.length && performance.now() - started < 12) { fillers[i](); i += 1; }
+    if (i < fillers.length) setTimeout(function () { fill(i); }, 16);
+  })(0);
   const has = iconMakerApps.length > 0;
   // Widget-first: the Shortcut walkthrough stays hidden until someone
   // explicitly chooses to replace their real Home Screen icons.
@@ -11386,7 +11411,7 @@ document.getElementById("iconsToWidgetBtn").onclick = async function () {
     const icons = [];
     for (let i = 0; i < iconMakerApps.length; i++) {
       const app = iconMakerApps[i];
-      const src = app.customB64 || drawHomeIcon(app, iconMakerStyle === "real" ? "mono" : iconMakerStyle, i);
+      const src = app.customB64 || drawHomeIcon(app, iconMakerStyle === "real" ? "mono" : iconMakerStyle, i, 256);
       icons.push(await downscaleDataUrl(src, 160));
     }
     const pack = { id: uid(), name: "Icon set " + (iconPacks.length + 1), icons: icons };
@@ -11549,7 +11574,7 @@ function renderExplore() {
       if (entry.pack) {
         img.src = entry.pack.icons[index % entry.pack.icons.length];
       } else if (entry.id === "mono" || entry.id === "ringmono") {
-        img.src = drawHomeIcon(app, entry.id, index);
+        img.src = drawHomeIcon(app, entry.id, index, 192);
       } else {
         img.src = themeTilePng(app, entry.id, index, 112);
       }
