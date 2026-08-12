@@ -918,7 +918,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 87;
+const WK_VERSION = 88;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -3662,14 +3662,37 @@ function paintThemeTile(x, S, app, themeName, index, fullBleed) {
   x.restore();
 }
 const tileCache = {};
+// Safari frees canvas backing stores lazily, so a fresh canvas per tile can
+// pile up against the per-page canvas memory cap during fast pack browsing
+// (crashes). Every tile draws on ONE reusable scratch canvas instead, with
+// context state reset so tiles can't bleed into each other.
+const tileScratch = document.createElement("canvas");
+function tileScratchCtx(px) {
+  if (tileScratch.width !== px || tileScratch.height !== px) {
+    tileScratch.width = px; tileScratch.height = px;
+  }
+  const ctx = tileScratch.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
+  ctx.shadowBlur = 0; ctx.shadowColor = "transparent";
+  ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+  ctx.lineWidth = 1; ctx.lineCap = "butt"; ctx.lineJoin = "miter";
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.clearRect(0, 0, px, px);
+  return ctx;
+}
+function tileCachePut(key, url) {
+  const keys = Object.keys(tileCache);
+  if (keys.length > 400) for (const k of keys.slice(0, 200)) delete tileCache[k];
+  tileCache[key] = url;
+}
 function themeTilePng(app, themeName, index, px) {
   const key = themeName + "|" + (app.label || "") + "|" + (index % 8) + "|" + px;
   if (tileCache[key]) return tileCache[key];
-  const c = document.createElement("canvas");
-  c.width = px; c.height = px;
-  paintThemeTile(c.getContext("2d"), px, app, themeName, index, false);
-  const url = c.toDataURL("image/png");
-  tileCache[key] = url;
+  paintThemeTile(tileScratchCtx(px), px, app, themeName, index, false);
+  const url = tileScratch.toDataURL("image/png");
+  tileCachePut(key, url);
   return url;
 }
 // Themes whose look needs real drawing. Since recognized apps now get vector
@@ -11163,9 +11186,7 @@ function drawHomeIcon(app, styleName, index, px) {
   const S = px || 1024;
   const cacheKey = "home|" + styleName + "|" + (app.label || "") + "|" + (app.emoji || "") + "|" + (index % 8) + "|" + S;
   if (S <= 256 && tileCache[cacheKey]) return tileCache[cacheKey];
-  const c = document.createElement("canvas");
-  c.width = S; c.height = S;
-  const x = c.getContext("2d");
+  const x = tileScratchCtx(S);
   const letter = (app.label || "A").trim().charAt(0).toUpperCase();
   if (styleName === "mono" || styleName === "ringmono") {
     const pair = MONO_GRADIENTS[index % MONO_GRADIENTS.length];
@@ -11193,15 +11214,15 @@ function drawHomeIcon(app, styleName, index, px) {
     x.textAlign = "center";
     x.textBaseline = "middle";
     x.fillText(letter, S / 2, S * 0.53);
-    const monoUrl = c.toDataURL("image/png");
-    if (S <= 256) tileCache[cacheKey] = monoUrl;
+    const monoUrl = tileScratch.toDataURL("image/png");
+    if (S <= 256) tileCachePut(cacheKey, monoUrl);
     return monoUrl;
   }
   // Every ICON_THEMES style renders through the shared tile painter,
   // full-bleed (iOS rounds Home Screen icons itself).
   paintThemeTile(x, S, app, styleName, index, true);
-  const url = c.toDataURL("image/png");
-  if (S <= 256) tileCache[cacheKey] = url;
+  const url = tileScratch.toDataURL("image/png");
+  if (S <= 256) tileCachePut(cacheKey, url);
   return url;
 }
 // v83: the App Icon Maker lives in the Studio tab; the editor is widget-only.
