@@ -29,7 +29,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 92;
+const WK_VERSION = 93;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -899,6 +899,75 @@ function backgroundImageFor(design, family, position) {
   return img;
 }
 
+function drawBgPattern(ctx, design, W, H) {
+  const p = design.bgPattern;
+  if (!p) return;
+  const u = Math.min(W, H) / 158;
+  if (p === "dots") {
+    ctx.setFillColor(new Color("#FFFFFF", 0.14));
+    const step = 14 * u;
+    for (let y = step / 2; y < H; y += step) {
+      for (let x = step / 2; x < W; x += step) {
+        ctx.fillEllipse(new Rect(x - 1.3 * u, y - 1.3 * u, 2.6 * u, 2.6 * u));
+      }
+    }
+  } else if (p === "grid") {
+    ctx.setFillColor(new Color("#FFFFFF", 0.08));
+    const step = 16 * u;
+    for (let x = 0; x < W; x += step) ctx.fillRect(new Rect(x, 0, u, H));
+    for (let y = 0; y < H; y += step) ctx.fillRect(new Rect(0, y, W, u));
+  } else if (p === "stripes") {
+    ctx.setStrokeColor(new Color("#FFFFFF", 0.07));
+    ctx.setLineWidth(6 * u);
+    const step = 18 * u;
+    for (let d = 0; d < W + H; d += step) {
+      const path = new Path();
+      path.move(new Point(d, 0));
+      path.addLine(new Point(d - H, H));
+      ctx.addPath(path);
+      ctx.strokePath();
+    }
+  } else if (p === "waves") {
+    ctx.setStrokeColor(new Color("#FFFFFF", 0.11));
+    ctx.setLineWidth(1.6 * u);
+    const rows = 6;
+    for (let r = 1; r <= rows; r++) {
+      const path = new Path();
+      const baseY = (H * r) / (rows + 1);
+      path.move(new Point(0, baseY));
+      for (let x = 0; x <= W; x += 6 * u) {
+        path.addLine(new Point(x, baseY + Math.sin((x / W) * Math.PI * 3 + r) * 5 * u));
+      }
+      ctx.addPath(path);
+      ctx.strokePath();
+    }
+  } else if (p === "grain" || p === "paper") {
+    let seed = 7;
+    const n = Math.min(700, Math.round((W * H) / (140 * u * u)));
+    for (let i = 0; i < n; i++) {
+      seed = (seed * 16807) % 2147483647;
+      const x = seed % W;
+      seed = (seed * 16807) % 2147483647;
+      const y = seed % H;
+      ctx.setFillColor(new Color(i % 2 ? "#FFFFFF" : "#000000", 0.09));
+      ctx.fillRect(new Rect(x, y, u, u));
+    }
+    if (p === "paper") {
+      ctx.setFillColor(new Color("#FFFFFF", 0.04));
+      for (let x = 0; x < W; x += 5 * u) ctx.fillRect(new Rect(x, 0, u * 0.7, H));
+    }
+  } else if (p === "blobs") {
+    const spots = [[0.25, 0.3, 0.5], [0.78, 0.7, 0.42]];
+    for (const sp of spots) {
+      const R = Math.max(W, H) * sp[2];
+      for (let r = 14; r >= 1; r--) {
+        const frac = r / 14;
+        ctx.setFillColor(new Color("#FFFFFF", 0.012));
+        ctx.fillEllipse(new Rect(sp[0] * W - R * frac, sp[1] * H - R * frac, R * frac * 2, R * frac * 2));
+      }
+    }
+  }
+}
 function drawFreestyle(design, family, bgImg, live) {
   // Draw at the device's true widget size (in pixels) so nothing stretches.
   const pts = widgetPointSizes(family);
@@ -939,6 +1008,7 @@ function drawFreestyle(design, family, bgImg, live) {
         }
       }
     }
+    drawBgPattern(ctx, design, W, H);
   }
   const scale = Math.min(W, H) / 158;
   const els = design.canvasElements || [];
