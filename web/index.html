@@ -122,10 +122,14 @@
   .method-cards button { min-height: 54px; font-size: 14px; }
   .pane { display: none; }
   .pane.active { display: block; animation: paneIn .22s ease; }
-  /* v83: the editor is a fullscreen mode you enter, not a tab. */
-  #editorMode { position: fixed; inset: 0; z-index: 35; background: var(--bg); display: none;
+  /* Re-animating Explore recomposites its whole image grid — skip it. */
+  .pane-explore.active { animation: none; }
+  /* v83: the editor is a fullscreen mode you enter, not a tab.
+     v86: it sits BELOW the tab bar (z 28 < 30) and leaves room for it, so
+     the tabs always remain a way out of the editor. */
+  #editorMode { position: fixed; inset: 0; z-index: 28; background: var(--bg); display: none;
     overflow-y: auto; -webkit-overflow-scrolling: touch;
-    padding: 0 14px calc(24px + env(safe-area-inset-bottom)); }
+    padding: 0 14px calc(96px + env(safe-area-inset-bottom)); }
   #editorMode.open { display: block; }
   #editorModeHead { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 8px;
     background: var(--bg); padding: calc(env(safe-area-inset-top) + 6px) 0 6px; }
@@ -914,7 +918,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 85;
+const WK_VERSION = 86;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -7990,6 +7994,7 @@ function setupLauncherControls() {
       return { label: app.label || "App", emoji: app.emoji || "", iconUrl: app.iconUrl || "" };
     });
     switchTab("studio");
+    renderIconMaker();
     toast("⚡ Your apps are in the Icon Maker — pick a style, save, done");
   };
   document.getElementById("appSearchBtn").onclick = searchAppStore;
@@ -10229,7 +10234,11 @@ setInterval(function () {
 // v83: tabs are destinations. The editor is a mode you enter (openEditor),
 // so switchTab("editor") opens it over whatever tab is active; the old
 // Install tab folded into My Widgets + Settings, so it maps there.
+// v86: heavy tabs render on first visit, not at boot — Explore draws ~180
+// icon tiles and the Icon Maker a full grid; doing that at load was the
+// out-of-memory crash on phones.
 let lastBaseTab = null;
+const lazyTabRendered = {};
 function openEditor() {
   document.getElementById("editorMode").classList.add("open");
   document.getElementById("editorMode").scrollTop = 0;
@@ -10257,9 +10266,16 @@ function paintStageTile() {
   stage.style.backgroundSize = "44px 44px";
 }
 function switchTab(name) {
-  if (name === "editor") { openEditor(); name = lastBaseTab || localStorage.getItem("widgetking.tab") || "create"; }
+  const entering = name === "editor";
+  if (entering) { openEditor(); name = lastBaseTab || localStorage.getItem("widgetking.tab") || "create"; }
   if (name === "install") name = "widgets";
   if (!["create", "explore", "widgets", "studio", "settings"].includes(name)) name = "create";
+  const editorWasOpen = document.getElementById("editorMode").classList.contains("open");
+  // Tapping the already-active tab (rapid double-taps) is a no-op.
+  if (!entering && !editorWasOpen && name === lastBaseTab) return;
+  // Tapping any real tab while editing leaves the editor — the tab bar must
+  // always be a way out.
+  if (!entering && editorWasOpen) closeEditor();
   lastBaseTab = name;
   localStorage.setItem("widgetking.tab", name);
   document.querySelectorAll(".pane").forEach(function (pane) {
@@ -10269,7 +10285,8 @@ function switchTab(name) {
     b.classList.toggle("active", b.dataset.tab === name);
     b.setAttribute("aria-selected", b.dataset.tab === name ? "true" : "false");
   });
-  if (name === "studio") renderIconMaker();
+  if (name === "explore" && !lazyTabRendered.explore) { lazyTabRendered.explore = true; renderExplore(); }
+  if (name === "studio" && !lazyTabRendered.studio) { lazyTabRendered.studio = true; renderIconMaker(); }
   if (name === "widgets") renderInstallChecklist();
   if (name === "create") renderStatusCard();
   window.scrollTo({ top: 0 });
@@ -11549,13 +11566,14 @@ function renderExplore() {
         iconMakerApps.forEach(function (app) { delete app.customB64; });
       }
       switchTab("studio");
+      renderIconMaker();
       toast("🎨 " + entry.name + " applied — your apps, this style. Long-press icons to save them.");
     };
     list.appendChild(card);
   }
 }
 document.getElementById("exploreSearch").oninput = renderExplore;
-renderExplore();
+// (rendered lazily on first Explore visit — see switchTab)
 
 // ==================== Auto Shortcut Guide ====================
 // Reads every saved widget and lists what each app button does on tap, plus
@@ -11681,7 +11699,6 @@ document.getElementById("wizardCopyBtn").onclick = function () {
 };
 setupLauncherControls();
 renderTemplates();
-renderIconMaker();
 renderStatusCard();
 renderInstallChecklist();
 paintStageTile();
