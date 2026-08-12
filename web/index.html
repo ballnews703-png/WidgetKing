@@ -196,14 +196,17 @@
   .cel-shape { pointer-events: auto; }
   .snap-guide { position: absolute; background: rgba(255,255,255,.75); pointer-events: none; z-index: 5; }
   .cel-photo img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
-  #studio { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: none;
-    flex-direction: column; overscroll-behavior: contain; padding-top: env(safe-area-inset-top); }
-  #studio.open { display: flex; }
-  #studioHead { display: flex; align-items: center; gap: 8px; padding: 10px 14px;
-    border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-  #studioHead .title { font-weight: 700; font-size: 15px; margin-right: auto; }
-  #studioStage { flex: 1; min-height: 120px; display: flex; align-items: center; justify-content: center;
+  /* v84: Studio is no longer a second fullscreen editor — it's THE canvas,
+     inline at the top of the editor mode. The stage pins while tools scroll. */
+  #studio { display: none; }
+  #studio.open { display: block; }
+  #studioHead { display: flex; align-items: center; gap: 8px; padding: 4px 0 8px;
+    flex-wrap: wrap; }
+  #studioHead .size-buttons { margin-right: auto; }
+  #studioStage { height: min(44vh, 400px); display: flex; align-items: center; justify-content: center;
     padding: 14px; overflow: hidden; position: relative;
+    position: sticky; top: calc(env(safe-area-inset-top) + 52px); z-index: 24;
+    border-radius: 16px;
     background: repeating-conic-gradient(var(--stage-a) 0% 25%, var(--stage-b) 0% 50%) 0 0 / 22px 22px; }
   #studioTools { display: flex; gap: 6px; margin-bottom: 10px; position: sticky; top: 0;
     background: var(--bg); padding: 4px 0; z-index: 3; }
@@ -224,8 +227,7 @@
     touch-action: none; box-shadow: 0 12px 36px rgba(0,0,0,.55); flex-shrink: 0;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     text-align: center; user-select: none; -webkit-user-select: none; }
-  #studioPanel { max-height: 46vh; overflow-y: auto; padding: 10px 14px 18px;
-    border-top: 1px solid var(--line); -webkit-overflow-scrolling: touch; }
+  #studioPanel { padding: 10px 0 18px; }
   #studioLayers { display: flex; gap: 6px; overflow-x: auto; padding: 6px 0;
     -webkit-overflow-scrolling: touch; }
   .layer-chip { flex-shrink: 0; display: flex; align-items: center; gap: 5px; font-size: 12px;
@@ -415,14 +417,19 @@
   <p class="hint" style="margin-top:6px" id="setupPointer">⚙️ AI setup lives in <b>Settings</b> — key, model, and review options.</p>
 </section>
 
+<div id="editorMode">
+<div id="editorModeHead">
+  <button id="editorDoneBtn">← Done</button>
+  <span class="title">Make it yours</span>
+  <span class="spacer"></span>
+</div>
+
 <div id="studio">
   <div id="studioHead">
-    <span class="title">🎨 Studio</span>
     <div class="row size-buttons" id="studioSizeButtons" style="margin:0"></div>
     <button id="studioUndoBtn" disabled aria-label="Undo" title="Undo">↩︎</button>
     <button id="studioRedoBtn" disabled aria-label="Redo" title="Redo">↪︎</button>
     <button id="studioSaveBtn" class="primary">💾 Save</button>
-    <button id="studioCloseBtn">✕ Done</button>
   </div>
   <div id="studioStage"><div id="studioCanvas"></div><div id="studioQuickbar" style="display:none"></div></div>
   <div id="studioPanel">
@@ -443,12 +450,6 @@
   </div>
 </div>
 
-<div id="editorMode">
-<div id="editorModeHead">
-  <button id="editorDoneBtn">← Done</button>
-  <span class="title">Make it yours</span>
-  <span class="spacer"></span>
-</div>
 <section id="editorSection">
   <h2 id="editorTitle" style="display:none">Make it yours</h2>
   <div id="previewDock">
@@ -461,7 +462,7 @@
   </div>
   <div class="editor-grid">
     <div id="canvasWrap">
-      <button id="openStudioBtn" style="width:100%;max-width:380px">🎨 Open Studio — full-screen drag &amp; drop editor</button>
+      <button id="openStudioBtn" style="width:100%;max-width:380px">🖐 Make it drag &amp; drop — every piece becomes a movable element</button>
       <div id="freestyleTools" style="display:none; width: 100%; max-width: 380px;">
         <div class="chips" id="palette"></div>
         <div id="inspector" style="display:none;"></div>
@@ -911,7 +912,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 83;
+const WK_VERSION = 84;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -7443,15 +7444,9 @@ function buildInspectorContent(inspector) {
 }
 
 function renderFreestyleUI() {
-  const tools = document.getElementById("freestyleTools");
-  tools.style.display = current.kind === "freestyle" ? "block" : "none";
-  if (current.kind !== "freestyle") return;
-  buildPalette(document.getElementById("palette"));
-  const inspector = document.getElementById("inspector");
-  const hint = document.getElementById("freestyleHint");
-  const hasSelection = buildInspectorContent(inspector);
-  inspector.style.display = hasSelection ? "block" : "none";
-  hint.style.display = hasSelection ? "none" : "block";
+  // v84: the form-side freestyle palette/inspector retired — the Studio
+  // surface (panes + quickbar) is the one home for freestyle editing.
+  document.getElementById("freestyleTools").style.display = "none";
 }
 
 // ==================== Studio (fullscreen editor) ====================
@@ -7674,22 +7669,37 @@ function convertToFreestyle(design) {
   return true;
 }
 
+// v84: one editing surface. For freestyle designs the Studio canvas IS the
+// editor — pinned at the top, tools scrolling beneath. For structured kinds
+// (clock, launcher, lock…) the live preview dock shows instead, and
+// openStudio() is the "make it drag-and-drop" conversion, not a mode switch.
+function syncEditorSurface() {
+  if (!current) return;
+  const freestyle = current.kind === "freestyle";
+  studioOpen = freestyle;
+  document.getElementById("studio").classList.toggle("open", freestyle);
+  document.getElementById("previewDock").style.display = freestyle ? "none" : "";
+  document.getElementById("openStudioBtn").style.display = freestyle ? "none" : "";
+  if (freestyle) {
+    studioSize = previewSize;
+    renderStudioUI();
+    renderStudioCanvas();
+  }
+}
 function openStudio() {
   const converted = convertToFreestyle(current);
-  studioOpen = true;
   studioSize = previewSize;
-  document.getElementById("studio").classList.add("open");
-  document.body.style.overflow = "hidden";
+  openEditor();
+  syncEditorSurface();
   refreshEditors();
-  if (converted) toast("Opened in Studio — every part is now a drag-and-drop element ✨");
+  document.getElementById("editorMode").scrollTop = 0;
+  if (converted) toast("Every part is now a drag-and-drop element — tap, drag, pinch ✨");
 }
 function closeStudio() {
-  studioOpen = false;
   multiSelect = null;
-  document.getElementById("studio").classList.remove("open");
-  document.body.style.overflow = "";
   syncControls();
   renderAll();
+  closeEditor();
 }
 document.getElementById("openStudioBtn").onclick = openStudio;
 // Empty-canvas touches: a tap clears the selection, a drag sweeps out a
@@ -7756,7 +7766,6 @@ document.getElementById("studioCanvas").addEventListener("pointerdown", function
   window.addEventListener("pointerup", up);
   window.addEventListener("pointercancel", up);
 });
-document.getElementById("studioCloseBtn").onclick = closeStudio;
 document.getElementById("studioSaveBtn").onclick = function () {
   document.getElementById("saveBtn").onclick();
   toast("Saved ✓ — find it in My Widgets");
@@ -9072,6 +9081,7 @@ function renderAll() {
   renderFreestyleUI();
   renderLauncherUI();
   renderPreview();
+  syncEditorSurface();
   updateMagicHint();
 }
 function updateMagicHint() {
