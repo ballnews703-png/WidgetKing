@@ -122,6 +122,30 @@
   .method-cards button { min-height: 54px; font-size: 14px; }
   .pane { display: none; }
   .pane.active { display: block; animation: paneIn .22s ease; }
+  /* v83: the editor is a fullscreen mode you enter, not a tab. */
+  #editorMode { position: fixed; inset: 0; z-index: 35; background: var(--bg); display: none;
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: 0 14px calc(24px + env(safe-area-inset-bottom)); }
+  #editorMode.open { display: block; }
+  #editorModeHead { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 8px;
+    background: var(--bg); padding: calc(env(safe-area-inset-top) + 6px) 0 6px; }
+  #editorModeHead .title { font-weight: 700; }
+  #editorMode #saveRow { bottom: env(safe-area-inset-bottom); }
+  /* v83: shared page skeleton — actions block + collapsible sections. */
+  .wk-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
+  details.wk-sec > summary { list-style: none; display: flex; align-items: center; justify-content: space-between;
+    font-weight: 700; font-size: 15px; margin: 14px 0 6px; cursor: pointer; }
+  details.wk-sec > summary::-webkit-details-marker { display: none; }
+  details.wk-sec > summary::after { content: "▾"; color: var(--muted); transition: transform .15s ease; }
+  details.wk-sec:not([open]) > summary::after { transform: rotate(-90deg); }
+  .status-card { border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; font-size: 14px;
+    background: rgba(139, 92, 246, .12); display: flex; align-items: center; gap: 10px; }
+  .status-card .grow { flex: 1; }
+  .settings-row { display: flex; align-items: center; gap: 10px; border-radius: 12px;
+    padding: 12px 14px; margin-bottom: 8px; font-size: 14px; background: rgba(127, 127, 127, .09); }
+  .settings-row .val { margin-left: auto; color: var(--muted); font-size: 13px; }
+  .slot-badge { font-size: 10px; color: var(--muted); background: rgba(127,127,127,.14);
+    border-radius: 8px; padding: 2px 6px; margin-left: 6px; }
   @keyframes paneIn { from { opacity: .4; transform: translateY(6px); } to { opacity: 1; transform: none; } }
   .field { margin-bottom: 12px; }
   .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
@@ -343,12 +367,12 @@
 </header>
 
 <section id="builderSection" class="pane pane-create">
+  <div id="statusCard" class="status-card" style="display:none"></div>
   <h2>What are we making today?</h2>
   <div class="method-cards">
     <button id="exploreTabBtn">🧭 Explore gallery<br><span style="font-size:11px;color:var(--muted)">widgets &amp; icon styles</span></button>
     <button id="newWidgetBtn">➕ Create new widget<br><span style="font-size:11px;color:var(--muted)">start from scratch</span></button>
     <button id="cloneBtn">📷 Clone a widget<br><span style="font-size:11px;color:var(--muted)">from any photo</span></button>
-    <button id="pageStudioBtn">📱 Design a page<br><span style="font-size:11px;color:var(--muted)">whole Home Screen</span></button>
   </div>
   <input type="file" id="cloneInput" accept="image/*" style="display:none">
 </section>
@@ -388,36 +412,7 @@
       <button id="mfNote">📝 Keep it as a note</button>
     </div>
   </div>
-  <details>
-    <summary>⚙️ Designer setup</summary>
-    <p class="hint" style="margin-top:8px">
-      Paste the access key to unlock the full designer on this device. Stored
-      only in this browser.
-    </p>
-    <input type="password" id="apiKeyInput" placeholder="Access key" autocomplete="off">
-    <div class="row" style="margin-top:8px">
-      <span style="font-size:12px;color:var(--muted)">Model</span>
-      <select id="aiModel" style="flex:1">
-        <option value="claude-opus-5">Best quality</option>
-        <option value="claude-haiku-4-5">Fastest</option>
-      </select>
-    </div>
-    <label style="font-size:13px;display:flex;align-items:center;gap:6px;margin-top:8px">
-      <input type="checkbox" id="aiEyes" checked> 👁 Design review — the AI looks at its finished widget and fixes flaws (recommended)
-    </label>
-    <label style="font-size:13px;display:flex;align-items:center;gap:6px;margin-top:8px">
-      <input type="checkbox" id="aiPolish"> ✨ Design-director pass — a second AI review for extra polish
-    </label>
-    <div class="row" style="margin-top:8px">
-      <span style="font-size:12px;color:var(--muted)">Budget $</span>
-      <input type="text" id="budgetInput" inputmode="decimal" style="width:64px">
-      <span id="spendReadout" style="font-size:12px;color:var(--muted);flex:1"></span>
-      <button id="resetSpend">Reset</button>
-    </div>
-    <div class="row" style="margin-top:8px">
-      <button id="clearKeyBtn" style="flex:1">🧹 Clear key from this device</button>
-    </div>
-  </details>
+  <p class="hint" style="margin-top:6px" id="setupPointer">⚙️ AI setup lives in <b>Settings</b> — key, model, and review options.</p>
 </section>
 
 <div id="studio">
@@ -448,9 +443,14 @@
   </div>
 </div>
 
-<section id="editorSection" class="pane pane-editor">
-  <div class="chips" id="editorSubTabs" style="margin-bottom:10px" role="tablist" aria-label="Editor mode"></div>
-  <h2 id="editorTitle">Make it yours</h2>
+<div id="editorMode">
+<div id="editorModeHead">
+  <button id="editorDoneBtn">← Done</button>
+  <span class="title">Make it yours</span>
+  <span class="spacer"></span>
+</div>
+<section id="editorSection">
+  <h2 id="editorTitle" style="display:none">Make it yours</h2>
   <div id="previewDock">
     <div id="canvas"></div>
     <div class="row size-buttons" id="sizeButtons"></div>
@@ -629,9 +629,15 @@
     </div>
   </div>
 </section>
+</div>
 
 <section id="librarySection" class="pane pane-widgets">
   <h2>My Widgets</h2>
+  <div id="installChecklist" class="status-card" style="display:none">
+    <div class="grow">🚀 <b>New phone?</b> Put your widgets on your Home Screen — the wizard walks you through it once.</div>
+    <button class="primary" id="checklistWizardBtn">Set up</button>
+    <button id="checklistDismissBtn" aria-label="Dismiss setup reminder">✕</button>
+  </div>
   <div id="backupNudge" style="display:none;border-radius:14px;padding:10px 12px;margin-bottom:8px;background:rgba(240,196,69,.14);font-size:13px;cursor:pointer">💾 <b>Protect your work</b> — your designs live only in this browser. Tap to save a backup file.</div>
   <input type="text" id="librarySearch" placeholder="🔍 Search your widgets…" style="margin-bottom:8px">
   <div class="chips" id="libFolders" style="margin-bottom:4px"></div>
@@ -649,8 +655,48 @@
   </div>
 </section>
 
-<section id="installSection" class="pane pane-install">
-  <h2>Put it on your iPhone (no Mac needed)</h2>
+<section id="settingsSection" class="pane pane-settings">
+  <h2>⚙️ Settings</h2>
+  <details class="wk-sec" id="designerSetup" open>
+    <summary>✨ AI designer</summary>
+    <p class="hint" style="margin-top:8px">
+      Paste the access key to unlock the full designer on this device. Stored
+      only in this browser.
+    </p>
+    <input type="password" id="apiKeyInput" placeholder="Access key" autocomplete="off">
+    <div class="row" style="margin-top:8px">
+      <span style="font-size:12px;color:var(--muted)">Model</span>
+      <select id="aiModel" style="flex:1">
+        <option value="claude-opus-5">Best quality</option>
+        <option value="claude-haiku-4-5">Fastest</option>
+      </select>
+    </div>
+    <label style="font-size:13px;display:flex;align-items:center;gap:6px;margin-top:8px">
+      <input type="checkbox" id="aiEyes" checked> 👁 Design review — the AI looks at its finished widget and fixes flaws (recommended)
+    </label>
+    <label style="font-size:13px;display:flex;align-items:center;gap:6px;margin-top:8px">
+      <input type="checkbox" id="aiPolish"> ✨ Design-director pass — a second AI review for extra polish
+    </label>
+    <div class="row" style="margin-top:8px">
+      <span style="font-size:12px;color:var(--muted)">Budget $</span>
+      <input type="text" id="budgetInput" inputmode="decimal" style="width:64px">
+      <span id="spendReadout" style="font-size:12px;color:var(--muted);flex:1"></span>
+      <button id="resetSpend">Reset</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="clearKeyBtn" style="flex:1">🧹 Clear key from this device</button>
+    </div>
+  </details>
+  <details class="wk-sec" id="appSettings" open>
+    <summary>📱 App</summary>
+    <button class="settings-row" id="appearanceRow" style="width:100%;text-align:left">🌓 Appearance <span class="val" id="appearanceVal">Auto</span></button>
+    <a class="settings-row" href="privacy.html" style="text-decoration:none;color:inherit">🔒 Privacy policy <span class="val">↗</span></a>
+    <div class="settings-row">👑 WidgetKing <span class="val" id="settingsVersion"></span></div>
+  </details>
+</section>
+
+<section id="installSection" class="pane pane-settings">
+  <h2>📲 Install &amp; setup help</h2>
   <button class="primary" id="wizardBtn" style="width:100%;font-size:16px;padding:14px">🪄 Set up my iPhone — step by step</button>
   <p class="hint" style="margin-top:8px">💡 Make this designer feel like an app: in Safari tap <b>Share → Add to Home Screen</b> — you'll get a WidgetKing 👑 icon that opens full-screen.</p>
   <h3 style="margin:16px 0 4px">👑 Pick your WidgetKing icon</h3>
@@ -672,7 +718,15 @@
   <p class="hint">iOS refreshes Scriptable widgets on its own schedule (every few minutes), so clock and battery values are close but not live to-the-second. Everything runs on your devices — nothing is uploaded anywhere.</p>
 </section>
 
-<section id="iconMakerSection" class="pane pane-editor">
+<section id="studioTabSection" class="pane pane-studio">
+  <h2>📱 Studio</h2>
+  <p class="hint">Design your whole phone at once — a full Home Screen page, or a matching set of app icons.</p>
+  <div class="wk-actions">
+    <button class="primary" id="pageStudioBtn" style="flex:1;font-size:15px;padding:14px">📱 Design a page<br><span style="font-size:11px;opacity:.85">whole Home Screen — widgets, icons, wallpaper</span></button>
+  </div>
+</section>
+
+<section id="iconMakerSection" class="pane pane-studio">
   <h2>🎨 App Icon Maker</h2>
   <p class="hint">Restyle your real Home Screen app icons — pick a pack, add your apps, save the icons.
   <b>Heads-up:</b> this tool (and its one-time Shortcuts step) is only for <b>standalone icons on your Home Screen</b>.
@@ -715,7 +769,7 @@
   </details>
 </section>
 
-<section id="shortcutGuideSection" class="pane pane-install">
+<section id="shortcutGuideSection" class="pane pane-settings">
   <details class="dcard"><summary>⚡ Your Shortcut Guide — reads your widgets</summary><div class="dbody">
   <p class="hint">What each app button does on tap, auto-generated from your saved widgets. Zero-flash tip: a single-app widget can skip Scriptable entirely — long-press it → <b>Edit Widget → When Interacting → Open URL</b> → paste the link (📋 below).</p>
   <div id="shortcutGuideList"></div>
@@ -845,9 +899,9 @@
 <nav id="tabbar" role="tablist" aria-label="Main sections">
   <button data-tab="create" class="active" role="tab" aria-selected="true"><span class="tab-ico" aria-hidden="true">✨</span>Create</button>
   <button data-tab="explore" role="tab" aria-selected="false"><span class="tab-ico" aria-hidden="true">🧭</span>Explore</button>
-  <button data-tab="editor" role="tab" aria-selected="false"><span class="tab-ico" aria-hidden="true">🎨</span>Editor</button>
   <button data-tab="widgets" role="tab" aria-selected="false"><span class="tab-ico" aria-hidden="true">👑</span>My Widgets</button>
-  <button data-tab="install" role="tab" aria-selected="false"><span class="tab-ico" aria-hidden="true">🚀</span>Install</button>
+  <button data-tab="studio" role="tab" aria-selected="false"><span class="tab-ico" aria-hidden="true">📱</span>Studio</button>
+  <button data-tab="settings" role="tab" aria-selected="false"><span class="tab-ico" aria-hidden="true">⚙️</span>Settings</button>
 </nav>
 
 <div id="toast"></div>
@@ -857,7 +911,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 82;
+const WK_VERSION = 83;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -4181,6 +4235,11 @@ function normalizeDesign(design) {
   const fromVersion = Number(design.schemaVersion) || 0;
   if (fromVersion < 1) { /* 0 -> 1: no field changes, leniency covers it */ }
   design.schemaVersion = 1;
+  // Which surface this design targets. Home-only today; Lock Screen designs
+  // are already their own kind. Future surfaces re-scope content through this.
+  if (!["home", "lock"].includes(design.surface)) {
+    design.surface = design.kind === "lock" ? "lock" : "home";
+  }
   if (!design.id) design.id = uid();
   if (!design.name) design.name = "My Widget";
   if (!design.kind) design.kind = "clock";
@@ -7905,10 +7964,7 @@ function setupLauncherControls() {
     iconMakerApps = apps.map(function (app) {
       return { label: app.label || "App", emoji: app.emoji || "", iconUrl: app.iconUrl || "" };
     });
-    editorSubTab = "icons";
-    localStorage.setItem("widgetking.editorsub", editorSubTab);
-    switchTab("editor");
-    applyEditorSubTab();
+    switchTab("studio");
     toast("⚡ Your apps are in the Icon Maker — pick a style, save, done");
   };
   document.getElementById("appSearchBtn").onclick = searchAppStore;
@@ -8547,11 +8603,6 @@ function loadIntoEditor(design) {
     " upgraded — now opens directly, no Shortcut needed");
   selectedElId = null;
   multiSelect = null;
-  if (editorSubTab !== "widget") {
-    editorSubTab = "widget";
-    localStorage.setItem("widgetking.editorsub", "widget");
-    applyEditorSubTab();
-  }
   syncControls();
   renderAll();
 }
@@ -8876,6 +8927,7 @@ function renderBackupNudge() {
 function markBackedUp() {
   localStorage.setItem("widgetking.lastbackup", JSON.stringify({ count: designs.length, time: Date.now() }));
   renderBackupNudge();
+  renderStatusCard();
 }
 function renderLibrary() {
   renderShortcutGuide();
@@ -8938,6 +8990,15 @@ function renderLibrary() {
   if (!shown.length) {
     library.innerHTML = '<p class="hint">Nothing in this folder yet — use 📁 on a widget to move it here.</p>';
   }
+  // Numbered slots (v83): each design occupies a visible, named box —
+  // "Small #2" — so the collection feels concrete and any future per-device
+  // cap explains itself. Slot numbers follow save order within a size.
+  const slotOf = {}, slotCounts = {};
+  for (const d of designs) {
+    const size = d.kind === "lock" ? "lock" : (SIZES[d.fitSize] ? d.fitSize : "medium");
+    slotCounts[size] = (slotCounts[size] || 0) + 1;
+    slotOf[d.id] = size.charAt(0).toUpperCase() + size.slice(1) + " #" + slotCounts[size];
+  }
   for (const design of shown) {
     const item = document.createElement("div");
     item.className = "lib-item";
@@ -8945,6 +9006,7 @@ function renderLibrary() {
     const meta = document.createElement("div");
     meta.className = "meta";
     meta.innerHTML = '<div class="name">' + esc(design.name) +
+      ' <span class="slot-badge">' + slotOf[design.id] + '</span>' +
       (design.starter ? ' <span style="font-size:10px;background:rgba(240,196,69,.25);border-radius:8px;padding:2px 6px">✨ Starter</span>' : '') +
       '</div><div class="kind">' +
       (KIND_ICONS[design.kind] || "🧩") + ' ' + esc(design.kind) +
@@ -9266,8 +9328,7 @@ document.getElementById("mfBuilder").onclick = function () {
 };
 document.getElementById("mfAI").onclick = function () {
   document.getElementById("magicFallback").style.display = "none";
-  document.querySelector("#magicSection details").open = true;
-  document.getElementById("apiKeyInput").focus();
+  openDesignerSetup();
 };
 document.getElementById("mfNote").onclick = function () {
   document.getElementById("magicFallback").style.display = "none";
@@ -9284,10 +9345,8 @@ document.getElementById("newWidgetBtn").onclick = function () {
 };
 document.getElementById("cloneBtn").onclick = function () {
   if (!getApiKey()) {
-    const setup = document.querySelector("#magicSection details");
-    if (setup) setup.open = true;
-    document.getElementById("apiKeyInput").focus();
-    toast("📷 Cloning needs the full designer — finish ⚙️ Designer setup first");
+    openDesignerSetup();
+    toast("📷 Cloning needs the full designer — finish ⚙️ setup first");
     return;
   }
   document.getElementById("cloneInput").click();
@@ -9654,6 +9713,7 @@ function scriptVersion() {
 // The Home-Screen app can serve a stale cached page for days — show which
 // version THIS page is, and check the server for a newer one.
 document.getElementById("appVersion").textContent = "v" + scriptVersion();
+document.getElementById("settingsVersion").textContent = "v" + scriptVersion() + " — your designs stay on this device";
 setTimeout(async function () {
   try {
     const res = await fetch(location.pathname + "?upd=" + Date.now(), { cache: "no-store" });
@@ -9685,6 +9745,8 @@ function updateCopyButtons() {
 function markCopied() {
   localStorage.setItem("widgetking.lastcopy", String(Date.now()));
   updateCopyButtons();
+  renderStatusCard();
+  renderInstallChecklist();
 }
 document.getElementById("copyScriptBtn").onclick = async function () {
   const script = await buildScript();
@@ -10133,8 +10195,24 @@ setInterval(function () {
 }, 30000);
 
 // ==================== App shell: tabs + appearance ====================
+// v83: tabs are destinations. The editor is a mode you enter (openEditor),
+// so switchTab("editor") opens it over whatever tab is active; the old
+// Install tab folded into My Widgets + Settings, so it maps there.
+let lastBaseTab = null;
+function openEditor() {
+  document.getElementById("editorMode").classList.add("open");
+  document.getElementById("editorMode").scrollTop = 0;
+}
+function closeEditor() {
+  document.getElementById("editorMode").classList.remove("open");
+  renderLibrary();
+  renderStatusCard();
+}
 function switchTab(name) {
-  if (!["create", "explore", "editor", "widgets", "install"].includes(name)) name = "create";
+  if (name === "editor") { openEditor(); name = lastBaseTab || localStorage.getItem("widgetking.tab") || "create"; }
+  if (name === "install") name = "widgets";
+  if (!["create", "explore", "widgets", "studio", "settings"].includes(name)) name = "create";
+  lastBaseTab = name;
   localStorage.setItem("widgetking.tab", name);
   document.querySelectorAll(".pane").forEach(function (pane) {
     pane.classList.toggle("active", pane.classList.contains("pane-" + name));
@@ -10143,8 +10221,76 @@ function switchTab(name) {
     b.classList.toggle("active", b.dataset.tab === name);
     b.setAttribute("aria-selected", b.dataset.tab === name ? "true" : "false");
   });
+  if (name === "studio") renderIconMaker();
+  if (name === "widgets") renderInstallChecklist();
+  if (name === "create") renderStatusCard();
   window.scrollTo({ top: 0 });
 }
+document.getElementById("editorDoneBtn").onclick = closeEditor;
+function openDesignerSetup() {
+  switchTab("settings");
+  document.getElementById("designerSetup").open = true;
+  document.getElementById("apiKeyInput").focus();
+}
+// Create opens with status, not just a menu: one card, highest priority only,
+// nothing when there's nothing to do. Status, never promotion.
+function renderStatusCard() {
+  const card = document.getElementById("statusCard");
+  if (!card) return;
+  const dirty = Number(localStorage.getItem("widgetking.libstamp") || 0) >
+    Number(localStorage.getItem("widgetking.lastcopy") || 0);
+  let html = "", act = "";
+  if (designs.length && dirty) {
+    html = '<div class="grow">🔁 Your designs changed since the last phone update.</div><button class="primary" id="statusActBtn">Update</button>';
+    act = "push";
+  } else if (designs.length && !getApiKey()) {
+    html = '<div class="grow">✨ The AI designer isn’t set up on this device yet.</div><button class="primary" id="statusActBtn">Set up</button>';
+    act = "setup";
+  } else {
+    let marker = {};
+    try { marker = JSON.parse(localStorage.getItem("widgetking.lastbackup") || "{}"); } catch (e) {}
+    const grown = designs.length - (Number(marker.count) || 0) >= 10;
+    const stale = Date.now() - (Number(marker.time) || 0) > 7 * 24 * 3600 * 1000;
+    if (designs.length >= 5 && (grown || stale)) {
+      html = '<div class="grow">💾 Your designs haven’t been backed up in a while.</div><button class="primary" id="statusActBtn">Back up</button>';
+      act = "backup";
+    }
+  }
+  card.style.display = html ? "flex" : "none";
+  card.innerHTML = html;
+  if (!html) return;
+  document.getElementById("statusActBtn").onclick = function () {
+    if (act === "push") document.getElementById("pushUpdateBtn").click();
+    else if (act === "setup") openDesignerSetup();
+    else document.getElementById("backupBtn").click();
+    renderStatusCard();
+  };
+}
+// First-install checklist atop My Widgets: shows until the script has been
+// copied/installed once (or the card is dismissed), then never again.
+function renderInstallChecklist() {
+  const card = document.getElementById("installChecklist");
+  if (!card) return;
+  const done = localStorage.getItem("widgetking.lastcopy") || localStorage.getItem("widgetking.checklistdismissed");
+  card.style.display = done ? "none" : "flex";
+}
+document.getElementById("checklistWizardBtn").onclick = function () {
+  document.getElementById("wizardBtn").click();
+};
+document.getElementById("checklistDismissBtn").onclick = function () {
+  localStorage.setItem("widgetking.checklistdismissed", "1");
+  renderInstallChecklist();
+};
+function updateAppearanceVal() {
+  const mode = localStorage.getItem("widgetking.appearance") || "auto";
+  const el = document.getElementById("appearanceVal");
+  if (el) el.textContent = mode === "auto" ? "Auto" : mode === "dark" ? "Dark" : "Light";
+}
+document.getElementById("appearanceRow").onclick = function () {
+  document.getElementById("modeToggle").click();
+  updateAppearanceVal();
+};
+updateAppearanceVal();
 document.querySelectorAll("#tabbar button").forEach(function (b) {
   b.onclick = function () { switchTab(b.dataset.tab); };
 });
@@ -10983,31 +11129,7 @@ function drawHomeIcon(app, styleName, index) {
   paintThemeTile(x, S, app, styleName, index, true);
   return c.toDataURL("image/png");
 }
-// Editor sub-tabs: the widget editor and the App Icon Maker share the tab.
-let editorSubTab = localStorage.getItem("widgetking.editorsub") || "widget";
-function applyEditorSubTab() {
-  const row = document.getElementById("editorSubTabs");
-  row.innerHTML = "";
-  for (const pair of [["widget", "🧩 Widget"], ["icons", "📱 App icons"]]) {
-    const chip = document.createElement("button");
-    chip.textContent = pair[1];
-    chip.className = editorSubTab === pair[0] ? "sel" : "";
-    chip.setAttribute("role", "tab");
-    chip.setAttribute("aria-selected", editorSubTab === pair[0] ? "true" : "false");
-    chip.onclick = function () {
-      editorSubTab = pair[0];
-      localStorage.setItem("widgetking.editorsub", editorSubTab);
-      applyEditorSubTab();
-    };
-    row.appendChild(chip);
-  }
-  const widgetMode = editorSubTab !== "icons";
-  document.getElementById("editorTitle").style.display = widgetMode ? "" : "none";
-  document.getElementById("previewDock").style.display = widgetMode ? "" : "none";
-  document.querySelector("#editorSection .editor-grid").style.display = widgetMode ? "" : "none";
-  document.getElementById("iconMakerSection").style.display = widgetMode ? "none" : "";
-  if (!widgetMode) renderIconMaker();
-}
+// v83: the App Icon Maker lives in the Studio tab; the editor is widget-only.
 function renderIconMaker() {
   const packChips = document.getElementById("iconPackChips");
   packChips.innerHTML = "";
@@ -11214,9 +11336,6 @@ document.getElementById("iconsToWidgetBtn").onclick = async function () {
     design.launcherStyle.iconTheme = iconMakerStyle;
   }
   loadIntoEditor(design);
-  editorSubTab = "widget";
-  localStorage.setItem("widgetking.editorsub", "widget");
-  applyEditorSubTab();
   switchTab("editor");
   toast("🧩 Launcher built — save it, then 🔁 Update phone. No Shortcuts needed ✓");
 };
@@ -11380,11 +11499,7 @@ function renderExplore() {
         iconMakerStyle = entry.id;
         iconMakerApps.forEach(function (app) { delete app.customB64; });
       }
-      editorSubTab = "icons";
-      localStorage.setItem("widgetking.editorsub", "icons");
-      switchTab("editor");
-      applyEditorSubTab();
-      renderIconMaker();
+      switchTab("studio");
       toast("🎨 " + entry.name + " applied — your apps, this style. Long-press icons to save them.");
     };
     list.appendChild(card);
@@ -11518,7 +11633,8 @@ document.getElementById("wizardCopyBtn").onclick = function () {
 setupLauncherControls();
 renderTemplates();
 renderIconMaker();
-applyEditorSubTab();
+renderStatusCard();
+renderInstallChecklist();
 updateCopyButtons();
 renderShortcutGuide();
 renderLibrary();

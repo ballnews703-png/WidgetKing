@@ -117,6 +117,9 @@ struct WidgetDesign: Identifiable, Codable, Hashable {
     /// design predates versioning; bump when a field is renamed or changes
     /// meaning, and migrate old values in init(from:).
     var schemaVersion = 1
+    /// Which surface this design targets ("home" today; future: "lock", …).
+    /// Shared with the web designer so surface support is a data change.
+    var surface = "home"
     var id = UUID()
     var name = "My Widget"
     var kind: WidgetKind = .clock
@@ -144,7 +147,7 @@ struct WidgetDesign: Identifiable, Codable, Hashable {
 
 extension WidgetDesign {
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, id, name, kind, themeID, fontStyle, textColorHex
+        case schemaVersion, surface, id, name, kind, themeID, fontStyle, textColorHex
         case primaryText, secondaryText, targetDate, canvasElements
     }
 
@@ -156,6 +159,7 @@ extension WidgetDesign {
         let fromVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 0
         // 0 -> 1: no field changes; the lenient defaults below cover it.
         schemaVersion = max(fromVersion, 1)
+        surface = try container.decodeIfPresent(String.self, forKey: .surface) ?? "home"
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         name = try container.decodeIfPresent(String.self, forKey: .name) ?? defaults.name
         kind = try container.decodeIfPresent(WidgetKind.self, forKey: .kind) ?? defaults.kind
