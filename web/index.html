@@ -126,14 +126,40 @@
   .pane-explore.active { animation: none; }
   /* v83: the editor is a fullscreen mode you enter, not a tab.
      v86: it sits BELOW the tab bar (z 28 < 30) and leaves room for it, so
-     the tabs always remain a way out of the editor. */
+     the tabs always remain a way out of the editor.
+     v89: tools live in a bottom sheet (--sheet-h) with a horizontal rail;
+     the scroll area leaves room so nothing hides behind the sheet. */
   #editorMode { position: fixed; inset: 0; z-index: 28; background: var(--bg); display: none;
     overflow-y: auto; -webkit-overflow-scrolling: touch;
-    padding: 0 14px calc(96px + env(safe-area-inset-bottom)); }
+    padding: 0 14px calc(var(--sheet-h, 40vh) + 120px + env(safe-area-inset-bottom)); }
+  #editorSheet { position: fixed; left: 0; right: 0;
+    bottom: calc(64px + env(safe-area-inset-bottom));
+    height: var(--sheet-h, 40vh); z-index: 29;
+    background: var(--bg); border-top: 1px solid var(--line);
+    border-radius: 28px 28px 0 0; box-shadow: 0 -10px 30px var(--shadow);
+    display: flex; flex-direction: column; transition: height .18s ease; }
+  #sheetHandle { flex: none; display: flex; justify-content: center; padding: 8px 0 4px;
+    cursor: grab; touch-action: none; }
+  #sheetHandle span { width: 42px; height: 5px; border-radius: 3px; background: var(--muted); opacity: .5; }
+  #editorRail { flex: none; display: flex; gap: 4px; overflow-x: auto; padding: 2px 10px 6px;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  #editorRail::-webkit-scrollbar { display: none; }
+  #editorRail button { flex: none; width: 64px; min-height: 56px; border: none; background: none;
+    border-radius: 12px; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 2px; font-size: 11px; color: var(--muted); }
+  #editorRail button .ri { font-size: 22px; line-height: 1; }
+  #editorRail button.active { background: var(--accent); color: var(--accent-text); }
+  #sheetBody { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: 4px 14px 16px; overscroll-behavior: contain; }
+  .sheet-panel { display: none; }
+  .sheet-panel.active { display: block; }
+  .tpl-row { display: flex; flex-wrap: wrap; gap: 10px; }
+  #editorModeHead #saveRow { position: static; margin: 0 0 0 auto; display: flex; gap: 6px; padding: 0; }
+  #editorModeHead #saveRow button { min-height: 38px; padding: 6px 12px; font-size: 13px; flex: none; }
   #editorMode.open { display: block; }
   #editorModeHead { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 8px;
     background: var(--bg); padding: calc(env(safe-area-inset-top) + 6px) 0 6px; }
-  #editorModeHead .title { font-weight: 700; }
+  #editorModeHead .title { font-weight: 700; font-size: 14px; white-space: nowrap; }
   #editorMode #saveRow { bottom: env(safe-area-inset-bottom); }
   /* v83: shared page skeleton — actions block + collapsible sections. */
   .wk-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
@@ -207,10 +233,11 @@
   #studioHead { display: flex; align-items: center; gap: 8px; padding: 4px 0 8px;
     flex-wrap: wrap; }
   #studioHead .size-buttons { margin-right: auto; }
-  #studioStage { height: min(44vh, 400px); display: flex; align-items: center; justify-content: center;
+  #studioStage { height: clamp(150px, calc(100dvh - var(--sheet-h, 40vh) - 230px), 400px);
+    display: flex; align-items: center; justify-content: center;
     padding: 14px; overflow: hidden;
     position: sticky; top: calc(env(safe-area-inset-top) + 52px); z-index: 24;
-    border-radius: 16px; transform: translateZ(0);
+    border-radius: 16px; transform: translateZ(0); transition: height .18s ease;
     /* Checkerboard painted as a raster tile by paintStageTile() — a live
        repeating-conic-gradient repaints on every scroll frame on iOS. */
     background-color: var(--stage-b); background-repeat: repeat; }
@@ -435,7 +462,6 @@
     <div class="row size-buttons" id="studioSizeButtons" style="margin:0"></div>
     <button id="studioUndoBtn" disabled aria-label="Undo" title="Undo">↩︎</button>
     <button id="studioRedoBtn" disabled aria-label="Redo" title="Redo">↪︎</button>
-    <button id="studioSaveBtn" class="primary">💾 Save</button>
   </div>
   <div id="studioStage"><div id="studioCanvas"></div><div id="studioQuickbar" style="display:none"></div></div>
   <div id="studioPanel">
@@ -477,7 +503,7 @@
       <input type="file" id="photoInput" accept="image/*" style="display:none">
     </div>
     <div>
-      <details class="dcard" open><summary>✏️ Name &amp; type</summary><div class="dbody">
+      <details class="dcard" open id="dcardName"><summary>✏️ Name &amp; type</summary><div class="dbody">
       <div class="field"><label>Name</label><input type="text" id="nameInput"></div>
       <div class="field"><label>Type</label><div class="row kind-buttons" id="kindButtons"></div></div>
       </div></details>
@@ -559,7 +585,7 @@
         <p class="hint" style="margin-top:6px">Taps work per-icon on <b>Medium/Large</b> (Small opens the first app) and flash through Scriptable for a moment — an iOS rule. For instant taps:</p>
         <button id="toIconMakerBtn" style="width:100%">⚡ Make these zero-flash Home Screen icons instead</button>
       </div>
-      <details class="dcard" open><summary>🎨 Colors &amp; style</summary><div class="dbody">
+      <details class="dcard" open id="dcardStyle"><summary>🎨 Colors &amp; style</summary><div class="dbody">
       <div class="field">
         <label>Background</label>
         <div class="row kind-buttons" id="bgButtons"></div>
@@ -601,13 +627,13 @@
         <label>Gradient direction</label>
         <div class="row" id="gradDirRow"></div>
       </div>
-      <div class="field"><label>Font</label><select id="fontSelect">
+      <div class="field" id="fFont"><label>Font</label><select id="fontSelect">
         <option value="classic">Classic</option><option value="rounded" selected>Rounded</option>
         <option value="serif">Serif</option><option value="mono">Mono</option>
       </select></div>
-      <div class="field"><label>Text color</label><input type="color" id="textColor" value="#ffffff"></div>
+      <div class="field" id="fTextColor"><label>Text color</label><input type="color" id="textColor" value="#ffffff"></div>
       </div></details>
-      <details class="dcard"><summary>⚡ Extras</summary><div class="dbody">
+      <details class="dcard" id="dcardExtras"><summary>⚡ Extras</summary><div class="dbody">
       <div class="field" id="fTap">
         <label>Tap to open — which app should launch when this widget is tapped?</label>
         <div class="row">
@@ -636,6 +662,29 @@
     </div>
   </div>
 </section>
+
+<div id="editorSheet">
+  <div id="sheetHandle" role="button" aria-label="Resize the tool drawer" title="Drag to resize"><span></span></div>
+  <div id="editorRail" role="tablist" aria-label="Editor tools"></div>
+  <div id="sheetBody">
+    <div class="sheet-panel" id="panelWidget"></div>
+    <div class="sheet-panel" id="panelTemplates">
+      <div class="chips" id="panelPackChips"></div>
+      <div id="panelTemplateRow" class="tpl-row"></div>
+    </div>
+    <div class="sheet-panel" id="panelPieces"></div>
+    <div class="sheet-panel" id="panelText"><div id="panelTextTiles"></div></div>
+    <div class="sheet-panel" id="panelPhotos">
+      <div id="panelPhotoTiles"></div>
+      <p class="hint">Photos come from your camera roll and stay on your device. Once placed, tap the photo on the canvas to crop, frame (polaroid, film, border), or swap it.</p>
+    </div>
+    <div class="sheet-panel" id="panelBackground"></div>
+    <div class="sheet-panel" id="panelApps"><div id="panelAppTiles"></div></div>
+    <div class="sheet-panel" id="panelData"></div>
+    <div class="sheet-panel" id="panelLayers"></div>
+    <div class="sheet-panel" id="panelEdit"></div>
+  </div>
+</div>
 </div>
 
 <section id="librarySection" class="pane pane-widgets">
@@ -918,7 +967,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 88;
+const WK_VERSION = 89;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -6523,42 +6572,63 @@ function insertSmartPiece(makeEls) {
   refreshEditors();
   toast("Piece added — drag to place, pinch to resize (it moves as one)");
 }
-function buildPalette(container) {
+function buildPalette(container, spec) {
+  // spec (v89): {smart: bool, keys: [...]} renders a scoped panel subset;
+  // omitted = the full grouped palette (legacy callers).
   container.innerHTML = "";
   const byKey = {};
   ELEMENT_PALETTE.forEach(function (p) { byKey[p[0]] = p[1]; });
-  const pieceHead = document.createElement("div");
-  pieceHead.className = "pal-head";
-  pieceHead.textContent = "Pieces — styled combos";
-  container.appendChild(pieceHead);
-  const pieceGrid = document.createElement("div");
-  pieceGrid.className = "pal-grid";
-  for (const piece of SMART_PIECES) {
-    const parts = piece[1].split(" ");
-    const ico = parts.shift();
-    const button = document.createElement("button");
-    button.innerHTML = '<span class="pal-ico">' + ico + '</span><span class="pal-name">' + parts.join(" ") + "</span>";
-    button.onclick = function () { insertSmartPiece(piece[2]); };
-    pieceGrid.appendChild(button);
-  }
-  container.appendChild(pieceGrid);
-  for (const [title, keys] of PALETTE_GROUPS) {
-    const head = document.createElement("div");
-    head.className = "pal-head";
-    head.textContent = title;
-    container.appendChild(head);
+  const addTileGrid = function (keys) {
     const grid = document.createElement("div");
     grid.className = "pal-grid";
     for (const key of keys) {
       if (!byKey[key]) continue;
       const parts = byKey[key].split(" ");
-      const ico = /^[A-Za-z]/.test(parts[0]) ? "🅃" : parts.shift();
+      const ico = /^[A-Za-z]/.test(parts[0]) ? "\ud83c\udd43" : parts.shift();
       const button = document.createElement("button");
       button.innerHTML = '<span class="pal-ico">' + ico + '</span><span class="pal-name">' + parts.join(" ") + "</span>";
-      button.onclick = function () { addElement(key); };
+      button.onclick = function () {
+        // Adding a piece to a structured widget converts it to drag & drop
+        // first — one surface, no dead taps.
+        if (current && current.kind !== "freestyle") openStudio();
+        addElement(key);
+      };
       grid.appendChild(button);
     }
     container.appendChild(grid);
+  };
+  const addSmart = function () {
+    const pieceHead = document.createElement("div");
+    pieceHead.className = "pal-head";
+    pieceHead.textContent = "Pieces \u2014 styled combos";
+    container.appendChild(pieceHead);
+    const pieceGrid = document.createElement("div");
+    pieceGrid.className = "pal-grid";
+    for (const piece of SMART_PIECES) {
+      const parts = piece[1].split(" ");
+      const ico = parts.shift();
+      const button = document.createElement("button");
+      button.innerHTML = '<span class="pal-ico">' + ico + '</span><span class="pal-name">' + parts.join(" ") + "</span>";
+      button.onclick = function () {
+        if (current && current.kind !== "freestyle") openStudio();
+        insertSmartPiece(piece[2]);
+      };
+      pieceGrid.appendChild(button);
+    }
+    container.appendChild(pieceGrid);
+  };
+  if (spec) {
+    if (spec.smart) addSmart();
+    if (spec.keys) addTileGrid(spec.keys);
+    return;
+  }
+  addSmart();
+  for (const [title, keys] of PALETTE_GROUPS) {
+    const head = document.createElement("div");
+    head.className = "pal-head";
+    head.textContent = title;
+    container.appendChild(head);
+    addTileGrid(keys);
   }
 }
 
@@ -7514,20 +7584,14 @@ function renderStudioCanvas() {
   applyDesignBackground(canvas, current);
   renderFreestyleInto(canvas, current, w, h, true);
 }
+// v89: the sheet + rail replace the old three studio tool tabs. The legacy
+// setStudioTool names map onto sheet tools so existing logic keeps working.
 let studioTool = "add";
 let studioLastSel = null;
 function setStudioTool(name) {
   studioTool = name;
-  document.querySelectorAll("#studioTools button").forEach(function (b) {
-    b.classList.toggle("active", b.dataset.tool === name);
-  });
-  document.getElementById("studioAddPane").style.display = name === "add" ? "block" : "none";
-  document.getElementById("studioEditPane").style.display = name === "edit" ? "block" : "none";
-  document.getElementById("studioLayersPane").style.display = name === "layers" ? "block" : "none";
+  setSheetTool(name === "add" ? "pieces" : name === "edit" ? "edit" : name);
 }
-document.querySelectorAll("#studioTools button").forEach(function (b) {
-  b.onclick = function () { setStudioTool(b.dataset.tool); };
-});
 // Floating toolbar over the canvas — the design-app basics one thumb away.
 function renderStudioQuickbar() {
   const bar = document.getElementById("studioQuickbar");
@@ -7569,7 +7633,6 @@ function renderStudioQuickbar() {
   });
 }
 function renderStudioUI() {
-  buildPalette(document.getElementById("studioPalette"));
   // Selecting something jumps you to its controls; deselecting returns to Add.
   if (selectedElId && selectedElId !== studioLastSel) setStudioTool("edit");
   else if (!selectedElId && studioTool === "edit") setStudioTool("add");
@@ -7809,10 +7872,6 @@ document.getElementById("studioCanvas").addEventListener("pointerdown", function
   window.addEventListener("pointerup", up);
   window.addEventListener("pointercancel", up);
 });
-document.getElementById("studioSaveBtn").onclick = function () {
-  document.getElementById("saveBtn").onclick();
-  toast("Saved ✓ — find it in My Widgets");
-};
 window.addEventListener("resize", function () { if (studioOpen) renderStudioCanvas(); });
 
 // ==================== Launcher editor ====================
@@ -8487,17 +8546,17 @@ let activePack = "all";
 const PACK_CHIPS = [["all", "✨ All"], ["Picks", "👑 Picks"], ["Bento", "🍱 Bento"], ["Glass", "🫧 Glass"], ["Cute", "🌸 Cute"], ["Minimal", "▫️ Minimal"],
   ["Zen", "🍃 Zen"], ["Sports", "🏈 Sports"], ["Work", "💼 Work"],
   ["Neon", "⚡ Neon"], ["Live", "🌤 Live"], ["Pro", "💎 Pro"]];
-function renderTemplates() {
-  const chipRow = document.getElementById("packChips");
+function renderTemplates(rowEl, chipEl) {
+  const chipRow = chipEl || document.getElementById("packChips");
   chipRow.innerHTML = "";
   for (const pair of PACK_CHIPS) {
     const chip = document.createElement("button");
     chip.textContent = pair[1];
     chip.className = activePack === pair[0] ? "sel" : "";
-    chip.onclick = function () { activePack = pair[0]; renderTemplates(); };
+    chip.onclick = function () { activePack = pair[0]; renderTemplates(rowEl, chipEl); };
     chipRow.appendChild(chip);
   }
-  const row = document.getElementById("templateRow");
+  const row = rowEl || document.getElementById("templateRow");
   row.innerHTML = "";
   // Some designs are meant for wider/taller widgets — preview them at their
   // intended size so nobody has to imagine the medium or large version.
@@ -10315,6 +10374,169 @@ function switchTab(name) {
   window.scrollTo({ top: 0 });
 }
 document.getElementById("editorDoneBtn").onclick = closeEditor;
+// ==================== Editor sheet & tool rail (v89) ====================
+// One horizontal rail, one sheet with three heights. Every panel is the
+// same features re-homed, not rebuilt — the moved nodes keep their ids
+// and handlers, so renderControls() keeps working untouched.
+const RAIL_TOOLS = [
+  ["widget", "🧩", "Widget"],
+  ["templates", "✨", "Templates"],
+  ["pieces", "🧱", "Pieces"],
+  ["text", "🔤", "Text"],
+  ["photos", "🖼", "Photos"],
+  ["background", "🎨", "Background"],
+  ["apps", "📲", "Apps"],
+  ["data", "📡", "Data"],
+  ["layers", "📚", "Layers"]
+];
+const PANEL_FOR = { widget: "panelWidget", templates: "panelTemplates", pieces: "panelPieces",
+  text: "panelText", photos: "panelPhotos", background: "panelBackground", apps: "panelApps",
+  data: "panelData", layers: "panelLayers", edit: "panelEdit" };
+const DATA_ELEMENT_KINDS = ["weather", "calendar", "month", "week", "greeting", "reminders",
+  "news", "worldclock", "stock", "astro", "battery", "sleeper", "sleeperlogo"];
+const SHEET_DETENTS = { peek: 0.17, half: 0.42, full: 0.78 };
+let sheetTool = localStorage.getItem("widgetking.sheettool") || "widget";
+if (!PANEL_FOR[sheetTool] || sheetTool === "edit") sheetTool = "widget";
+const panelBuilt = {};
+function sheetDetentFor(tool) {
+  const saved = localStorage.getItem("widgetking.sheet." + tool);
+  return SHEET_DETENTS[saved] ? saved : "half";
+}
+function applySheetDetent(name) {
+  document.documentElement.style.setProperty("--sheet-h",
+    Math.round(window.innerHeight * SHEET_DETENTS[name]) + "px");
+  studioScaleCache = null;
+  if (studioOpen) renderStudioCanvas();
+}
+function buildSheetPanel(tool) {
+  if (panelBuilt[tool]) return;
+  panelBuilt[tool] = true;
+  if (tool === "templates") {
+    renderTemplates(document.getElementById("panelTemplateRow"), document.getElementById("panelPackChips"));
+  } else if (tool === "pieces") {
+    buildPalette(document.getElementById("panelPieces"),
+      { smart: true, keys: ["shape", "icon", "emoji", "art", "clock", "date", "countdown", "progress", "ring"] });
+  } else if (tool === "text") {
+    buildPalette(document.getElementById("panelTextTiles"), { keys: ["text"] });
+  } else if (tool === "photos") {
+    buildPalette(document.getElementById("panelPhotoTiles"), { keys: ["photo"] });
+  } else if (tool === "apps") {
+    buildPalette(document.getElementById("panelAppTiles"), { keys: ["app"] });
+  } else if (tool === "data") {
+    buildPalette(document.getElementById("panelData"), { keys: DATA_ELEMENT_KINDS });
+  }
+}
+// Rule 9: a selected element's properties open in the sheet, and the rail
+// highlights the tool family that element belongs to.
+function railHomeForSelection() {
+  const el = current && current.canvasElements
+    ? current.canvasElements.find(function (e) { return e.id === selectedElId; }) : null;
+  if (!el) return "pieces";
+  if (el.kind === "text") return "text";
+  if (el.kind === "photo") return "photos";
+  if (el.kind === "app") return "apps";
+  return DATA_ELEMENT_KINDS.includes(el.kind) ? "data" : "pieces";
+}
+function setSheetTool(name) {
+  if (!PANEL_FOR[name]) name = "widget";
+  sheetTool = name;
+  studioTool = name === "edit" ? "edit" : "add";
+  if (name !== "edit") localStorage.setItem("widgetking.sheettool", name);
+  buildSheetPanel(name);
+  const highlightTool = name === "edit" ? railHomeForSelection() : name;
+  document.querySelectorAll("#editorRail button").forEach(function (b) {
+    b.classList.toggle("active", b.dataset.tool === highlightTool);
+    b.setAttribute("aria-selected", b.dataset.tool === highlightTool ? "true" : "false");
+  });
+  document.querySelectorAll(".sheet-panel").forEach(function (p) {
+    p.classList.toggle("active", p.id === PANEL_FOR[name]);
+  });
+  applySheetDetent(sheetDetentFor(name));
+  const active = document.querySelector("#editorRail button.active");
+  if (active && active.scrollIntoView) active.scrollIntoView({ block: "nearest", inline: "nearest" });
+  document.getElementById("sheetBody").scrollTop = 0;
+}
+(function buildRail() {
+  const rail = document.getElementById("editorRail");
+  for (const t of RAIL_TOOLS) {
+    const b = document.createElement("button");
+    b.dataset.tool = t[0];
+    b.setAttribute("role", "tab");
+    b.innerHTML = '<span class="ri" aria-hidden="true">' + t[1] + '</span>' + t[2];
+    b.onclick = function () { setSheetTool(t[0]); };
+    rail.appendChild(b);
+  }
+})();
+// Grab handle: drag resizes live and snaps to the nearest height (kept per
+// tool); a plain tap cycles half -> full -> peek.
+(function wireSheetHandle() {
+  const handle = document.getElementById("sheetHandle");
+  handle.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--sheet-h")) ||
+      Math.round(window.innerHeight * 0.42);
+    let moved = false;
+    const sheet = document.getElementById("editorSheet");
+    const stage = document.getElementById("studioStage");
+    sheet.style.transition = "none";
+    stage.style.transition = "none";
+    const move = function (ev) {
+      const dy = startY - ev.clientY;
+      if (Math.abs(dy) > 6) moved = true;
+      const h = Math.max(window.innerHeight * 0.12, Math.min(window.innerHeight * 0.85, startH + dy));
+      document.documentElement.style.setProperty("--sheet-h", Math.round(h) + "px");
+    };
+    const up = function () {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      sheet.style.transition = "";
+      stage.style.transition = "";
+      const vh = window.innerHeight;
+      let name;
+      if (!moved) {
+        const order = ["half", "full", "peek"];
+        name = order[(order.indexOf(sheetDetentFor(sheetTool)) + 1) % 3];
+      } else {
+        const h = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--sheet-h")) || vh * 0.42;
+        name = "half";
+        let dist = Infinity;
+        for (const k of Object.keys(SHEET_DETENTS)) {
+          const d = Math.abs(h - vh * SHEET_DETENTS[k]);
+          if (d < dist) { dist = d; name = k; }
+        }
+      }
+      localStorage.setItem("widgetking.sheet." + sheetTool, name);
+      applySheetDetent(name);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  });
+})();
+// Re-home the form editor's control blocks into their panels (nodes move,
+// ids and handlers survive), then land on the remembered tool.
+(function mountEditorSheet() {
+  const move = function (id, target) {
+    const n = document.getElementById(id);
+    if (n) document.getElementById(target).appendChild(n);
+  };
+  move("dcardName", "panelWidget");
+  ["fCountdown", "fQuote", "fNote", "fPlaylist", "fLock"].forEach(function (id) { move(id, "panelWidget"); });
+  move("dcardExtras", "panelWidget");
+  move("dcardStyle", "panelBackground");
+  move("fFont", "panelText");
+  move("fTextColor", "panelText");
+  move("fLauncher", "panelApps");
+  move("studioEditPane", "panelEdit");
+  move("studioLayersPane", "panelLayers");
+  document.getElementById("studioEditPane").style.display = "block";
+  document.getElementById("studioLayersPane").style.display = "block";
+  document.getElementById("studioPanel").style.display = "none";
+  document.getElementById("editorModeHead").appendChild(document.getElementById("saveRow"));
+  setSheetTool(sheetTool);
+})();
 function openDesignerSetup() {
   switchTab("settings");
   document.getElementById("designerSetup").open = true;
