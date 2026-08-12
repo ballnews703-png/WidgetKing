@@ -129,9 +129,13 @@
      the tabs always remain a way out of the editor.
      v89: tools live in a bottom sheet (--sheet-h) with a horizontal rail;
      the scroll area leaves room so nothing hides behind the sheet. */
+  /* v90: the editor page itself does NOT scroll. Canvas, size buttons,
+     undo/redo, and Save are all fixed; the sheet body is the only
+     scrolling surface. (Also removes a huge iOS scroll-raster layer.) */
   #editorMode { position: fixed; inset: 0; z-index: 28; background: var(--bg); display: none;
-    overflow-y: auto; -webkit-overflow-scrolling: touch;
-    padding: 0 14px calc(var(--sheet-h, 40vh) + 120px + env(safe-area-inset-bottom)); }
+    padding: 0 14px; overflow: hidden; }
+  #editorMode.open { display: flex; flex-direction: column; }
+  #editorMode #editorSection { flex: 1; min-height: 0; overflow: hidden; }
   #editorSheet { position: fixed; left: 0; right: 0;
     bottom: calc(64px + env(safe-area-inset-bottom));
     height: var(--sheet-h, 40vh); z-index: 29;
@@ -156,8 +160,7 @@
   .tpl-row { display: flex; flex-wrap: wrap; gap: 10px; }
   #editorModeHead #saveRow { position: static; margin: 0 0 0 auto; display: flex; gap: 6px; padding: 0; }
   #editorModeHead #saveRow button { min-height: 38px; padding: 6px 12px; font-size: 13px; flex: none; }
-  #editorMode.open { display: block; }
-  #editorModeHead { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 8px;
+  #editorModeHead { flex: none; display: flex; align-items: center; gap: 8px;
     background: var(--bg); padding: calc(env(safe-area-inset-top) + 6px) 0 6px; }
   #editorModeHead .title { font-weight: 700; font-size: 14px; white-space: nowrap; }
   #editorMode #saveRow { bottom: env(safe-area-inset-bottom); }
@@ -229,15 +232,14 @@
   /* v84: Studio is no longer a second fullscreen editor — it's THE canvas,
      inline at the top of the editor mode. The stage pins while tools scroll. */
   #studio { display: none; }
-  #studio.open { display: block; }
+  #studio.open { display: block; flex: none; }
   #studioHead { display: flex; align-items: center; gap: 8px; padding: 4px 0 8px;
     flex-wrap: wrap; }
   #studioHead .size-buttons { margin-right: auto; }
-  #studioStage { height: clamp(150px, calc(100dvh - var(--sheet-h, 40vh) - 230px), 400px);
+  #studioStage { height: clamp(150px, calc(100dvh - var(--sheet-h, 40vh) - 185px), 400px);
     display: flex; align-items: center; justify-content: center;
-    padding: 14px; overflow: hidden;
-    position: sticky; top: calc(env(safe-area-inset-top) + 52px); z-index: 24;
-    border-radius: 16px; transform: translateZ(0); transition: height .18s ease;
+    padding: 14px; overflow: hidden; position: relative;
+    border-radius: 16px; transition: height .18s ease;
     /* Checkerboard painted as a raster tile by paintStageTile() — a live
        repeating-conic-gradient repaints on every scroll frame on iOS. */
     background-color: var(--stage-b); background-repeat: repeat; }
@@ -967,7 +969,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 89;
+const WK_VERSION = 90;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -7568,9 +7570,15 @@ function studioScaleFor(dims) {
   studioScaleCache = { key: key, scale: scale };
   return scale;
 }
+// iOS fires resize constantly while scrolling (toolbar collapse) — a naive
+// listener rebuilds the canvas dozens of times per flick. Debounce hard.
+let studioResizeTimer = null;
 window.addEventListener("resize", function () {
-  studioScaleCache = null;
-  if (studioOpen) renderStudioCanvas();
+  clearTimeout(studioResizeTimer);
+  studioResizeTimer = setTimeout(function () {
+    studioScaleCache = null;
+    if (studioOpen) renderStudioCanvas();
+  }, 250);
 });
 function renderStudioCanvas() {
   const canvas = document.getElementById("studioCanvas");
@@ -7872,7 +7880,6 @@ document.getElementById("studioCanvas").addEventListener("pointerdown", function
   window.addEventListener("pointerup", up);
   window.addEventListener("pointercancel", up);
 });
-window.addEventListener("resize", function () { if (studioOpen) renderStudioCanvas(); });
 
 // ==================== Launcher editor ====================
 let editingIconUrl = "";
@@ -10323,8 +10330,10 @@ let lastBaseTab = null;
 const lazyTabRendered = {};
 function openEditor() {
   document.getElementById("editorMode").classList.add("open");
-  document.getElementById("editorMode").scrollTop = 0;
   document.body.style.overflow = "hidden";
+  // Open ready to edit: canvas tools for freestyle, the widget form for
+  // structured kinds — never a blank sheet waiting for a tool tap.
+  setSheetTool(current && current.kind === "freestyle" ? "pieces" : "widget");
 }
 function closeEditor() {
   document.getElementById("editorMode").classList.remove("open");
@@ -10403,8 +10412,11 @@ function sheetDetentFor(tool) {
   return SHEET_DETENTS[saved] ? saved : "half";
 }
 function applySheetDetent(name) {
-  document.documentElement.style.setProperty("--sheet-h",
-    Math.round(window.innerHeight * SHEET_DETENTS[name]) + "px");
+  // Rule 1: the canvas may shrink but is never covered — cap the sheet so
+  // at least the minimum stage (150px) plus chrome always fits above it.
+  const vh = window.innerHeight;
+  const px = Math.min(Math.round(vh * SHEET_DETENTS[name]), vh - 340);
+  document.documentElement.style.setProperty("--sheet-h", px + "px");
   studioScaleCache = null;
   if (studioOpen) renderStudioCanvas();
 }
@@ -10484,7 +10496,7 @@ function setSheetTool(name) {
     const move = function (ev) {
       const dy = startY - ev.clientY;
       if (Math.abs(dy) > 6) moved = true;
-      const h = Math.max(window.innerHeight * 0.12, Math.min(window.innerHeight * 0.85, startH + dy));
+      const h = Math.max(window.innerHeight * 0.12, Math.min(window.innerHeight - 340, startH + dy));
       document.documentElement.style.setProperty("--sheet-h", Math.round(h) + "px");
     };
     const up = function () {
@@ -11151,8 +11163,12 @@ function renderPageFrame() {
     frame.appendChild(div);
   }
 }
+let pageResizeTimer = null;
 window.addEventListener("resize", function () {
-  if (document.getElementById("pageStudio").classList.contains("open")) renderPageFrame();
+  clearTimeout(pageResizeTimer);
+  pageResizeTimer = setTimeout(function () {
+    if (document.getElementById("pageStudio").classList.contains("open")) renderPageFrame();
+  }, 250);
 });
 function openSlotSheet(slot) {
   const key = slotKey(slot);
