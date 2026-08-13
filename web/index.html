@@ -998,7 +998,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 93;
+const WK_VERSION = 94;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -6296,9 +6296,16 @@ function attachDrag(div, el) {
       if (!gesture.pointers.has(event.pointerId)) startPinchPointer(event);
       return;
     }
-    const canvasNode = div.parentElement;
+    // The canvas DOM is rebuilt on every selection change, so this handler
+    // can fire on a node that was already replaced — always resolve the LIVE
+    // canvas, and capture geometry BEFORE any refresh can rebuild it.
+    const canvasNode = document.getElementById("studioCanvas");
+    if (!canvasNode || !canvasNode.contains(div)) {
+      selectedElId = el.id;
+      refreshEditors(); // stale node: select + rerender, next touch hits fresh DOM
+      return;
+    }
     selectedElId = el.id;
-    refreshEditors();
     const rect = canvasNode.getBoundingClientRect();
     gesture = {
       el: el, rect: rect, mode: "drag",
@@ -6318,6 +6325,9 @@ function attachDrag(div, el) {
     window.addEventListener("pointermove", gestureMove);
     window.addEventListener("pointerup", gestureUp);
     window.addEventListener("pointercancel", gestureUp);
+    // Refresh AFTER the gesture is fully captured — the selection-driven
+    // rebuild must never yank geometry out from under an in-flight tap.
+    refreshEditors();
   });
 }
 function toggleMultiPick(id) {
@@ -10453,6 +10463,21 @@ new MutationObserver(function () {
 }).observe(document.body, { childList: true, subtree: true });
 a11ySweep();
 
+// Device-only bugs must be visible to the person holding the phone, or they
+// read as "random crashes". Surface the first few unexpected errors as
+// toasts so they can be reported word-for-word.
+let errorToastCount = 0;
+window.addEventListener("error", function (event) {
+  if (errorToastCount >= 3) return;
+  errorToastCount += 1;
+  try { toast("⚠️ App error — please report this: " + String(event.message).slice(0, 110)); } catch (e) {}
+});
+window.addEventListener("unhandledrejection", function (event) {
+  if (errorToastCount >= 3) return;
+  errorToastCount += 1;
+  try { toast("⚠️ App error — please report this: " + String(event.reason).slice(0, 110)); } catch (e) {}
+});
+
 // Keep clock previews ticking.
 setInterval(function () {
   if (current.kind === "clock" || current.kind === "freestyle") renderPreview();
@@ -10648,7 +10673,9 @@ function setSheetTool(name) {
   });
   if (name === "pieces" || name === "templates") renderRecents(name);
   if (name === "background") renderBgPatternChips();
-  applySheetDetent(sheetDetentFor(name));
+  // Selecting an element must NOT resize the sheet/canvas — a height change
+  // mid-tap rebuilds the canvas under the finger (the tap-crash class).
+  if (name !== "edit") applySheetDetent(sheetDetentFor(name));
   const active = document.querySelector("#editorRail button.active");
   if (active && active.scrollIntoView) active.scrollIntoView({ block: "nearest", inline: "nearest" });
   document.getElementById("sheetBody").scrollTop = 0;
@@ -11743,8 +11770,10 @@ let iconFetchQueue = false;
 async function fetchMakerIcons() {
   if (iconFetchQueue) return;
   iconFetchQueue = true;
+  let fetched = 0;
   for (const app of iconMakerApps) {
     if (app.iconUrl || app.noIcon) continue;
+    fetched += 1;
     try {
       const data = await jsonp("https://itunes.apple.com/search?media=software&entity=software&limit=1&term=" + encodeURIComponent(app.label));
       const result = data.results && data.results[0];
@@ -11754,7 +11783,11 @@ async function fetchMakerIcons() {
     await new Promise(function (r) { setTimeout(r, 300); });
   }
   iconFetchQueue = false;
-  renderIconMaker();
+  // Re-render ONLY if something was actually fetched. When every app is
+  // already resolved this function returns synchronously — re-rendering
+  // unconditionally made renderIconMaker <-> fetchMakerIcons recurse to a
+  // stack overflow (a guaranteed crash on every Studio visit).
+  if (fetched) renderIconMaker();
 }
 // Two drawn styles beyond the emoji-tile themes: gradient monograms and
 // ring-framed letters — closer to the paid icon packs people buy.
