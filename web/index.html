@@ -998,7 +998,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 94;
+const WK_VERSION = 95;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -2211,9 +2211,18 @@ function drawFreestyle(design, family, bgImg, live) {
       ctx.drawTextInRect(text, new Rect(px - boxW / 2, py - fs * 0.72, boxW, H));
     } else {
       ctx.setTextAlignedCenter();
-      const lines = (el.kind === "calendar" || el.kind === "reminders" || el.kind === "news")
-        ? Math.min(Math.max(Number(el.count) || 1, 1), 4) : 1;
-      ctx.drawTextInRect(text, new Rect(px - W / 2, py - fs * 0.72, W, fs * 1.7 * lines));
+      const isList = el.kind === "calendar" || el.kind === "reminders" || el.kind === "news";
+      if (isList) {
+        // Lists wrap inside the widest centered box that still FITS the
+        // widget at this position — matching the designer preview. A
+        // full-width box centered off-center ran long headlines straight
+        // off the widget edge.
+        const boxW = Math.max(W * 0.3, Math.min(W, 2 * Math.min(px, W - px)));
+        const top = py - fs * 0.72;
+        ctx.drawTextInRect(text, new Rect(px - boxW / 2, top, boxW, Math.max(fs * 1.7, H - top)));
+      } else {
+        ctx.drawTextInRect(text, new Rect(px - W / 2, py - fs * 0.72, W, fs * 1.7));
+      }
     }
   }
   return ctx.getImage();
