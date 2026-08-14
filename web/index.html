@@ -473,6 +473,11 @@
     font-size: 14px; font-weight: 700; color: var(--muted); min-height: 38px; }
   .seg button.sel { background: var(--accent); color: var(--accent-text); }
   #featuredRow { display: flex; gap: 12px; margin-bottom: 6px; }
+  .pxdel { position: absolute; top: -8px; right: -8px; z-index: 3; width: 26px; height: 26px;
+    min-height: 26px; padding: 0; border-radius: 999px; background: var(--card);
+    border: 1px solid var(--line); color: var(--muted); display: flex;
+    align-items: center; justify-content: center; box-shadow: 0 2px 8px var(--shadow); }
+  .pslot.filled { cursor: grab; }
   .feat-card { flex: 1; min-width: 0; background: none; border: none; padding: 0;
     display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 0; }
   .feat-card .fwrap { overflow: hidden; border-radius: 22px; box-shadow: 0 8px 24px var(--shadow); }
@@ -1183,7 +1188,9 @@
   </div>
   <div id="pageBody">
     <p class="hint">Compose a whole Home Screen page — a single widget can't cover a full page (Apple caps at Large), so this designs the set together and gives you an exact placement checklist. Clear/Glass backgrounds make it look like one seamless panel.</p>
-    <div class="chips" id="pageLayouts"></div>
+    <div class="row" style="margin-bottom:10px">
+      <button class="primary" id="pageAddBtn" style="flex:1"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-plus"/></svg> Add widget</button>
+    </div>
     <div id="pageFrame"></div>
     <div id="pageSheet" style="display:none">
       <p class="hint" id="pageSheetTitle"></p>
@@ -1252,7 +1259,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 109;
+const WK_VERSION = 110;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -12213,8 +12220,42 @@ const PAGE_LAYOUTS = {
   tall: bandLayout("Big below wide", ["M", "L"]),
   ssl: bandLayout("2 small + big", ["S", "L"])
 };
-let pageState = { name: "My Page", layout: "mixed", slots: {} };
-let pagePickingSlot = null;
+// v110: the page is an ORDERED LIST of widgets that flows into the three
+// bands exactly like iOS lays them out — mediums take a band, consecutive
+// smalls pair up, a large spans two bands. No more picking from a menu of
+// every combination; add widgets and drag them around.
+let pageState = { name: "My Page", items: [] };
+function flowItems(items) {
+  const rows = ["top", "middle", "bottom"];
+  const placed = [];
+  let band = 0;
+  let i = 0;
+  while (i < items.length) {
+    const it = items[i];
+    if (it.size === "large") {
+      if (band > 1) break;
+      placed.push({ item: it, index: i, slot: { size: "large", pos: rows[band] } });
+      band += 2; i += 1;
+    } else if (it.size === "medium") {
+      if (band > 2) break;
+      placed.push({ item: it, index: i, slot: { size: "medium", pos: rows[band] } });
+      band += 1; i += 1;
+    } else {
+      if (band > 2) break;
+      placed.push({ item: it, index: i, slot: { size: "small", pos: rows[band] + "-left" } });
+      if (items[i + 1] && items[i + 1].size === "small") {
+        placed.push({ item: items[i + 1], index: i + 1, slot: { size: "small", pos: rows[band] + "-right" } });
+        i += 2;
+      } else { i += 1; }
+      band += 1;
+    }
+  }
+  return { placed: placed, fits: i >= items.length, bandsUsed: band };
+}
+function canAddSize(size, excludeIndex) {
+  const items = pageState.items.filter(function (x, i) { return i !== excludeIndex; });
+  return flowItems(items.concat([{ id: null, size: size }])).fits;
+}
 
 function slotRect(slot) {
   const g = PAGE_GEO;
@@ -12252,67 +12293,129 @@ function renderPageFrame() {
   frame.innerHTML = "";
   frame.style.background = WALLPAPER_STANDIN;
   const frameW = frame.clientWidth || 280;
-  const frameH = frameW * (2622 / 1206);
-  const layout = PAGE_LAYOUTS[pageState.layout];
-  if (!layout) { // "auto" — the AI chooses the arrangement when it designs
+  pageState.items = pageState.items.filter(function (it) {
+    return designs.some(function (d) { return d.id === it.id; });
+  });
+  if (pageState.items.length === 0) {
     frame.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;text-align:center">' +
-      '<span class="hint" style="margin:0">WidgetKing will pick the best layout for your idea — describe the page below and tap Design my page.</span></div>';
+      '<span class="hint" style="margin:0">Tap ＋ Add widget to place your first one — or describe the whole page below and WidgetKing designs the set.</span></div>';
     return;
   }
-  for (const slot of layout.slots) {
-    const key = slotKey(slot);
+  const flow = flowItems(pageState.items);
+  for (const p of flow.placed) {
+    const slot = p.slot;
     const rect = slotRect(slot);
+    const design = designs.find(function (d) { return d.id === p.item.id; });
+    if (!design) continue;
     const div = document.createElement("div");
-    div.className = "pslot" + (pageState.slots[key] ? " filled" : "") + (pagePickingSlot === key ? " picking" : "");
+    div.className = "pslot filled";
     div.style.left = (rect.x * 100) + "%";
     div.style.top = (rect.y * 100) + "%";
     div.style.width = (rect.w * 100) + "%";
     div.style.height = (rect.h * 100) + "%";
-    const design = designs.find(function (d) { return d.id === pageState.slots[key]; });
-    if (design) {
-      // v92: slots show flat PNG snapshots instead of live widget DOM — six
-      // live previews (gradients, shadows) in the compositor was the memory
-      // that crashed phones when the keyboard opened. Cached per design+size.
-      // v108: refit to the SLOT's size first — rendering a small-authored
-      // design raw at medium stretched its layout apart (Andrew's report).
-      let fitted = design;
-      if (design.fitSize !== slot.size && SIZES[design.fitSize] && SIZES[slot.size]) {
-        fitted = normalizeDesign(JSON.parse(JSON.stringify(design)));
-        refitElements(fitted, design.fitSize, slot.size);
-        fitted.fitSize = slot.size;
-      }
-      const snapKey = design.id + "|" + slot.size + "|" + (design.schemaVersion || 0);
-      const img = document.createElement("img");
-      img.alt = design.name;
-      img.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none";
-      div.appendChild(img);
-      if (pageSnapCache[snapKey]) {
-        img.src = pageSnapCache[snapKey];
-      } else {
-        renderDesignPng(fitted, slot.size).then(function (png) {
-          if (png) { pageSnapCache[snapKey] = png; img.src = png; }
-          else {
-            // Snapshot failed (rare) — fall back to the live preview node.
-            img.remove();
-            const inner = renderDesignNode(fitted, slot.size);
-            inner.style.position = "absolute";
-            inner.style.left = "0";
-            inner.style.top = "0";
-            inner.style.transformOrigin = "top left";
-            inner.style.pointerEvents = "none";
-            div.appendChild(inner);
-            requestAnimationFrame(function () {
-              inner.style.transform = "scale(" + ((div.clientWidth || rect.w * frameW) / SIZES[slot.size][0]) + ")";
-            });
-          }
-        });
-      }
-    } else {
-      div.textContent = "＋ " + slot.size;
+    div.style.touchAction = "none";
+    // v92: flat PNG snapshots, not live widget DOM (memory). v108: refit the
+    // design to the slot's size first so the layout is true to the slot.
+    let fitted = design;
+    if (design.fitSize !== slot.size && SIZES[design.fitSize] && SIZES[slot.size]) {
+      fitted = normalizeDesign(JSON.parse(JSON.stringify(design)));
+      refitElements(fitted, design.fitSize, slot.size);
+      fitted.fitSize = slot.size;
     }
-    div.onclick = function () { openSlotSheet(slot); };
+    const snapKey = design.id + "|" + slot.size + "|" + (design.schemaVersion || 0);
+    const img = document.createElement("img");
+    img.alt = design.name;
+    img.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none";
+    div.appendChild(img);
+    if (pageSnapCache[snapKey]) {
+      img.src = pageSnapCache[snapKey];
+    } else {
+      renderDesignPng(fitted, slot.size).then(function (png) {
+        if (png) { pageSnapCache[snapKey] = png; img.src = png; }
+        else {
+          img.remove();
+          const inner = renderDesignNode(fitted, slot.size);
+          inner.style.position = "absolute";
+          inner.style.left = "0";
+          inner.style.top = "0";
+          inner.style.transformOrigin = "top left";
+          inner.style.pointerEvents = "none";
+          div.appendChild(inner);
+          requestAnimationFrame(function () {
+            inner.style.transform = "scale(" + ((div.clientWidth || rect.w * frameW) / SIZES[slot.size][0]) + ")";
+          });
+        }
+      });
+    }
+    const del = document.createElement("button");
+    del.className = "pxdel";
+    del.setAttribute("aria-label", "Remove " + design.name + " from the page");
+    del.innerHTML = '<svg class="ic ic-sm" aria-hidden="true" style="margin:0"><use href="#i-close"/></svg>';
+    del.onclick = function (e) {
+      e.stopPropagation();
+      pageState.items.splice(p.index, 1);
+      renderPageFrame();
+    };
+    div.appendChild(del);
+    wirePageDrag(div, p.index);
     frame.appendChild(div);
   }
+}
+// Drag to rearrange (v110), iPhone-style: the tile follows the finger; on
+// release it re-slots into the order nearest the drop point and everything
+// reflows. Per the v94 rule, the DOM is never rebuilt mid-gesture — the
+// dragged node only moves by transform; the rebuild happens on commit.
+function wirePageDrag(div, index) {
+  div.addEventListener("pointerdown", function (e) {
+    if (e.target.closest(".pxdel")) return;
+    e.preventDefault();
+    const frame = document.getElementById("pageFrame");
+    const frameRect = frame.getBoundingClientRect();
+    const startX = e.clientX, startY = e.clientY;
+    let moved = false;
+    const move = function (ev) {
+      const dx = ev.clientX - startX, dy = ev.clientY - startY;
+      if (Math.abs(dx) + Math.abs(dy) > 10) moved = true;
+      if (!moved) return;
+      div.style.transform = "translate(" + dx + "px," + dy + "px)";
+      div.style.zIndex = "6";
+      div.style.opacity = "0.85";
+    };
+    const up = function (ev) {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      if (!moved) {
+        div.style.transform = "";
+        openAddSheet(index);
+        return;
+      }
+      // Insertion index: count items whose placed center sorts before the
+      // drop point (row-major: y bands first, then x).
+      const flow = flowItems(pageState.items);
+      const px2 = (ev.clientX - frameRect.left) / frameRect.width;
+      const py2 = (ev.clientY - frameRect.top) / frameRect.height;
+      let insertAt = 0;
+      for (const q of flow.placed) {
+        if (q.index === index) continue;
+        const r = slotRect(q.slot);
+        const cy = r.y + r.h / 2, cx = r.x + r.w / 2;
+        if (py2 > cy || (Math.abs(py2 - cy) < r.h / 2 && px2 > cx)) insertAt += 1;
+      }
+      const it = pageState.items.splice(index, 1)[0];
+      pageState.items.splice(Math.min(insertAt, pageState.items.length), 0, it);
+      if (!flowItems(pageState.items).fits) {
+        // The new order can't flow (large pushed past the last band) — undo.
+        pageState.items.splice(pageState.items.indexOf(it), 1);
+        pageState.items.splice(index, 0, it);
+        toast("That spot doesn't fit — large widgets need two rows");
+      }
+      renderPageFrame();
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  });
 }
 // Typing shield: while the keyboard is up for the page-idea field, the
 // heavy page preview (six live widget previews at 3x) is dropped from the
@@ -12333,41 +12436,63 @@ window.addEventListener("resize", function () {
         document.getElementById("pageFrame").style.display !== "none") renderPageFrame();
   }, 250);
 });
-function openSlotSheet(slot) {
-  const key = slotKey(slot);
-  pagePickingSlot = key;
+function openAddSheet(replaceIndex) {
+  const replacing = typeof replaceIndex === "number";
   const sheet = document.getElementById("pageSheet");
   sheet.style.display = "block";
-  document.getElementById("pageSheetTitle").textContent =
-    "Pick a design for the " + slot.size + " widget (" + slot.pos.replace("-", " ") + "):";
+  document.getElementById("pageSheetTitle").textContent = replacing
+    ? "Change this widget — pick a design and size:"
+    : "Add a widget — pick a design and size:";
   const chips = document.getElementById("pageSheetChips");
   chips.innerHTML = "";
+  let chosenSize = replacing ? pageState.items[replaceIndex].size : null;
+  const sizeRow = document.createElement("div");
+  sizeRow.className = "row";
+  sizeRow.style.cssText = "width:100%;gap:6px;margin-bottom:8px";
+  const sizeBtns = {};
+  ["small", "medium", "large"].forEach(function (size) {
+    const b = document.createElement("button");
+    b.textContent = size.charAt(0).toUpperCase() + size.slice(1);
+    b.style.flex = "1";
+    const ok = canAddSize(size, replacing ? replaceIndex : undefined);
+    b.disabled = !ok;
+    if (!ok) b.title = "No room left for a " + size + " widget on this page";
+    if (!chosenSize && ok) chosenSize = size;
+    b.onclick = function () {
+      chosenSize = size;
+      Object.keys(sizeBtns).forEach(function (k) { sizeBtns[k].classList.toggle("sel", k === chosenSize); });
+    };
+    sizeBtns[size] = b;
+    sizeRow.appendChild(b);
+  });
+  if (!chosenSize) {
+    chips.innerHTML = '<span class="hint">The page is full — remove a widget first (tap ✕ on one).</span>';
+    return;
+  }
+  Object.keys(sizeBtns).forEach(function (k) { sizeBtns[k].classList.toggle("sel", k === chosenSize); });
+  chips.appendChild(sizeRow);
   if (designs.length === 0) {
-    chips.innerHTML = '<span class="hint">No saved designs yet — build a few first, or use ✨ Design my page.</span>';
+    chips.appendChild(Object.assign(document.createElement("span"), {
+      className: "hint", textContent: "No saved designs yet — build a few first, or use Design my page below." }));
   }
   for (const design of designs) {
     const chip = document.createElement("button");
-    chip.textContent = (KIND_ICONS[design.kind] || "🧩") + " " + design.name;
-    if (pageState.slots[key] === design.id) chip.className = "sel";
+    chip.textContent = design.name;
+    if (replacing && pageState.items[replaceIndex].id === design.id) chip.className = "sel";
     chip.onclick = function () {
-      pageState.slots[key] = design.id;
-      pagePickingSlot = null;
+      if (replacing) pageState.items[replaceIndex] = { id: design.id, size: chosenSize };
+      else pageState.items.push({ id: design.id, size: chosenSize });
       sheet.style.display = "none";
       renderPageFrame();
     };
     chips.appendChild(chip);
   }
-  const clear = document.createElement("button");
-  clear.textContent = "🚫 Empty slot";
-  clear.onclick = function () {
-    delete pageState.slots[key];
-    pagePickingSlot = null;
-    sheet.style.display = "none";
-    renderPageFrame();
-  };
-  chips.appendChild(clear);
-  renderPageFrame();
+  const cancel = document.createElement("button");
+  cancel.textContent = "Cancel";
+  cancel.onclick = function () { sheet.style.display = "none"; };
+  chips.appendChild(cancel);
 }
+document.getElementById("pageAddBtn").onclick = function () { openAddSheet(); };
 function layoutMini(layout) {
   const mini = document.createElement("span");
   mini.className = "lay-mini";
@@ -12381,34 +12506,6 @@ function layoutMini(layout) {
   return mini;
 }
 function renderPageStudio() {
-  const layoutChips = document.getElementById("pageLayouts");
-  layoutChips.innerHTML = "";
-  function layoutChip(label, id, mini) {
-    const chip = document.createElement("button");
-    chip.className = "lay-chip" + (pageState.layout === id ? " sel" : "");
-    chip.title = label;
-    if (mini) chip.appendChild(mini);
-    const span = document.createElement("span");
-    span.textContent = label;
-    chip.appendChild(span);
-    chip.onclick = function () {
-      pageState.layout = id;
-      pageState.slots = {};
-      document.getElementById("pageSheet").style.display = "none";
-      document.getElementById("pageChecklist").innerHTML = "";
-      renderPageStudio();
-    };
-    layoutChips.appendChild(chip);
-  }
-  if (getApiKey()) {
-    const aiMini = document.createElement("span");
-    aiMini.className = "lay-mini ai";
-    aiMini.textContent = "🤖";
-    layoutChip("WidgetKing picks", "auto", aiMini);
-  }
-  for (const id of Object.keys(PAGE_LAYOUTS)) {
-    layoutChip(PAGE_LAYOUTS[id].name, id, layoutMini(PAGE_LAYOUTS[id]));
-  }
   document.getElementById("pageAIRow").style.display = getApiKey() ? "flex" : "none";
   renderPageFrame();
 }
@@ -12455,13 +12552,11 @@ document.getElementById("pageAIBtn").onclick = async function () {
   if (!idea) { toast("Describe the page first"); return; }
   const key = getApiKey();
   if (!key) return;
-  const auto = !PAGE_LAYOUTS[pageState.layout];
-  const layoutAsk = auto
-    ? "First CHOOSE the best layout id for this idea from: " +
+  // v110: the AI always chooses the arrangement — the named band-combos are
+  // its vocabulary; the result lands as ordered items the user can rearrange.
+  const layoutAsk = "First CHOOSE the best layout id for this idea from: " +
       Object.keys(PAGE_LAYOUTS).map(function (id) { return id + " (" + describeLayoutSlots(id) + ")"; }).join(" | ") +
-      ". Return that id as layout, then fill its slots in order."
-    : "Use layout '" + pageState.layout + "' — " + describeLayoutSlots(pageState.layout) +
-      ". Return layout='" + pageState.layout + "' and one slots entry per slot, in that exact order.";
+      ". Return that id as layout, then fill its slots in order.";
   const button = document.getElementById("pageAIBtn");
   button.disabled = true;
   button.textContent = "Designing the page… 🎨";
@@ -12475,10 +12570,9 @@ document.getElementById("pageAIBtn").onclick = async function () {
         "Use the archetypes and craft tricks; every freestyle design needs at least 5 elements (dividers, rings, accent glyphs, shadow duplicates) — intricate, never plain." +
         archiveExemplar(idea)
     }], key, PAGE_SCHEMA);
-    const chosenId = PAGE_LAYOUTS[spec.layout] ? spec.layout : (auto ? "mixed" : pageState.layout);
-    pageState.layout = chosenId;
+    const chosenId = PAGE_LAYOUTS[spec.layout] ? spec.layout : "mixed";
     const layout = PAGE_LAYOUTS[chosenId];
-    pageState.slots = {}; // a fresh page design replaces earlier picks
+    pageState.items = []; // a fresh page design replaces earlier picks
     let filled = 0;
     const newDesigns = [];
     layout.slots.forEach(function (slot, i) {
@@ -12492,7 +12586,7 @@ document.getElementById("pageAIBtn").onclick = async function () {
       const stored = JSON.parse(JSON.stringify(design));
       designs.push(stored);
       newDesigns.push(stored);
-      pageState.slots[slotKey(slot)] = design.id;
+      pageState.items.push({ id: design.id, size: slot.size });
       filled++;
     });
     persist();
@@ -12512,10 +12606,10 @@ document.getElementById("pageAIBtn").onclick = async function () {
   }
 };
 document.getElementById("pageSaveBtn").onclick = function () {
-  const layout = PAGE_LAYOUTS[pageState.layout];
-  if (!layout) { toast("Run ✨ Design my page first, or pick a layout"); return; }
-  const filled = layout.slots.filter(function (s) { return pageState.slots[slotKey(s)]; });
-  if (filled.length === 0) { toast("Fill at least one slot first"); return; }
+  const filled = flowItems(pageState.items).placed.filter(function (p) {
+    return designs.some(function (d) { return d.id === p.item.id; });
+  }).map(function (p) { return p.slot; });
+  if (filled.length === 0) { toast("Add at least one widget first"); return; }
   try {
     const pages = JSON.parse(localStorage.getItem("widgetking.pages") || "[]");
     const existing = pages.findIndex(function (p) { return p.name === pageState.name; });
@@ -12524,8 +12618,11 @@ document.getElementById("pageSaveBtn").onclick = function () {
     localStorage.setItem("widgetking.pages", JSON.stringify(pages));
   } catch (e) {}
   // Stamp each design with its slot so the widget aligns from the name alone.
+  const flowNow = flowItems(pageState.items);
+  const designAtSlot = {};
+  flowNow.placed.forEach(function (p) { designAtSlot[slotKey(p.slot)] = p.item.id; });
   filled.forEach(function (slot) {
-    const design = designs.find(function (d) { return d.id === pageState.slots[slotKey(slot)]; });
+    const design = designs.find(function (d) { return d.id === designAtSlot[slotKey(slot)]; });
     if (design) design.position = slot.pos;
   });
   persist();
@@ -12533,7 +12630,7 @@ document.getElementById("pageSaveBtn").onclick = function () {
   let html = '<h2 style="font-size:15px">📋 Placement checklist</h2>' +
     '<p class="hint">Re-copy the script into Scriptable first (your designs ride inside it — each now remembers its spot), then add each widget:</p>';
   filled.forEach(function (slot, index) {
-    const design = designs.find(function (d) { return d.id === pageState.slots[slotKey(slot)]; });
+    const design = designs.find(function (d) { return d.id === designAtSlot[slotKey(slot)]; });
     const param = design.name;
     html += '<div class="row" style="justify-content:space-between;padding:8px 4px;border-bottom:1px solid var(--line)">' +
       '<span style="font-size:13px">' + (index + 1) + '. <b>' + slot.size.charAt(0).toUpperCase() + slot.size.slice(1) +
