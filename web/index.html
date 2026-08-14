@@ -179,6 +179,29 @@
   .settings-row .val { margin-left: auto; color: var(--muted); font-size: 13px; }
   .slot-badge { font-size: 10px; color: var(--muted); background: rgba(127,127,127,.14);
     border-radius: 8px; padding: 2px 6px; margin-left: 6px; }
+  /* v98: five-screen welcome tour — one idea per screen, real previews. */
+  #welcomeTour { position: fixed; inset: 0; z-index: 70; background: var(--bg); display: none;
+    flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    padding: calc(env(safe-area-inset-top) + 20px) 24px calc(env(safe-area-inset-bottom) + 20px); }
+  #welcomeTour.open { display: flex; }
+  .wt-pane { flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 10px; width: 100%; max-width: 380px; animation: paneIn .25s ease; }
+  .wt-pane h2 { font-size: 24px; margin: 8px 0 0; line-height: 1.2; }
+  .wt-pane p { color: var(--muted); font-size: 15px; margin: 0; line-height: 1.5; }
+  .wt-art { border-radius: 24px; overflow: hidden; box-shadow: 0 14px 40px var(--shadow); }
+  .wt-bubble { border-radius: 16px; padding: 8px 14px; font-size: 14px; max-width: 85%; }
+  .wt-ask { background: var(--accent); color: var(--accent-text); align-self: flex-end; }
+  .wt-reply { background: rgba(127,127,127,.15); align-self: flex-start; }
+  .wt-big { font-size: 52px; line-height: 1; }
+  .wt-rows { display: flex; flex-direction: column; gap: 10px; text-align: left; font-size: 14px; }
+  .wt-rows > div { background: rgba(127,127,127,.09); border-radius: 14px; padding: 10px 14px; }
+  .wt-rows b { font-size: 15px; }
+  .wt-chips { justify-content: center; }
+  .wt-chips span { background: rgba(127,127,127,.13); border-radius: 14px; padding: 6px 12px; font-size: 13px; }
+  .wt-foot { flex: none; width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 12px; }
+  .wt-dots { display: flex; gap: 8px; justify-content: center; }
+  .wt-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); opacity: .35; }
+  .wt-dots span.on { opacity: 1; background: var(--accent); }
   @keyframes paneIn { from { opacity: .4; transform: translateY(6px); } to { opacity: 1; transform: none; } }
   .field { margin-bottom: 12px; }
   .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
@@ -777,6 +800,7 @@
   <details class="wk-sec" id="appSettings" open>
     <summary>📱 App</summary>
     <button class="settings-row" id="appearanceRow" style="width:100%;text-align:left">🌓 Appearance <span class="val" id="appearanceVal">Auto</span></button>
+    <button class="settings-row" id="replayTourRow" style="width:100%;text-align:left">👋 Welcome tour <span class="val">Replay</span></button>
     <a class="settings-row" href="privacy.html" style="text-decoration:none;color:inherit">🔒 Privacy policy <span class="val">↗</span></a>
     <div class="settings-row">👑 WidgetKing <span class="val" id="settingsVersion"></span></div>
   </details>
@@ -866,6 +890,54 @@
     <a href="privacy.html" style="color:var(--muted)">Privacy policy</a> — your designs stay on your device.
   </p>
 </section>
+
+<div id="welcomeTour" role="dialog" aria-label="Welcome to WidgetKing">
+  <div class="wt-pane" data-p="0">
+    <div class="wt-art" id="wtArt0"></div>
+    <div class="wt-bubble wt-ask">a cozy sunset clock with the weather</div>
+    <div class="wt-bubble wt-reply">Done — make it yours ✨</div>
+    <h2>Describe it. WidgetKing designs it.</h2>
+    <p>Say what you want in plain English — a real Home Screen widget comes back, ready to tweak.</p>
+  </div>
+  <div class="wt-pane" data-p="1" style="display:none">
+    <div class="chips wt-chips"><span>☀️ Weather</span><span>📅 Calendar</span><span>🔋 Battery</span><span>🏈 Fantasy</span><span>📰 News</span></div>
+    <div class="wt-art" id="wtArt1"></div>
+    <h2>Real info, your look.</h2>
+    <p>Weather, calendar, reminders, sports, stocks and more — live on your widget, styled exactly how you like.</p>
+  </div>
+  <div class="wt-pane" data-p="2" style="display:none">
+    <div class="wt-big">🔒</div>
+    <h2>Yours stays yours.</h2>
+    <div class="wt-rows">
+      <div><b>Designs live on your device</b><br>No account, no server, nothing uploaded.</div>
+      <div><b>No ads, no tracking</b><br>WidgetKing doesn't watch what you do.</div>
+      <div><b>AI is optional</b><br>Only your widget idea is sent — and only when you use it.</div>
+    </div>
+    <p class="hint"><a href="privacy.html" style="color:var(--muted)">The full privacy policy</a> is two screens long. On purpose.</p>
+  </div>
+  <div class="wt-pane" data-p="3" style="display:none">
+    <div class="wt-big">🧩</div>
+    <h2>How it reaches your Home Screen.</h2>
+    <div class="wt-rows">
+      <div><b>1 · Design here</b><br>Templates, drag &amp; drop, or the AI.</div>
+      <div><b>2 · Scriptable shows it</b><br>A free app renders your designs as real widgets.</div>
+      <div><b>3 · One tap updates</b><br>Change a design, tap 🔁, your phone catches up.</div>
+    </div>
+  </div>
+  <div class="wt-pane" data-p="4" style="display:none">
+    <div class="wt-big">👑</div>
+    <h2>You're ready.</h2>
+    <p>Design something, save it, and the setup wizard walks your iPhone through the rest — once.</p>
+    <div class="wk-actions" style="justify-content:center">
+      <button class="primary" id="wtWizardBtn" style="flex:1">🪄 Set up my iPhone</button>
+      <button id="wtBrowseBtn" style="flex:1">Look around first</button>
+    </div>
+  </div>
+  <div class="wt-foot">
+    <div class="wt-dots" id="wtDots"></div>
+    <button class="primary" id="wtNextBtn" style="width:100%">Next</button>
+  </div>
+</div>
 
 <div id="setupWizard">
   <div id="wizardHead">
@@ -998,7 +1070,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 97;
+const WK_VERSION = 98;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -10921,6 +10993,70 @@ function openDesignerSetup() {
   document.getElementById("designerSetup").open = true;
   document.getElementById("apiKeyInput").focus();
 }
+// ==================== Welcome tour (v98) ====================
+// First visit = no remembered tab yet (captured before boot writes one).
+const isFirstVisit = !localStorage.getItem("widgetking.tab");
+// Five screens, one idea each: promise -> live data -> privacy -> how it
+// works -> ready. Shown once on a first visit; replayable from Settings.
+// The art is REAL rendered designs, not mockups.
+let wtStep = 0;
+function wtRenderStep() {
+  document.querySelectorAll(".wt-pane").forEach(function (p) {
+    p.style.display = Number(p.dataset.p) === wtStep ? "flex" : "none";
+  });
+  const dots = document.getElementById("wtDots");
+  dots.innerHTML = "";
+  for (let i = 0; i < 5; i++) {
+    const d = document.createElement("span");
+    if (i === wtStep) d.className = "on";
+    dots.appendChild(d);
+  }
+  document.getElementById("wtNextBtn").style.display = wtStep === 4 ? "none" : "";
+}
+function wtArt(targetId, design, sizeKey, scale) {
+  const box = document.getElementById(targetId);
+  if (box.childElementCount) return;
+  const dims = SIZES[sizeKey];
+  const node = renderDesignNode(normalizeDesign(design), sizeKey);
+  node.style.transform = "scale(" + scale + ")";
+  node.style.transformOrigin = "top left";
+  box.style.width = Math.round(dims[0] * scale) + "px";
+  box.style.height = Math.round(dims[1] * scale) + "px";
+  box.appendChild(node);
+}
+function showWelcomeTour() {
+  wtArt("wtArt0", { name: "Tour", kind: "freestyle", themeID: "sunset", gradientDir: "mesh", canvasElements: [
+    { id: "w1", kind: "clock", x: 0.5, y: 0.38, size: 26, font: "serif" },
+    { id: "w2", kind: "weather", x: 0.5, y: 0.72, size: 12 }
+  ] }, "small", 1.05);
+  wtArt("wtArt1", { name: "Tour2", kind: "freestyle", themeID: "midnight", canvasElements: [
+    { id: "d1", kind: "text", text: "TODAY", x: 0.24, y: 0.2, size: 9, opacity: 0.75 },
+    { id: "d2", kind: "date", x: 0.26, y: 0.42, size: 15 },
+    { id: "d3", kind: "weather", x: 0.26, y: 0.68, size: 12 },
+    { id: "d4", kind: "calendar", x: 0.72, y: 0.5, size: 10, count: 2 }
+  ] }, "medium", 0.72);
+  wtStep = 0;
+  wtRenderStep();
+  document.getElementById("welcomeTour").classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+function closeWelcomeTour() {
+  localStorage.setItem("widgetking.tourseen", "1");
+  document.getElementById("welcomeTour").classList.remove("open");
+  document.body.style.overflow = "";
+}
+document.getElementById("wtNextBtn").onclick = function () {
+  wtStep = Math.min(4, wtStep + 1);
+  wtRenderStep();
+};
+document.getElementById("wtWizardBtn").onclick = function () {
+  closeWelcomeTour();
+  document.getElementById("wizardBtn").click();
+};
+document.getElementById("wtBrowseBtn").onclick = function () {
+  closeWelcomeTour();
+  switchTab("create");
+};
 // Create opens with status, not just a menu: one card, highest priority only,
 // nothing when there's nothing to do. Status, never promotion.
 function renderStatusCard() {
@@ -10979,6 +11115,7 @@ document.getElementById("appearanceRow").onclick = function () {
   document.getElementById("modeToggle").click();
   updateAppearanceVal();
 };
+document.getElementById("replayTourRow").onclick = showWelcomeTour;
 updateAppearanceVal();
 document.querySelectorAll("#tabbar button").forEach(function (b) {
   b.onclick = function () { switchTab(b.dataset.tab); };
@@ -12394,6 +12531,7 @@ syncControls();
 renderAll();
 updateSpendUI();
 switchTab(localStorage.getItem("widgetking.tab") || "create");
+if (isFirstVisit && !localStorage.getItem("widgetking.tourseen")) showWelcomeTour();
 receiveSharedDesign();
 </script>
 </body>
