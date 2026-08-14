@@ -437,6 +437,7 @@
   .app-tag { display: flex; align-items: center; gap: 6px; background: var(--card2);
     border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: 13px; }
   .app-tag button { border: none; background: none; padding: 0 2px; font-size: 13px; color: var(--muted); min-height: 0; }
+  .app-tag.editing { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
   textarea::placeholder, input::placeholder { color: var(--muted); opacity: .55; font-style: italic; }
   details { margin-top: 10px; }
   summary { cursor: pointer; font-size: 13px; color: var(--muted); }
@@ -722,6 +723,7 @@
           <input type="text" id="customLabel" placeholder="Label" style="flex:1">
           <input type="text" id="customUrl" placeholder="URL or app scheme (e.g. spotify://)" style="flex:2">
           <button id="addCustomApp">Add</button>
+          <button id="cancelEditApp" style="display:none">Cancel</button>
         </div>
         <label style="margin-top:10px">Icon style</label>
         <div class="row">
@@ -1017,7 +1019,7 @@
   <input type="file" id="iconUploadInput" accept="image/*" style="display:none">
   <input type="file" id="bulkIconInput" accept="image/*" multiple style="display:none">
   <div class="row" style="margin:6px 0">
-    <button id="bulkIconBtn">📁 Upload icon pack (bulk)</button>
+    <button id="bulkIconBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-folder"/></svg> Upload icon pack (bulk)</button>
   </div>
   <div class="chips" id="myIconPacks"></div>
   <p class="hint">A pack is a named set of your own icons (upload up to 24 at once). Use it anywhere an icon style is offered — launchers, app buttons, or applied to the grid below.</p>
@@ -1025,7 +1027,7 @@
   <div class="chips" id="iconPackChips"></div>
   <label style="font-size:12px;color:var(--muted);margin-top:6px;display:block">Icon style</label>
   <div class="chips" id="iconStyleChips"></div>
-  <label style="font-size:12px;color:var(--muted);margin-top:6px;display:block">Your apps (tap a chip to remove — search works for any App Store app)</label>
+  <label style="font-size:12px;color:var(--muted);margin-top:6px;display:block">Your apps — tap a name to rename it, ✕ to remove. Search works for any App Store app.</label>
   <div class="row">
     <input type="text" id="iconAppSearch" placeholder="Type an app name… (e.g. Instagram)" style="flex:1">
     <button id="iconAppAdd">＋ Add</button>
@@ -1033,8 +1035,8 @@
   <div class="chips" id="iconAppChips"></div>
   <div id="iconGrid"></div>
   <div class="row" id="iconUseRow" style="margin-top:10px;display:none;flex-wrap:wrap;gap:8px">
-    <button class="primary" id="iconsToWidgetBtn" style="flex:2;min-width:200px">🧩 Put these in a widget<br><span style="font-size:11px;opacity:.85">recommended — works instantly, no setup</span></button>
-    <button id="iconsToHomeBtn" style="flex:1;min-width:150px">📲 Replace real app icons<br><span style="font-size:11px;color:var(--muted)">needs a one-time Shortcut each</span></button>
+    <button class="primary" id="iconsToWidgetBtn" style="flex:2;min-width:200px"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-puzzle"/></svg> Put these in a widget<br><span style="font-size:11px;opacity:.85">recommended — works instantly, no setup</span></button>
+    <button id="iconsToHomeBtn" style="flex:1;min-width:150px"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-phone"/></svg> Replace real app icons<br><span style="font-size:11px;color:var(--muted)">needs a one-time Shortcut each</span></button>
   </div>
   <p class="hint" id="iconSaveHint" style="display:none"><b>Long-press each icon → “Add to Photos”.</b> Then follow the guide:</p>
   <details id="iconHowTo" style="display:none">
@@ -1268,7 +1270,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 114;
+const WK_VERSION = 115;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -8368,6 +8370,7 @@ document.getElementById("studioCanvas").addEventListener("pointerdown", function
 
 // ==================== Launcher editor ====================
 let editingIconUrl = "";
+let editingAppIndex = -1;
 
 function jsonp(url) {
   return new Promise(function (resolve, reject) {
@@ -8512,28 +8515,33 @@ function renderLauncherUI() {
 
   const list = document.getElementById("appList");
   list.innerHTML = "";
+  if (editingAppIndex >= (current.apps || []).length) cancelAppEdit();
   (current.apps || []).forEach(function (app, index) {
     const tag = document.createElement("div");
     tag.className = "app-tag";
+    if (index === editingAppIndex) tag.classList.add("editing");
     const textSpan = document.createElement("span");
     textSpan.textContent = (app.emoji || "🌐") + " " + (app.label || "App");
     textSpan.style.cursor = "pointer";
-    textSpan.title = "Tap to edit";
+    textSpan.title = "Tap to edit " + (app.label || "this app");
     textSpan.onclick = function () {
+      // v115: editing keeps the app IN the list (highlighted) while its
+      // fields load below — Save updates it in place. The old flow removed
+      // the app the moment you tapped it and trusted you to re-Add it.
+      editingAppIndex = index;
       document.getElementById("customEmoji").value = app.emoji || "";
       document.getElementById("customLabel").value = app.label || "";
       document.getElementById("customUrl").value = app.url || "";
       editingIconUrl = app.iconUrl || "";
-      current.apps.splice(index, 1);
       renderLauncherUI();
-      renderPreview();
-      toast("Editing " + (app.label || "app") + " — tweak the fields below and press Add");
+      toast("Editing " + (app.label || "app") + " — change the fields below, then Save");
     };
     tag.appendChild(textSpan);
     const left = document.createElement("button");
     left.textContent = "◀";
     left.disabled = index === 0;
     left.onclick = function () {
+      cancelAppEdit();
       const t = current.apps[index - 1];
       current.apps[index - 1] = current.apps[index];
       current.apps[index] = t;
@@ -8543,6 +8551,7 @@ function renderLauncherUI() {
     right.textContent = "▶";
     right.disabled = index === current.apps.length - 1;
     right.onclick = function () {
+      cancelAppEdit();
       const t = current.apps[index + 1];
       current.apps[index + 1] = current.apps[index];
       current.apps[index] = t;
@@ -8551,7 +8560,9 @@ function renderLauncherUI() {
     const remove = document.createElement("button");
     remove.textContent = "✕";
     remove.title = "Remove " + (app.label || "this app");
+    remove.setAttribute("aria-label", "Remove " + (app.label || "this app"));
     remove.onclick = function () {
+      cancelAppEdit();
       current.apps.splice(index, 1);
       renderLauncherUI();
       renderPreview();
@@ -8559,6 +8570,22 @@ function renderLauncherUI() {
     tag.append(left, right, remove);
     list.appendChild(tag);
   });
+  updateAppFormButtons();
+}
+// v115 edit-in-place state for the launcher app list. -1 = adding new.
+function cancelAppEdit() {
+  if (editingAppIndex < 0 && !editingIconUrl) return;
+  editingAppIndex = -1;
+  editingIconUrl = "";
+  document.getElementById("customEmoji").value = "";
+  document.getElementById("customLabel").value = "";
+  document.getElementById("customUrl").value = "";
+  updateAppFormButtons();
+}
+function updateAppFormButtons() {
+  const editing = editingAppIndex >= 0;
+  document.getElementById("addCustomApp").textContent = editing ? "Save" : "Add";
+  document.getElementById("cancelEditApp").style.display = editing ? "" : "none";
 }
 function setupLauncherControls() {
   document.getElementById("toIconMakerBtn").onclick = function () {
@@ -8627,13 +8654,20 @@ function setupLauncherControls() {
     if (!url) { toast("Enter a URL or app scheme"); return; }
     current.apps = current.apps || [];
     const app = { emoji: emoji, label: label, url: url };
-    if (editingIconUrl) { app.iconUrl = editingIconUrl; editingIconUrl = ""; }
-    current.apps.push(app);
-    document.getElementById("customEmoji").value = "";
-    document.getElementById("customLabel").value = "";
-    document.getElementById("customUrl").value = "";
+    if (editingIconUrl) { app.iconUrl = editingIconUrl; }
+    if (editingAppIndex >= 0 && current.apps[editingAppIndex]) {
+      current.apps[editingAppIndex] = app;
+      toast((app.label || "App") + " updated ✓");
+    } else {
+      current.apps.push(app);
+    }
+    cancelAppEdit();
     renderLauncherUI();
     renderPreview();
+  };
+  document.getElementById("cancelEditApp").onclick = function () {
+    cancelAppEdit();
+    renderLauncherUI();
   };
 }
 
@@ -12909,7 +12943,7 @@ function renderIconMaker() {
   }
   const styleChips = document.getElementById("iconStyleChips");
   styleChips.innerHTML = "";
-  const styleNames = { real: "📱 Real icon", mono: "🅰️ Monogram", ringmono: "⭕ Ring letter" };
+  const styleNames = { real: "Real icon", mono: "Monogram", ringmono: "Ring letter" };
   for (const id of ["real", "mono", "ringmono"].concat(Object.keys(ICON_THEMES))) {
     const chip = document.createElement("button");
     chip.textContent = styleNames[id] || ICON_THEMES[id].name;
@@ -12949,10 +12983,42 @@ function renderIconMaker() {
   const appChips = document.getElementById("iconAppChips");
   appChips.innerHTML = "";
   iconMakerApps.forEach(function (app, index) {
-    const chip = document.createElement("button");
-    chip.textContent = (app.emoji || "🔤") + " " + app.label + " ✕";
-    chip.onclick = function () { iconMakerApps.splice(index, 1); renderIconMaker(); };
-    appChips.appendChild(chip);
+    // v115: tapping a chip used to DELETE the app — now the ✕ is the only
+    // remove, and tapping the name renames it in place (artwork refetches).
+    const tag = document.createElement("div");
+    tag.className = "app-tag";
+    const textSpan = document.createElement("span");
+    textSpan.textContent = (app.emoji || "🔤") + " " + app.label;
+    textSpan.style.cursor = "pointer";
+    textSpan.title = "Tap to rename " + app.label;
+    textSpan.onclick = function () {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = app.label;
+      input.maxLength = 20;
+      input.setAttribute("aria-label", "Rename " + app.label);
+      input.style.cssText = "width:110px;min-height:0;padding:2px 6px;font-size:13px";
+      input.onblur = function () {
+        const name = input.value.trim();
+        if (name && name !== app.label) {
+          app.label = name.slice(0, 20);
+          delete app.iconUrl;
+          delete app.noIcon;
+        }
+        renderIconMaker();
+      };
+      input.onkeydown = function (e) { if (e.key === "Enter") { e.preventDefault(); input.blur(); } };
+      tag.replaceChild(input, textSpan);
+      input.focus();
+      input.select();
+    };
+    const remove = document.createElement("button");
+    remove.textContent = "✕";
+    remove.title = "Remove " + app.label;
+    remove.setAttribute("aria-label", "Remove " + app.label);
+    remove.onclick = function () { iconMakerApps.splice(index, 1); renderIconMaker(); };
+    tag.append(textSpan, remove);
+    appChips.appendChild(tag);
   });
   const grid = document.getElementById("iconGrid");
   grid.innerHTML = "";
