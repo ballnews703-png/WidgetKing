@@ -998,7 +998,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 96;
+const WK_VERSION = 97;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -1553,6 +1553,12 @@ async function liveDataFor(design) {
   }
   return live;
 }
+// The feed's own name is never a headline — it appears as the channel
+// title, the channel image title, and lives on in old caches, so filter it
+// on EVERY path rather than trusting position.
+function cleanHeadlines(titles) {
+  return titles.filter(function (t) { return String(t).trim().toLowerCase() !== "google news"; });
+}
 async function fetchNews(count) {
   const fm = FileManager.local();
   const cachePath = fm.joinPath(fm.documentsDirectory(), "widgetking-news.json");
@@ -1560,7 +1566,7 @@ async function fetchNews(count) {
     if (fm.fileExists(cachePath)) {
       const cached = JSON.parse(fm.readString(cachePath));
       if (cached && (Date.now() - cached.at) < 30 * 60 * 1000 && Array.isArray(cached.titles)) {
-        return cached.titles.slice(0, count);
+        return cleanHeadlines(cached.titles).slice(0, count);
       }
     }
   } catch (e) {}
@@ -1574,10 +1580,9 @@ async function fetchNews(count) {
         .replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
       if (t) titles.push(t);
     }
-    // The feed's own name appears as the channel title AND the channel
-    // image title — drop every leading copy, not just the first.
-    const feedName = titles.length ? titles[0] : "";
-    while (titles.length && titles[0] === feedName) titles.shift();
+    const clean = cleanHeadlines(titles);
+    titles.length = 0;
+    for (const t of clean) titles.push(t);
     try { fm.writeString(cachePath, JSON.stringify({ at: Date.now(), titles: titles })); } catch (e) {}
     return titles.slice(0, count);
   } catch (e) { return null; }
