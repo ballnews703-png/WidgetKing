@@ -467,6 +467,16 @@
   .sec-card { background: var(--card); border-radius: 20px; padding: 14px 16px;
     box-shadow: 0 1px 2px var(--shadow); }
   button .ic { vertical-align: -5px; margin-right: 4px; }
+  .seg { display: flex; gap: 6px; background: var(--card2); border: 1px solid var(--line);
+    border-radius: 999px; padding: 4px; width: fit-content; }
+  .seg button { border: none; background: none; border-radius: 999px; padding: 9px 22px;
+    font-size: 14px; font-weight: 700; color: var(--muted); min-height: 38px; }
+  .seg button.sel { background: var(--accent); color: var(--accent-text); }
+  #featuredRow { display: flex; gap: 12px; margin-bottom: 6px; }
+  .feat-card { flex: 1; min-width: 0; background: none; border: none; padding: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 0; }
+  .feat-card .fwrap { overflow: hidden; border-radius: 22px; box-shadow: 0 8px 24px var(--shadow); }
+  .feat-card .fname { font-size: 13px; font-weight: 700; }
   #recentStrip { display: flex; gap: 10px; overflow-x: auto; padding: 2px 0 8px;
     -webkit-overflow-scrolling: touch; scrollbar-width: none; }
   #recentStrip::-webkit-scrollbar { display: none; }
@@ -559,11 +569,17 @@
 </section>
 
 <section id="exploreGalleryIntro" class="pane pane-explore">
-  <p class="hint" style="margin-top:2px">Ready-made widgets and icon styles — tap anything to make it yours. Your uploaded packs show here too, and publishing your own creations for everyone is coming with accounts.</p>
+  <div class="seg" id="exploreSeg" role="tablist" aria-label="Explore sections">
+    <button data-et="widgets" role="tab">Widgets</button>
+    <button data-et="icons" role="tab">Icons</button>
+  </div>
+  <p class="hint" id="exploreHint" style="margin-top:8px"></p>
 </section>
 
 <section id="templatesSection" class="pane pane-explore">
-  <div class="sec-label">Widgets</div>
+  <div class="sec-label">Featured</div>
+  <div id="featuredRow"></div>
+  <div class="sec-label">Feed</div>
   <div class="chips" id="packChips"></div>
   <div class="tpl-row" id="templateRow"></div>
 </section>
@@ -877,6 +893,11 @@
     <button id="checklistDismissBtn" aria-label="Dismiss setup reminder">✕</button>
   </div>
   <div id="backupNudge" style="display:none;border-radius:14px;padding:10px 12px;margin-bottom:8px;background:rgba(240,196,69,.14);font-size:13px;cursor:pointer">💾 <b>Protect your work</b> — your designs live only in this browser. Tap to save a backup file.</div>
+  <div class="seg" id="libSeg" role="tablist" aria-label="My Widgets sections" style="margin-bottom:10px">
+    <button data-lt="widgets" role="tab">Widgets</button>
+    <button data-lt="icons" role="tab">Icons</button>
+  </div>
+  <div id="libPacksPanel" style="display:none"></div>
   <input type="text" id="librarySearch" placeholder="🔍 Search your widgets…" style="margin-bottom:8px">
   <div class="chips" id="libFolders" style="margin-bottom:4px"></div>
   <div class="row" id="libSortRow" style="margin-bottom:8px"></div>
@@ -976,7 +997,7 @@
 
 <section id="iconMakerSection" class="pane pane-studio">
   <div class="sec-label">App Icon Maker</div>
-  <p class="hint">Restyle your real Home Screen app icons — pick a pack, add your apps, save the icons.
+  <p class="hint">Restyle your real Home Screen app icons — pick a pack, add your apps, save the icons. Browse every style in <b>Explore › Icons</b>.
   <b>Heads-up:</b> this tool (and its one-time Shortcuts step) is only for <b>standalone icons on your Home Screen</b>.
   Apps inside a WidgetKing launcher <i>widget</i> already work — no Shortcuts needed there.</p>
   <p class="hint">💡 Tap any icon below to swap in <b>your own image</b> (from Canva, Photos, anywhere). Uploads stay on your device.
@@ -1231,7 +1252,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 108;
+const WK_VERSION = 109;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -8668,12 +8689,13 @@ function buildTemplates() {
       { kind: "reminders", count: 1, x: 0.71, y: 0.78, size: 9, colorHex: "#C9D2E0", opacity: 0.9 }
     ] } },
     { category: "Neon", pack: "Neon", size: "medium", design: { name: "Night Drive", kind: "freestyle", themeID: "custom", customColors: ["#0B0B14", "#161028"], fontStyle: "futura", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
-      { kind: "clock", x: 0.32, y: 0.44, size: 34, colorHex: "#FFFFFF", opacity: 1, bold: true },
-      { kind: "date", x: 0.32, y: 0.7, size: 11, colorHex: "#FF2E92", opacity: 1, bold: true },
-      { kind: "shape", shape: "pill", x: 0.76, y: 0.32, w: 0.3, h: 0.18, colorHex: "#7EF9E2", opacity: 1 },
-      { kind: "weather", wmode: "now", unit: "f", x: 0.76, y: 0.32, size: 11, colorHex: "#062A22", opacity: 1, bold: true },
-      { kind: "shape", shape: "pill", x: 0.76, y: 0.58, w: 0.3, h: 0.18, colorHex: "#FF2E92", opacity: 1 },
-      { kind: "battery", x: 0.76, y: 0.58, size: 11, colorHex: "#2A0616", opacity: 1, bold: true }
+      { kind: "clock", x: 0.32, y: 0.42, size: 36, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "date", x: 0.32, y: 0.68, size: 12, colorHex: "#FF2E92", opacity: 1, bold: true },
+      { kind: "shape", shape: "pill", x: 0.76, y: 0.3, w: 0.3, h: 0.2, colorHex: "#7EF9E2", opacity: 1 },
+      { kind: "weather", wmode: "now", unit: "f", x: 0.76, y: 0.3, size: 11, colorHex: "#062A22", opacity: 1, bold: true },
+      { kind: "shape", shape: "pill", x: 0.76, y: 0.62, w: 0.3, h: 0.2, colorHex: "#FF2E92", opacity: 1 },
+      { kind: "battery", x: 0.76, y: 0.62, size: 11, colorHex: "#2A0616", opacity: 1, bold: true },
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.9, w: 0.86, h: 0.012, size: 0, colorHex: "#7EF9E2", opacity: 0.35 }
     ] } },
     { category: "Live", pack: "Live", size: "small", design: { name: "Sky Stack", kind: "freestyle", themeID: "custom", customColors: ["#16202E", "#1D2A3C"], fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
       { kind: "shape", shape: "pill", x: 0.5, y: 0.22, w: 0.78, h: 0.19, colorHex: "#8FD3FE", opacity: 1 },
@@ -8762,9 +8784,9 @@ function buildTemplates() {
       { kind: "worldclock", city: "New York", tz: "America/New_York", offsetMin: -300, showCity: true, x: 0.72, y: 0.74, size: 13, colorHex: "#FFFFFF", opacity: 0.95 }
     ] } },
     { category: "Picks", pack: "Picks", size: "small", design: { name: "Focus Today", kind: "freestyle", themeID: "forest", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
-      { kind: "text", text: "TODAY", x: 0.5, y: 0.14, size: 9, colorHex: "#A3C9A8", opacity: 0.9, w: 0, align: "center", bold: true },
-      { kind: "reminders", count: 3, x: 0.5, y: 0.44, size: 10, colorHex: "#FFFFFF", opacity: 0.95 },
-      { kind: "progress", source: "day", x: 0.5, y: 0.82, size: 6, w: 0.66, colorHex: "#A3C9A8", opacity: 1 }
+      { kind: "text", text: "TODAY", x: 0.5, y: 0.1, size: 9, colorHex: "#A3C9A8", opacity: 0.9, w: 0, align: "center", bold: true },
+      { kind: "reminders", count: 3, x: 0.5, y: 0.47, size: 9, colorHex: "#FFFFFF", opacity: 0.95 },
+      { kind: "progress", source: "day", x: 0.5, y: 0.87, size: 6, w: 0.66, colorHex: "#A3C9A8", opacity: 1 }
     ] } },
     { category: "Picks", pack: "Picks", size: "small", design: { name: "Film Memory", kind: "freestyle", themeID: "custom", customColors: ["#1B1B22", "#3A2E3C"], fontStyle: "typewriter", textColorHex: "#F5EBE0", canvasElements: [
       { kind: "photo", x: 0.5, y: 0.44, w: 0.78, shape: "rect", frame: "film", size: 18, opacity: 1, aspect: 0.75 },
@@ -8827,9 +8849,9 @@ function buildTemplates() {
       { kind: "progress", source: "day", x: 0.5, y: 0.8, w: 0.68, size: 6, colorHex: "#BFD9EA", opacity: 1 }
     ] } },
     { category: "Designer", pack: "Designer", design: { name: "Monogram", kind: "freestyle", themeID: "midnight", fontStyle: "copperplate", textColorHex: "#FFFFFF", canvasElements: [
-      { kind: "ring", source: "year", x: 0.5, y: 0.48, w: 0.72, size: 4, colorHex: "#FFD75E", opacity: 0.9 },
-      { kind: "text", text: "A", x: 0.5, y: 0.48, size: 52, colorHex: "#FFFFFF", opacity: 1, w: 0, align: "center", bold: true },
-      { kind: "text", text: "est. 2026", x: 0.5, y: 0.85, size: 9, colorHex: "#FFD75E", opacity: 0.85, w: 0, align: "center", bold: false }
+      { kind: "ring", source: "year", x: 0.5, y: 0.44, w: 0.62, size: 4, colorHex: "#FFD75E", opacity: 0.9 },
+      { kind: "text", text: "A", x: 0.5, y: 0.44, size: 48, colorHex: "#FFFFFF", opacity: 1, w: 0, align: "center", bold: true },
+      { kind: "text", text: "est. 2026", x: 0.5, y: 0.8, size: 9, colorHex: "#FFD75E", opacity: 0.85, w: 0, align: "center", bold: false }
     ] } },
     { category: "Designer", pack: "Designer", design: { name: "Neon Glow", kind: "freestyle", themeID: "custom", customColors: ["#0B0018", "#2B0A4E"], fontStyle: "mono", textColorHex: "#FFFFFF", canvasElements: [
       { kind: "clock", x: 0.5, y: 0.46, size: 34, colorHex: "#FF2079", opacity: 0.3 },
@@ -8838,17 +8860,17 @@ function buildTemplates() {
       { kind: "icon", text: "⚡", x: 0.14, y: 0.16, size: 14, colorHex: "#FF2079", opacity: 1 }
     ] } },
     { category: "Sports", pack: "Sports", design: { name: "Fantasy Command", kind: "freestyle", themeID: "custom", customColors: ["#0C1712", "#14402A"], fontStyle: "futura", textColorHex: "#FFFFFF", canvasElements: [
-      { kind: "sleeperlogo", side: "me", x: 0.14, y: 0.34, size: 32, opacity: 1 },
-      { kind: "sleeperlogo", side: "opp", x: 0.54, y: 0.34, size: 32, opacity: 1 },
-      { kind: "sleeper", mode: "score", x: 0.348, y: 0.352, size: 20, colorHex: "#08130C", opacity: 0.5 },
-      { kind: "sleeper", mode: "score", x: 0.34, y: 0.34, size: 20, colorHex: "#FFFFFF", opacity: 1 },
-      { kind: "sleeper", mode: "myteam", x: 0.14, y: 0.58, size: 8, colorHex: "#7FE08F", opacity: 0.95 },
-      { kind: "sleeper", mode: "opponent", x: 0.54, y: 0.58, size: 8, colorHex: "#FFFFFF", opacity: 0.7 },
-      { kind: "sleeper", mode: "record", x: 0.34, y: 0.72, size: 10, colorHex: "#7FE08F", opacity: 0.95 },
-      { kind: "shape", shape: "rect", x: 0.34, y: 0.83, w: 0.42, h: 0.006, size: 0, colorHex: "#FFFFFF", opacity: 0.25 },
+      { kind: "sleeperlogo", side: "me", x: 0.18, y: 0.34, size: 32, opacity: 1 },
+      { kind: "sleeperlogo", side: "opp", x: 0.58, y: 0.34, size: 32, opacity: 1 },
+      { kind: "sleeper", mode: "score", x: 0.388, y: 0.352, size: 16, colorHex: "#08130C", opacity: 0.5 },
+      { kind: "sleeper", mode: "score", x: 0.38, y: 0.34, size: 16, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "sleeper", mode: "myteam", x: 0.18, y: 0.58, size: 8, colorHex: "#7FE08F", opacity: 0.95 },
+      { kind: "sleeper", mode: "opponent", x: 0.58, y: 0.58, size: 8, colorHex: "#FFFFFF", opacity: 0.7 },
+      { kind: "sleeper", mode: "record", x: 0.38, y: 0.72, size: 10, colorHex: "#7FE08F", opacity: 0.95 },
+      { kind: "shape", shape: "rect", x: 0.38, y: 0.83, w: 0.42, h: 0.006, size: 0, colorHex: "#FFFFFF", opacity: 0.25 },
       { kind: "ring", source: "day", x: 0.85, y: 0.4, w: 0.26, size: 4, colorHex: "#7FE08F", opacity: 1 },
       { kind: "icon", text: "★", x: 0.85, y: 0.4, size: 11, colorHex: "#FFD75E", opacity: 1 },
-      { kind: "text", text: "game day", x: 0.85, y: 0.62, size: 7, colorHex: "#FFFFFF", opacity: 0.7, w: 0, align: "center", bold: false }
+      { kind: "text", text: "game day", x: 0.85, y: 0.72, size: 7, colorHex: "#FFFFFF", opacity: 0.7, w: 0, align: "center", bold: false }
     ] } },
     { category: "Sports", pack: "Sports", design: { name: "Game Slate", kind: "launcher", themeID: "custom", customColors: ["#0C1712", "#1C1C24"], fontStyle: "futura", textColorHex: "#FFFFFF", launcherStyle: { iconSize: 40, shape: "rounded", labels: true, columns: 3 }, apps: [
       { emoji: "🏈", label: "ESPN Fantasy", url: "fantasyapp://" },
@@ -10864,6 +10886,136 @@ function paintStageTile() {
   stage.style.backgroundImage = "url(" + c.toDataURL("image/png") + ")";
   stage.style.backgroundSize = "44px 44px";
 }
+// ==================== v109: Explore + My Widgets section pills ====================
+let exploreTabState = localStorage.getItem("widgetking.exploretab") || "widgets";
+let featuredBuilt = false;
+function applyExploreTab() {
+  const isW = exploreTabState === "widgets";
+  document.getElementById("templatesSection").style.display = isW ? "" : "none";
+  document.getElementById("exploreSection").style.display = isW ? "none" : "";
+  document.querySelectorAll("#exploreSeg button").forEach(function (b) {
+    b.classList.toggle("sel", b.dataset.et === exploreTabState);
+    b.setAttribute("aria-selected", b.dataset.et === exploreTabState ? "true" : "false");
+  });
+  document.getElementById("exploreHint").textContent = isW
+    ? "Ready-made widgets — tap anything to make it yours."
+    : "Icon styles for your Home Screen apps — tap a sheet to use it. Your uploaded packs show here too.";
+  if (isW && !featuredBuilt) { featuredBuilt = true; renderFeatured(); }
+  // Lazy discipline (v86): the heavy icon grid renders only when the Icons
+  // tab is actually shown, and is freed on leaving Explore as before.
+  if (!isW && !lazyTabRendered.explore) { lazyTabRendered.explore = true; renderExplore(); }
+}
+document.querySelectorAll("#exploreSeg button").forEach(function (b) {
+  b.onclick = function () {
+    exploreTabState = b.dataset.et;
+    localStorage.setItem("widgetking.exploretab", exploreTabState);
+    applyExploreTab();
+  };
+});
+function renderFeatured() {
+  const row = document.getElementById("featuredRow");
+  row.innerHTML = "";
+  const all = buildTemplates();
+  for (const name of ["Crown Jewel", "Night Drive"]) {
+    const t = all.find(function (x) { return x.design.name === name; });
+    if (!t) continue;
+    const sizeKey = t.size || "small";
+    const design = normalizeDesign(JSON.parse(JSON.stringify(t.design)));
+    const card = document.createElement("button");
+    card.className = "feat-card";
+    card.setAttribute("aria-label", "Use the " + name + " template");
+    const wrap = document.createElement("div");
+    wrap.className = "fwrap";
+    const dims = SIZES[sizeKey];
+    const targetW = Math.min(172, ((row.clientWidth || 360) - 12) / 2);
+    const scale = targetW / dims[0];
+    wrap.style.width = Math.round(dims[0] * scale) + "px";
+    wrap.style.height = Math.round(dims[1] * scale) + "px";
+    const inner = renderDesignNode(design, sizeKey);
+    inner.style.transform = "scale(" + scale + ")";
+    inner.style.transformOrigin = "top left";
+    wrap.appendChild(inner);
+    const label = document.createElement("span");
+    label.className = "fname";
+    label.textContent = name;
+    card.append(wrap, label);
+    card.onclick = function () {
+      recordRecent("templates", name);
+      const copy = normalizeDesign(JSON.parse(JSON.stringify(t.design)));
+      copy.id = uid();
+      previewSize = sizeKey;
+      loadIntoEditor(copy);
+      switchTab("editor");
+      popCanvas();
+      toast("Template loaded — make it yours ✨");
+    };
+    row.appendChild(card);
+  }
+}
+let libTabState = localStorage.getItem("widgetking.libtab") || "widgets";
+function applyLibTab() {
+  const isW = libTabState === "widgets";
+  ["librarySearch", "libFolders", "libSortRow", "library"].forEach(function (id) {
+    document.getElementById(id).style.display = isW ? "" : "none";
+  });
+  document.getElementById("libPacksPanel").style.display = isW ? "none" : "";
+  document.querySelectorAll("#libSeg button").forEach(function (b) {
+    b.classList.toggle("sel", b.dataset.lt === libTabState);
+    b.setAttribute("aria-selected", b.dataset.lt === libTabState ? "true" : "false");
+  });
+  if (!isW) renderLibPacks();
+}
+document.querySelectorAll("#libSeg button").forEach(function (b) {
+  b.onclick = function () {
+    libTabState = b.dataset.lt;
+    localStorage.setItem("widgetking.libtab", libTabState);
+    applyLibTab();
+  };
+});
+function renderLibPacks() {
+  const panel = document.getElementById("libPacksPanel");
+  panel.innerHTML = "";
+  if (!iconPacks.length) {
+    panel.innerHTML = '<p class="hint">No icon packs yet. Upload a set of images in Studio and it becomes a reusable icon style for your apps.</p>';
+    const go = document.createElement("button");
+    go.textContent = "Open Studio";
+    go.onclick = function () { switchTab("studio"); };
+    panel.appendChild(go);
+    return;
+  }
+  for (const pack of iconPacks) {
+    const item = document.createElement("div");
+    item.className = "lib-item";
+    const strip = document.createElement("div");
+    strip.style.cssText = "display:flex;gap:6px;flex-shrink:0";
+    (pack.icons || []).slice(0, 4).forEach(function (entry) {
+      const im = document.createElement("img");
+      im.src = typeof entry === "string" ? entry : (entry.b64 || entry.src || "");
+      im.alt = "";
+      im.style.cssText = "width:36px;height:36px;border-radius:9px;object-fit:cover";
+      strip.appendChild(im);
+    });
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.innerHTML = '<div class="name">' + esc(pack.name || "My pack") + '</div>' +
+      '<div class="kind">' + (pack.icons || []).length + ' icons</div>';
+    const del = document.createElement("button");
+    del.textContent = "Delete";
+    del.onclick = function () {
+      if (!confirm('Delete the pack "' + (pack.name || "My pack") + '"? Designs using it fall back to standard icons.')) return;
+      iconPacks = iconPacks.filter(function (p) { return p.id !== pack.id; });
+      saveIconPacks();
+      renderLibPacks();
+    };
+    item.append(strip, meta, del);
+    panel.appendChild(item);
+  }
+  const manage = document.createElement("button");
+  manage.style.cssText = "width:100%;margin-top:6px";
+  manage.textContent = "Upload & manage packs in Studio";
+  manage.onclick = function () { switchTab("studio"); };
+  panel.appendChild(manage);
+}
 function switchTab(name) {
   const entering = name === "editor";
   if (entering) { openEditor(); name = lastBaseTab || localStorage.getItem("widgetking.tab") || "create"; }
@@ -10897,9 +11049,9 @@ function switchTab(name) {
     b.classList.toggle("active", b.dataset.tab === name);
     b.setAttribute("aria-selected", b.dataset.tab === name ? "true" : "false");
   });
-  if (name === "explore" && !lazyTabRendered.explore) { lazyTabRendered.explore = true; renderExplore(); }
+  if (name === "explore") applyExploreTab();
   if (name === "studio" && !lazyTabRendered.studio) { lazyTabRendered.studio = true; renderIconMaker(); }
-  if (name === "widgets") renderInstallChecklist();
+  if (name === "widgets") { renderInstallChecklist(); applyLibTab(); }
   if (name === "create") { renderStatusCard(); renderRecentDesigns(); }
   window.scrollTo({ top: 0 });
 }
