@@ -142,9 +142,13 @@
     background: var(--bg); border-top: 1px solid var(--line);
     border-radius: 28px 28px 0 0; box-shadow: 0 -10px 30px var(--shadow);
     display: flex; flex-direction: column; transition: height .18s ease; }
-  #sheetHandle { flex: none; display: flex; justify-content: center; padding: 8px 0 4px;
+  #sheetHandle { flex: none; display: flex; justify-content: center; padding: 10px 0 6px;
     cursor: grab; touch-action: none; }
   #sheetHandle span { width: 48px; height: 5px; border-radius: 3px; background: var(--muted); opacity: .45; }
+  #sheetCollapseBtn { position: absolute; top: 6px; right: 10px; z-index: 1;
+    width: 40px; min-height: 30px; padding: 0; border-radius: 999px;
+    background: var(--card); border: 1px solid var(--line); color: var(--muted);
+    font-size: 17px; line-height: 1; }
   #editorRail { flex: none; display: flex; gap: 4px; overflow-x: auto; padding: 2px 10px 6px;
     -webkit-overflow-scrolling: touch; scrollbar-width: none; }
   #editorRail::-webkit-scrollbar { display: none; }
@@ -271,7 +275,7 @@
   #studioHead { display: flex; align-items: center; gap: 8px; padding: 4px 0 8px;
     flex-wrap: wrap; }
   #studioHead .size-buttons { margin-right: auto; }
-  #studioStage { height: clamp(150px, calc(100dvh - var(--sheet-h, 40vh) - 185px), 400px);
+  #studioStage { height: clamp(150px, calc(100dvh - var(--sheet-h, 40vh) - 185px), 560px);
     display: flex; align-items: center; justify-content: center;
     padding: 14px; overflow: hidden; position: relative;
     border-radius: 16px; transition: height .18s ease;
@@ -720,6 +724,7 @@
 
 <div id="editorSheet">
   <div id="sheetHandle" role="button" aria-label="Resize the tool drawer" title="Drag to resize"><span></span></div>
+  <button id="sheetCollapseBtn" aria-label="Hide the tools — see your widget">⌄</button>
   <div id="editorRail" role="tablist" aria-label="Editor tools"></div>
   <div id="sheetBody">
     <div class="sheet-panel" id="panelWelcome">
@@ -1123,7 +1128,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 104;
+const WK_VERSION = 105;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -10759,6 +10764,34 @@ function applySheetDetent(name) {
   document.documentElement.style.setProperty("--sheet-h", px + "px");
   studioScaleCache = null;
   if (studioOpen) renderStudioCanvas();
+  updateCollapseBtn();
+}
+function currentSheetPx() {
+  return parseInt(getComputedStyle(document.documentElement).getPropertyValue("--sheet-h")) ||
+    Math.round(window.innerHeight * 0.42);
+}
+function nearestDetent() {
+  // Compare against the heights detents actually PRODUCE (the vh-340 cap
+  // included) — on short viewports capped-full sits nearer to raw-half.
+  const vh = window.innerHeight;
+  const h = currentSheetPx();
+  let name = "half", dist = Infinity;
+  for (const k of Object.keys(SHEET_DETENTS)) {
+    const d = Math.abs(h - Math.min(vh * SHEET_DETENTS[k], vh - 340));
+    if (d < dist) { dist = d; name = k; }
+  }
+  return name;
+}
+function snapSheetTo(name) {
+  localStorage.setItem("widgetking.sheet." + sheetTool, name);
+  applySheetDetent(name);
+}
+function updateCollapseBtn() {
+  const b = document.getElementById("sheetCollapseBtn");
+  if (!b) return;
+  const collapsed = currentSheetPx() <= window.innerHeight * (SHEET_DETENTS.peek + 0.04);
+  b.textContent = collapsed ? "⌃" : "⌄";
+  b.setAttribute("aria-label", collapsed ? "Show the tools" : "Hide the tools — see your widget");
 }
 function buildSheetPanel(tool) {
   if (panelBuilt[tool]) return;
@@ -11146,28 +11179,71 @@ document.getElementById("tweakInput").addEventListener("keydown", function (e) {
       window.removeEventListener("pointercancel", up);
       sheet.style.transition = "";
       stage.style.transition = "";
-      const vh = window.innerHeight;
       let name;
       if (!moved) {
         const order = ["half", "full", "peek"];
         name = order[(order.indexOf(sheetDetentFor(sheetTool)) + 1) % 3];
       } else {
-        const h = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--sheet-h")) || vh * 0.42;
-        name = "half";
-        let dist = Infinity;
-        for (const k of Object.keys(SHEET_DETENTS)) {
-          const d = Math.abs(h - vh * SHEET_DETENTS[k]);
-          if (d < dist) { dist = d; name = k; }
-        }
+        name = nearestDetent();
       }
-      localStorage.setItem("widgetking.sheet." + sheetTool, name);
-      applySheetDetent(name);
+      snapSheetTo(name);
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
   });
 })();
+// Three ways DOWN (v105): the sheet was easy to raise but hard to dismiss —
+// the handle was the only drag target and downward swipes on the panel just
+// scrolled it. Now: (1) pulling down on a panel already scrolled to its top
+// collapses the sheet, exactly like iOS modal sheets; (2) an always-visible
+// chevron collapses/restores with one tap; (3) tapping the stage while the
+// sheet is tall drops it to half — you tap the thing you want to see.
+(function wireSheetBodyPull() {
+  const body = document.getElementById("sheetBody");
+  const sheet = document.getElementById("editorSheet");
+  const stage = document.getElementById("studioStage");
+  let startY = 0, startH = 0, claimed = false, eligible = false;
+  body.addEventListener("touchstart", function (e) {
+    eligible = body.scrollTop <= 0;
+    claimed = false;
+    startY = e.touches[0].clientY;
+    startH = currentSheetPx();
+  }, { passive: true });
+  body.addEventListener("touchmove", function (e) {
+    if (!eligible) return;
+    const dy = e.touches[0].clientY - startY;
+    if (!claimed) {
+      if (dy > 10) {
+        claimed = true;
+        sheet.style.transition = "none";
+        stage.style.transition = "none";
+      } else if (dy < -4) { eligible = false; return; }
+      else return;
+    }
+    if (e.cancelable) e.preventDefault();
+    const h = Math.max(window.innerHeight * 0.12, Math.min(window.innerHeight - 340, startH - dy));
+    document.documentElement.style.setProperty("--sheet-h", Math.round(h) + "px");
+  }, { passive: false });
+  const end = function () {
+    if (!claimed) return;
+    claimed = false;
+    eligible = false;
+    sheet.style.transition = "";
+    stage.style.transition = "";
+    snapSheetTo(nearestDetent());
+  };
+  body.addEventListener("touchend", end);
+  body.addEventListener("touchcancel", end);
+})();
+document.getElementById("sheetCollapseBtn").onclick = function () {
+  const collapsed = currentSheetPx() <= window.innerHeight * (SHEET_DETENTS.peek + 0.04);
+  snapSheetTo(collapsed ? "half" : "peek");
+};
+document.getElementById("studioStage").addEventListener("click", function (e) {
+  if (e.target !== this) return;
+  if (nearestDetent() === "full") snapSheetTo("half");
+});
 // Re-home the form editor's control blocks into their panels (nodes move,
 // ids and handlers survive), then land on the remembered tool.
 (function mountEditorSheet() {
