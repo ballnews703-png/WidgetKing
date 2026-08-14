@@ -478,6 +478,13 @@
     border: 1px solid var(--line); color: var(--muted); display: flex;
     align-items: center; justify-content: center; box-shadow: 0 2px 8px var(--shadow); }
   .pslot.filled { cursor: grab; }
+  /* v111: the widget picker drops down over the page instead of appearing
+     below the fold — no scrolling to find it. */
+  #pageSheet { position: fixed; left: 14px; right: 14px;
+    top: calc(env(safe-area-inset-top) + 64px); z-index: 80;
+    max-height: 62vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    background: var(--card); border: 1px solid var(--line); border-radius: 20px;
+    padding: 14px; box-shadow: 0 24px 60px var(--shadow); max-width: 560px; margin: 0 auto; }
   .feat-card { flex: 1; min-width: 0; background: none; border: none; padding: 0;
     display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 0; }
   .feat-card .fwrap { overflow: hidden; border-radius: 22px; box-shadow: 0 8px 24px var(--shadow); }
@@ -1189,7 +1196,9 @@
   <div id="pageBody">
     <p class="hint">Compose a whole Home Screen page — a single widget can't cover a full page (Apple caps at Large), so this designs the set together and gives you an exact placement checklist. Clear/Glass backgrounds make it look like one seamless panel.</p>
     <div class="row" style="margin-bottom:10px">
-      <button class="primary" id="pageAddBtn" style="flex:1"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-plus"/></svg> Add widget</button>
+      <button class="primary" id="pageAddBtn" style="flex:2"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-plus"/></svg> Add widget</button>
+      <button id="pageWallBtn" style="flex:1"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-photo"/></svg> Wallpaper</button>
+      <input type="file" id="pageWallInput" accept="image/*" style="display:none">
     </div>
     <div id="pageFrame"></div>
     <div id="pageSheet" style="display:none">
@@ -1259,7 +1268,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 110;
+const WK_VERSION = 111;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -5536,6 +5545,7 @@ function slimDesign(d) {
   const c = JSON.parse(JSON.stringify(d));
   delete c.id;
   delete c.launcherStyle;
+  delete c.sizes;
   for (const el of c.canvasElements || []) {
     delete el.id;
     if (el.kind === "photo") { delete el.dataUrl; delete el.photos; }
@@ -9135,6 +9145,14 @@ function loadIntoEditor(design) {
   if (SIZES[current.fitSize]) previewSize = current.fitSize;
   else current.fitSize = previewSize;
   resetSizeMemory(current, previewSize);
+  // v111: saved per-size layouts re-seed the session memory, so switching
+  // sizes restores what the user authored instead of refitting.
+  if (current.sizes) {
+    const store = sizeMemory[current.id];
+    for (const k of Object.keys(current.sizes)) {
+      if (SIZES[k] && !store.snaps[k]) store.snaps[k] = JSON.parse(JSON.stringify(current.sizes[k]));
+    }
+  }
   // Older designs used Shortcut bounces for apps we now know direct links
   // for — silently upgrade them (direct always beats the Shortcut hop).
   let upgradedLinks = 0;
@@ -9717,6 +9735,24 @@ document.getElementById("saveBtn").onclick = function () {
   if (current.starter) {
     delete current.starter;
     if (current.folder === "Starters") delete current.folder;
+  }
+  // v111: per-size layouts become DURABLE. The editor's size memory only
+  // lived for the session, so the medium arrangement someone crafted was
+  // lost on reload and the page fell back to refitting the wrong layout.
+  if (current.kind === "freestyle") {
+    const store = sizeMemory[current.id];
+    const sizes = {};
+    // Keep every size's snapshot, filtered to elements that still exist —
+    // geomApply matches by id, so a stale entry simply doesn't apply.
+    if (store) {
+      const liveIds = {};
+      current.canvasElements.forEach(function (el) { liveIds[el.id] = 1; });
+      for (const k of Object.keys(store.snaps)) {
+        sizes[k] = store.snaps[k].filter(function (sn) { return liveIds[sn.id]; });
+      }
+    }
+    sizes[SIZES[previewSize] ? previewSize : current.fitSize] = geomCopy(current.canvasElements);
+    current.sizes = sizes;
   }
   const rawName = document.getElementById("nameInput").value || "My Widget";
   current.name = dedupedName(rawName, current.id);
@@ -12291,7 +12327,9 @@ let pageSnapCache = {};
 function renderPageFrame() {
   const frame = document.getElementById("pageFrame");
   frame.innerHTML = "";
-  frame.style.background = WALLPAPER_STANDIN;
+  frame.style.background = pageState.wallpaper
+    ? 'url("' + pageState.wallpaper + '") center / cover'
+    : WALLPAPER_STANDIN;
   const frameW = frame.clientWidth || 280;
   pageState.items = pageState.items.filter(function (it) {
     return designs.some(function (d) { return d.id === it.id; });
@@ -12314,38 +12352,56 @@ function renderPageFrame() {
     div.style.width = (rect.w * 100) + "%";
     div.style.height = (rect.h * 100) + "%";
     div.style.touchAction = "none";
-    // v92: flat PNG snapshots, not live widget DOM (memory). v108: refit the
-    // design to the slot's size first so the layout is true to the slot.
+    // v92: flat PNG snapshots, not live widget DOM (memory). v108: refit to
+    // the slot's size. v111: a saved per-size layout beats refitting — the
+    // page shows what the user actually authored for that size.
     let fitted = design;
     if (design.fitSize !== slot.size && SIZES[design.fitSize] && SIZES[slot.size]) {
       fitted = normalizeDesign(JSON.parse(JSON.stringify(design)));
-      refitElements(fitted, design.fitSize, slot.size);
+      if (fitted.sizes && fitted.sizes[slot.size]) {
+        geomApply(fitted.canvasElements, fitted.sizes[slot.size]);
+      } else {
+        refitElements(fitted, design.fitSize, slot.size);
+      }
       fitted.fitSize = slot.size;
     }
-    const snapKey = design.id + "|" + slot.size + "|" + (design.schemaVersion || 0);
-    const img = document.createElement("img");
-    img.alt = design.name;
-    img.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none";
-    div.appendChild(img);
-    if (pageSnapCache[snapKey]) {
-      img.src = pageSnapCache[snapKey];
-    } else {
-      renderDesignPng(fitted, slot.size).then(function (png) {
-        if (png) { pageSnapCache[snapKey] = png; img.src = png; }
-        else {
-          img.remove();
-          const inner = renderDesignNode(fitted, slot.size);
-          inner.style.position = "absolute";
-          inner.style.left = "0";
-          inner.style.top = "0";
-          inner.style.transformOrigin = "top left";
-          inner.style.pointerEvents = "none";
-          div.appendChild(inner);
-          requestAnimationFrame(function () {
-            inner.style.transform = "scale(" + ((div.clientWidth || rect.w * frameW) / SIZES[slot.size][0]) + ")";
-          });
-        }
+    // v111: two design classes can't ride the SVG snapshot path — launchers
+    // with remote App Store icon art (foreignObject can't load them: the
+    // tile came out empty) and clear backgrounds (the checkerboard standin
+    // baked in; on a page, clear should show the wallpaper through).
+    const needsLive = (design.kind === "launcher" &&
+        (design.apps || []).some(function (a) { return a.iconUrl && /^http/.test(a.iconUrl); })) ||
+      (design.canvasElements || []).some(function (el) { return el.kind === "app" && el.iconUrl && /^http/.test(el.iconUrl); }) ||
+      design.background === "clear";
+    const mountLive = function () {
+      const inner = renderDesignNode(fitted, slot.size);
+      if (design.background === "clear") inner.style.background = "transparent";
+      inner.style.position = "absolute";
+      inner.style.left = "0";
+      inner.style.top = "0";
+      inner.style.transformOrigin = "top left";
+      inner.style.pointerEvents = "none";
+      div.appendChild(inner);
+      requestAnimationFrame(function () {
+        inner.style.transform = "scale(" + ((div.clientWidth || rect.w * frameW) / SIZES[slot.size][0]) + ")";
       });
+    };
+    const snapKey = design.id + "|" + slot.size + "|" + (design.schemaVersion || 0);
+    if (needsLive) {
+      mountLive();
+    } else {
+      const img = document.createElement("img");
+      img.alt = design.name;
+      img.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none";
+      div.appendChild(img);
+      if (pageSnapCache[snapKey]) {
+        img.src = pageSnapCache[snapKey];
+      } else {
+        renderDesignPng(fitted, slot.size).then(function (png) {
+          if (png) { pageSnapCache[snapKey] = png; img.src = png; }
+          else { img.remove(); mountLive(); }
+        });
+      }
     }
     const del = document.createElement("button");
     del.className = "pxdel";
@@ -12493,6 +12549,64 @@ function openAddSheet(replaceIndex) {
   chips.appendChild(cancel);
 }
 document.getElementById("pageAddBtn").onclick = function () { openAddSheet(); };
+// v111: put YOUR wallpaper behind the page so the design mirrors the phone.
+document.getElementById("pageWallBtn").onclick = function () {
+  const sheet = document.getElementById("pageSheet");
+  sheet.style.display = "block";
+  document.getElementById("pageSheetTitle").textContent = "Page wallpaper:";
+  const chips = document.getElementById("pageSheetChips");
+  chips.innerHTML = "";
+  const upload = document.createElement("button");
+  upload.textContent = "Upload a photo";
+  upload.onclick = function () {
+    sheet.style.display = "none";
+    document.getElementById("pageWallInput").click();
+  };
+  const match = document.createElement("button");
+  match.textContent = "Match my widgets";
+  match.disabled = pageState.items.length === 0;
+  match.onclick = function () {
+    const first = designs.find(function (d) { return d.id === (pageState.items[0] || {}).id; });
+    if (!first) return;
+    pageState.wallpaper = makeWallpaper(first);
+    sheet.style.display = "none";
+    renderPageFrame();
+  };
+  const none = document.createElement("button");
+  none.textContent = "Default";
+  none.onclick = function () {
+    delete pageState.wallpaper;
+    sheet.style.display = "none";
+    renderPageFrame();
+  };
+  const cancel = document.createElement("button");
+  cancel.textContent = "Cancel";
+  cancel.onclick = function () { sheet.style.display = "none"; };
+  chips.append(upload, match, none, cancel);
+};
+document.getElementById("pageWallInput").onchange = function (event) {
+  const file = event.target.files && event.target.files[0];
+  event.target.value = "";
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function () {
+    const img = new Image();
+    img.onload = function () {
+      // Downscale before storing — a full camera photo as a data URI would
+      // blow the localStorage budget and the compositor.
+      const maxH = 1200;
+      const k = Math.min(1, maxH / img.height);
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * k);
+      c.height = Math.round(img.height * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      pageState.wallpaper = c.toDataURL("image/jpeg", 0.82);
+      renderPageFrame();
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+};
 function layoutMini(layout) {
   const mini = document.createElement("span");
   mini.className = "lay-mini";
@@ -12638,6 +12752,9 @@ document.getElementById("pageSaveBtn").onclick = function () {
       '<button style="font-size:12px;padding:6px 10px;min-height:32px" onclick="navigator.clipboard&&navigator.clipboard.writeText(\'' +
       param.replace(/'/g, "\\'") + '\');toast(\'Parameter copied ✓\')">📋 ' + esc(param) + '</button></div>';
   });
+  if (pageState.wallpaper) {
+    html += '<p class="hint" style="margin-top:8px">Wallpaper: set the same photo as your Home Screen wallpaper (Settings → Wallpaper) so the page matches this preview.</p>';
+  }
   html += '<p class="hint" style="margin-top:8px">Each widget: long-press Home Screen → Edit → Add Widget → Scriptable → size above → Edit Widget → Script <b>WidgetKing</b> → paste the Parameter (just the name — each design remembers its spot). Type <b>Name | position</b> only to override.</p>';
   list.innerHTML = html;
   toast("Page saved 💾 Checklist below");
