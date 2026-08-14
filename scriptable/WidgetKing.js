@@ -29,7 +29,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 95;
+const WK_VERSION = 96;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -605,7 +605,10 @@ async function fetchNews(count) {
         .replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
       if (t) titles.push(t);
     }
-    titles.shift(); // the first <title> is the feed's own name
+    // The feed's own name appears as the channel title AND the channel
+    // image title — drop every leading copy, not just the first.
+    const feedName = titles.length ? titles[0] : "";
+    while (titles.length && titles[0] === feedName) titles.shift();
     try { fm.writeString(cachePath, JSON.stringify({ at: Date.now(), titles: titles })); } catch (e) {}
     return titles.slice(0, count);
   } catch (e) { return null; }
@@ -617,7 +620,9 @@ function newsText(el, titles) {
   return titles.slice(0, n).map(function (t) {
     const cut = t.lastIndexOf(" - ");
     const s = cut > 20 ? t.slice(0, cut) : t;
-    return "▪ " + (s.length > 46 ? s.slice(0, 45) + "…" : s);
+    // Headlines wrap inside their column now — let them breathe. The old
+    // 46-char cap was from the single-line era and chopped every story.
+    return "▪ " + (s.length > 92 ? s.slice(0, 90) + "…" : s);
   }).join("\n");
 }
 function progressPct(el) {
@@ -1245,12 +1250,18 @@ function drawFreestyle(design, family, bgImg, live) {
       const isList = el.kind === "calendar" || el.kind === "reminders" || el.kind === "news";
       if (isList) {
         // Lists wrap inside the widest centered box that still FITS the
-        // widget at this position — matching the designer preview. A
-        // full-width box centered off-center ran long headlines straight
-        // off the widget edge.
+        // widget at this position, and the whole block centers on the
+        // element's anchor — exactly like the designer preview. Height is
+        // estimated from wrapped line count so the block sits where placed
+        // instead of drifting into empty space below.
         const boxW = Math.max(W * 0.3, Math.min(W, 2 * Math.min(px, W - px)));
-        const top = py - fs * 0.72;
-        ctx.drawTextInRect(text, new Rect(px - boxW / 2, top, boxW, Math.max(fs * 1.7, H - top)));
+        const perLine = Math.max(6, Math.floor(boxW / (fs * 0.52)));
+        let lineCount = 0;
+        for (const ln of String(text).split("\n")) {
+          lineCount += Math.max(1, Math.ceil(ln.length / perLine));
+        }
+        const estH = fs * 1.55 * lineCount;
+        ctx.drawTextInRect(text, new Rect(px - boxW / 2, py - estH / 2, boxW, estH + fs));
       } else {
         ctx.drawTextInRect(text, new Rect(px - W / 2, py - fs * 0.72, W, fs * 1.7));
       }
