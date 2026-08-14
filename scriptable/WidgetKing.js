@@ -30,7 +30,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 112;
+const WK_VERSION = 113;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -980,6 +980,25 @@ function drawBgPattern(ctx, design, W, H) {
   }
 }
 function drawFreestyle(design, family, bgImg, live) {
+  // v113: a design can carry the layout the user authored for THIS size —
+  // apply it so the widget matches the editor instead of stretching the
+  // authored-size coordinates.
+  if (design.sizes && design.sizes[family] && design.fitSize !== family) {
+    design = JSON.parse(JSON.stringify(design));
+    const snapList = design.sizes[family];
+    const snapById = {};
+    for (let si = 0; si < snapList.length; si++) snapById[snapList[si].id] = snapList[si];
+    const elsAll = design.canvasElements || [];
+    for (let ei = 0; ei < elsAll.length; ei++) {
+      const sv = snapById[elsAll[ei].id];
+      if (!sv) continue;
+      elsAll[ei].x = sv.x;
+      elsAll[ei].y = sv.y;
+      if (typeof sv.size === "number") elsAll[ei].size = sv.size;
+      if (typeof sv.w === "number") elsAll[ei].w = sv.w;
+      if (typeof sv.h === "number") elsAll[ei].h = sv.h;
+    }
+  }
   // Draw at the device's true widget size (in pixels) so nothing stretches.
   const pts = widgetPointSizes(family);
   let s = 3;
