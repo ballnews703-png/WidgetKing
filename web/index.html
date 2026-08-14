@@ -711,7 +711,16 @@
         <button id="welcomeGoBtn">Go</button>
       </div>
     </div>
-    <div class="sheet-panel" id="panelWidget"></div>
+    <div class="sheet-panel" id="panelWidget">
+      <div id="tweakBlock" style="margin-bottom:12px">
+        <label style="font-size:12px;color:var(--muted)">✨ Quick tweaks — tap one, or ask in your own words</label>
+        <div class="chips" id="tweakChips" style="margin:6px 0"></div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="tweakInput" aria-label="Describe a change to this widget" placeholder="Change anything — try “warm sunset look”" style="flex:1">
+          <button class="primary" id="tweakBtn">Go</button>
+        </div>
+      </div>
+    </div>
     <div class="sheet-panel" id="panelTemplates">
       <div class="row" style="margin-bottom:8px">
         <input type="text" id="tplIdea" placeholder="Describe your ideal widget…" style="flex:1">
@@ -1080,7 +1089,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 101;
+const WK_VERSION = 102;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -9665,6 +9674,9 @@ for (const example of EXAMPLES) {
 function deliverMagicDesign(design, message) {
   loadIntoEditor(design);
   switchTab("editor");
+  // Land on the Widget tool so the fresh design arrives with Quick Tweaks
+  // in view — the moment after generation is when refinements get asked for.
+  setSheetTool("widget");
   popCanvas();
   if (message) toast(message);
   if (current.kind === "launcher" && current.apps.some(function (a) { return !a.iconUrl; })) {
@@ -10794,6 +10806,7 @@ function setSheetTool(name) {
   });
   if (name === "pieces" || name === "templates") renderRecents(name);
   if (name === "background") renderBgPatternChips();
+  if (name === "widget") renderTweakChips();
   // Selecting an element must NOT resize the sheet/canvas — a height change
   // mid-tap rebuilds the canvas under the finger (the tap-crash class).
   if (name !== "edit") applySheetDetent(sheetDetentFor(name));
@@ -10887,9 +10900,11 @@ document.getElementById("textGenerateBtn").onclick = function () {
   document.getElementById("textIdea").value = "";
   refreshEditors();
 };
-document.getElementById("bgGenerateBtn").onclick = function () {
-  const idea = document.getElementById("bgIdea").value.trim().toLowerCase();
-  if (!idea || !current) return;
+// Shared keyless style parser: mutates `current` from a plain-words wish and
+// returns the matched tokens (empty array = nothing style-like understood).
+// Used by the Background panel's Generate and by Quick Tweaks' keyless path.
+function applyStyleWish(idea) {
+  const matched = [];
   const patWords = {
     grain: ["grain", "noise", "film", "vintage", "retro"],
     dots: ["dot", "polka", "bubble"],
@@ -10903,10 +10918,9 @@ document.getElementById("bgGenerateBtn").onclick = function () {
   for (const p of Object.keys(patWords)) {
     if (patWords[p].some(function (w) { return idea.includes(w); })) { pattern = p; break; }
   }
-  if (/mesh|dreamy|aura|blend/.test(idea)) current.gradientDir = "mesh";
-  if (/glass|frost/.test(idea)) current.background = "glass";
-  else if (/clear|transparent|see.?through/.test(idea)) current.background = "clear";
-  else current.background = "gradient";
+  if (/mesh|dreamy|aura|blend/.test(idea)) { current.gradientDir = "mesh"; matched.push("mesh"); }
+  if (/glass|frost/.test(idea)) { current.background = "glass"; matched.push("glass"); }
+  else if (/clear|transparent|see.?through/.test(idea)) { current.background = "clear"; matched.push("clear"); }
   let theme = Object.keys(THEMES).find(function (n) { return idea.includes(n); });
   if (!theme) {
     const moods = {
@@ -10923,14 +10937,144 @@ document.getElementById("bgGenerateBtn").onclick = function () {
       if (THEMES[t] && moods[t].some(function (w) { return idea.includes(w); })) { theme = t; break; }
     }
   }
-  if (theme) { current.themeID = theme; current.customColors = null; }
-  current.bgPattern = pattern || (/plain|clean|simple|none/.test(idea) ? "" : current.bgPattern);
+  if (theme) { current.themeID = theme; current.customColors = null; matched.push(theme); }
+  if (pattern) { current.bgPattern = pattern; matched.push(pattern); }
+  else if (/plain|clean|simple|none/.test(idea)) { current.bgPattern = ""; matched.push("plain"); }
+  return matched;
+}
+document.getElementById("bgGenerateBtn").onclick = function () {
+  const idea = document.getElementById("bgIdea").value.trim().toLowerCase();
+  if (!idea || !current) return;
+  const matched = applyStyleWish(idea);
+  // A background request always yields a background — anything not explicitly
+  // glass/clear becomes a gradient (pre-refactor behavior, kept on purpose).
+  if (matched.indexOf("glass") < 0 && matched.indexOf("clear") < 0) current.background = "gradient";
   renderControls();
   refreshEditors();
   renderPreview();
   renderBgPatternChips();
-  toast("🎨 " + (theme || current.themeID) + (pattern ? " + " + pattern : "") + " — tweak anything below");
+  toast("🎨 " + current.themeID + (current.bgPattern ? " + " + current.bgPattern : "") + " — tweak anything below");
 };
+// ==================== Quick Tweaks (v102) ====================
+// The lesson from the best AI-editor flows: after a widget exists, the app
+// should PROPOSE the next changes, not present a blank input. Three chips,
+// always contextual to the current design, always working without a key
+// (deterministic appliers); the free-text row uses the AI when a key exists
+// and falls back to the style parser + simple ops without one.
+const TWEAK_HOP = { midnight: "sunset", sunset: "ocean", ocean: "gold", gold: "midnight",
+  candy: "lavender", lavender: "candy", neon: "midnight", forest: "paper", paper: "forest" };
+const TWEAK_PATTERN = { candy: "dots", lavender: "blobs", neon: "grid", ocean: "waves",
+  forest: "paper", paper: "grain", midnight: "grain", sunset: "grain", gold: "grain" };
+function tweakHeadlineEl() {
+  let best = null;
+  for (const el of (current && current.canvasElements) || []) {
+    if (el.kind !== "text" && el.kind !== "clock" && el.kind !== "date") continue;
+    if (!best || (el.size || 0) > (best.size || 0)) best = el;
+  }
+  return best;
+}
+function suggestTweaks() {
+  if (!current) return [];
+  const out = [];
+  const hop = TWEAK_HOP[current.themeID] ||
+    Object.keys(THEMES).find(function (t) { return t !== current.themeID; });
+  if (hop) out.push({ label: "Try a " + hop + " palette", apply: function () {
+    current.themeID = hop; current.customColors = null;
+  } });
+  if (!current.bgPattern) {
+    const pat = TWEAK_PATTERN[current.themeID] || "grain";
+    out.push({ label: "Add a soft " + pat + " texture", apply: function () { current.bgPattern = pat; } });
+  } else {
+    out.push({ label: "Drop the texture", apply: function () { current.bgPattern = ""; } });
+  }
+  const hero = tweakHeadlineEl();
+  if (hero && (hero.size || 0) < 48) {
+    out.push({ label: "Make the hero bigger", apply: function () {
+      hero.size = Math.min(Math.round((hero.size || 18) * 1.35), 72);
+    } });
+  } else if (current.background === "gradient" && current.gradientDir !== "mesh") {
+    out.push({ label: "Blend a dreamy mesh", apply: function () { current.gradientDir = "mesh"; } });
+  } else {
+    const fonts = Object.keys(FONT_CSS).filter(function (f) { return f !== current.fontStyle; });
+    out.push({ label: "Switch up the font", apply: function () {
+      current.fontStyle = fonts[(current.name || "").length % fonts.length] || fonts[0];
+    } });
+  }
+  return out.slice(0, 3);
+}
+function renderTweakChips() {
+  const row = document.getElementById("tweakChips");
+  if (!row) return;
+  row.innerHTML = "";
+  for (const t of suggestTweaks()) {
+    const b = document.createElement("button");
+    b.textContent = t.label;
+    b.onclick = function () {
+      if (!current) return;
+      t.apply();
+      syncControls();
+      renderAll();
+      popCanvas();
+      toast("✨ " + t.label);
+      renderTweakChips();
+    };
+    row.appendChild(b);
+  }
+}
+function keylessTweak(wish) {
+  const idea = wish.toLowerCase();
+  const notes = applyStyleWish(idea).slice();
+  const hero = tweakHeadlineEl();
+  if (hero && /bigger|larger|huge|bolder|pop/.test(idea)) {
+    hero.size = Math.min(Math.round((hero.size || 18) * 1.35), 72);
+    notes.push("bigger hero");
+  } else if (hero && /smaller|shrink|subtle|quieter/.test(idea)) {
+    hero.size = Math.max(8, Math.round((hero.size || 18) * 0.75));
+    notes.push("smaller hero");
+  }
+  if (notes.length === 0) {
+    toast("💡 Tap a chip below — or add an AI key in ⚙️ Settings to ask for anything in your own words");
+    return;
+  }
+  syncControls();
+  renderAll();
+  popCanvas();
+  renderTweakChips();
+  toast("✨ " + notes.join(" + "));
+}
+document.getElementById("tweakBtn").onclick = async function () {
+  const wish = document.getElementById("tweakInput").value.trim();
+  if (!wish || !current) return;
+  const key = getApiKey();
+  if (!key) { keylessTweak(wish); return; }
+  const button = document.getElementById("tweakBtn");
+  const forId = current.id;
+  button.disabled = true;
+  button.textContent = "…👑";
+  try {
+    const refined = await callClaude([{ role: "user", content:
+      "REFINE an existing widget design — do not start over. Current design JSON: " +
+      JSON.stringify(slimDesign(current)) +
+      "\nRequested change: " + wish +
+      "\nApply the requested change plus only the small adjustments needed to keep the design beautiful. Preserve everything the request doesn't touch: same kind, same content, same overall composition. Return the FULL spec." }], key);
+    if (!current || current.id !== forId) { toast("Design changed — refine skipped"); return; }
+    refined.id = current.id;
+    refined.folder = current.folder;
+    loadIntoEditor(refined);
+    popCanvas();
+    renderTweakChips();
+    document.getElementById("tweakInput").value = "";
+    toast("Refined 👑 — undo if it went too far");
+  } catch (error) {
+    toast("⚠️ Couldn't refine: " + error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = "Go";
+  }
+};
+document.getElementById("tweakInput").addEventListener("keydown", function (e) {
+  if (e.key === "Enter") { e.preventDefault(); document.getElementById("tweakBtn").onclick(); }
+});
 (function buildRail() {
   const rail = document.getElementById("editorRail");
   for (const t of RAIL_TOOLS) {

@@ -48,6 +48,19 @@ vocabulary with `surface` so "make this work on my Lock Screen" is a prompt it
 can satisfy, and one prompt can produce a coordinated family — Home Screen,
 Lock Screen, watch — visually related because the format is shared.
 
+## Native-only data elements (backlog for the native app)
+
+Observed in the market (Aug 2026): competing widget apps sell data sources that
+Scriptable cannot reach, so these wait for the native app — worth having ready:
+
+- **Now Playing** (MusicKit / MPMediaPlayer): current or last-played track with
+  album art. High demand, impossible from Scriptable.
+- **Health rings** (HealthKit): steps, heart rate, activity — fits our existing
+  ring element; needs entitlements + a privacy-string story.
+- **Service status boards** (plain HTTP, works today): dev-audience niche a
+  competitor charges for; our generic news/stocks fetch pattern covers it —
+  candidate for a Scriptable-era template pack, not blocked on native.
+
 ## UI rule
 
 No visible surface switcher until a second surface actually ships — no
