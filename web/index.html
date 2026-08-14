@@ -1268,7 +1268,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 113;
+const WK_VERSION = 114;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -5460,6 +5460,25 @@ function aiSystemPrompt(requestText) {
     "VARIETY: similar requests must NOT produce similar widgets. Rotate archetypes, pick a fresh palette (never a reference's), vary the hero (clock vs date vs ring vs type), and add one unexpected-but-tasteful touch per design — an unusual font pairing, an off-center anchor, a two-tone capsule, a wildcard accent.\n" +
     "Today is " + today + ". Resolve relative dates to yyyy-MM-dd. Names under 24 chars. Fill unused fields with empty strings, 0, or empty arrays. Compose like a designer, not a form-filler: every element should earn its place.";
 }
+// v114: a serialized SVG foreignObject carries NONE of the page's
+// stylesheets, so class-styled nodes lose those rules when rasterized —
+// .cel lost its position:absolute and every freestyle element collapsed
+// into the container's centered flex column (Wordle rendered as a vertical
+// stack in page snapshots while the live node was pixel-perfect). Bake the
+// few rules the preview renderers rely on into the serialized markup.
+function snapshotStyleNode() {
+  const st = document.createElement("style");
+  st.textContent = "*{box-sizing:border-box;margin:0;padding:0}" +
+    ".cel{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;line-height:1.1}" +
+    ".cel-photo img{display:block;width:100%;height:100%;object-fit:cover}" +
+    ".launch-flex{display:flex;flex-direction:column;justify-content:center;gap:10px;width:100%;height:100%;padding:12px}" +
+    ".launch-row{display:flex;justify-content:space-evenly;align-items:flex-start;width:100%}" +
+    ".launch-cell{display:flex;flex-direction:column;align-items:center;gap:3px}" +
+    ".launch-label{white-space:nowrap;overflow:hidden;max-width:100%;font-size:9px;opacity:.85}" +
+    ".launch-icon{border-radius:12px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;overflow:hidden}" +
+    ".launch-icon img{width:100%;height:100%;display:block;object-fit:cover}";
+  return st;
+}
 // Render a design to a PNG data URL (2x) so the AI can SEE its own work.
 // Same foreignObject technique as share cards; returns null on any failure
 // (remote images can't load inside SVG-as-image) so callers degrade quietly.
@@ -5470,6 +5489,7 @@ async function renderDesignPng(design, sizeKey) {
     const holder = document.createElement("div");
     holder.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
     holder.style.cssText = "width:" + dims[0] + "px;height:" + dims[1] + "px;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif";
+    holder.appendChild(snapshotStyleNode());
     holder.appendChild(node);
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + dims[0] + '" height="' + dims[1] + '">' +
       '<foreignObject width="100%" height="100%">' + new XMLSerializer().serializeToString(holder) + '</foreignObject></svg>';
@@ -10634,6 +10654,7 @@ async function shareCard(design) {
     const holder = document.createElement("div");
     holder.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
     holder.style.cssText = "width:" + dims[0] + "px;height:" + dims[1] + "px;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif";
+    holder.appendChild(snapshotStyleNode());
     holder.appendChild(node);
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + dims[0] + '" height="' + dims[1] + '">' +
       '<foreignObject width="100%" height="100%">' + new XMLSerializer().serializeToString(holder) + '</foreignObject></svg>';
