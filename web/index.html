@@ -1075,7 +1075,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 99;
+const WK_VERSION = 100;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -11029,25 +11029,18 @@ function wtArt(targetId, design, sizeKey, scale) {
   box.style.height = Math.round(dims[1] * scale) + "px";
   box.appendChild(node);
 }
+// Tour art comes from the SHOWCASE templates — the QA'd, doctrine-level
+// designs — so the first thing a new user sees is our best work, and the
+// tour improves automatically whenever the templates do.
+function tourDesign(name, fallback) {
+  const t = buildTemplates().find(function (x) { return x.design.name === name; });
+  return t ? JSON.parse(JSON.stringify(t.design)) : fallback;
+}
 function showWelcomeTour() {
-  wtArt("wtArtL", { name: "TourL", kind: "freestyle", themeID: "forest", bgPattern: "waves", canvasElements: [
-    { id: "l1", kind: "greeting", x: 0.5, y: 0.34, size: 15 },
-    { id: "l2", kind: "date", x: 0.5, y: 0.62, size: 11, opacity: 0.85 }
-  ] }, "small", 0.72);
-  wtArt("wtArt0", { name: "Tour", kind: "freestyle", themeID: "sunset", gradientDir: "mesh", canvasElements: [
-    { id: "w1", kind: "clock", x: 0.5, y: 0.38, size: 26, font: "serif" },
-    { id: "w2", kind: "weather", x: 0.5, y: 0.72, size: 12 }
-  ] }, "small", 0.95);
-  wtArt("wtArtR", { name: "TourR", kind: "freestyle", themeID: "midnight", bgPattern: "grain", canvasElements: [
-    { id: "r1", kind: "text", text: "dream big", x: 0.5, y: 0.42, size: 14, font: "cochin" },
-    { id: "r2", kind: "progress", x: 0.5, y: 0.7, w: 0.55, size: 5, source: "day" }
-  ] }, "small", 0.72);
-  wtArt("wtArt1", { name: "Tour2", kind: "freestyle", themeID: "midnight", canvasElements: [
-    { id: "d1", kind: "text", text: "TODAY", x: 0.24, y: 0.2, size: 9, opacity: 0.75 },
-    { id: "d2", kind: "date", x: 0.26, y: 0.42, size: 15 },
-    { id: "d3", kind: "weather", x: 0.26, y: 0.68, size: 12 },
-    { id: "d4", kind: "calendar", x: 0.72, y: 0.5, size: 10, count: 2 }
-  ] }, "medium", 0.72);
+  wtArt("wtArtL", tourDesign("Dreamy Hours", { name: "TourL", kind: "clock", themeID: "candy" }), "small", 0.72);
+  wtArt("wtArt0", tourDesign("Crown Jewel", { name: "Tour", kind: "clock", themeID: "lavender" }), "small", 0.95);
+  wtArt("wtArtR", tourDesign("Night Drive", { name: "TourR", kind: "clock", themeID: "midnight" }), "small", 0.72);
+  wtArt("wtArt1", tourDesign("Desk Brief", { name: "Tour2", kind: "clock", themeID: "midnight" }), "medium", 0.72);
   wtStep = 0;
   wtRenderStep();
   document.getElementById("welcomeTour").classList.add("open");
