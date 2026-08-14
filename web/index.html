@@ -178,9 +178,13 @@
   .tpl-row { display: flex; flex-wrap: wrap; gap: 10px; }
   #editorModeHead #saveRow { position: static; margin: 0 0 0 auto; display: flex; gap: 6px; padding: 0; }
   #editorModeHead #saveRow button { min-height: 38px; padding: 6px 12px; font-size: 13px; flex: none; }
-  #editorModeHead { flex: none; display: flex; align-items: center; gap: 8px;
-    background: var(--bg); padding: calc(env(safe-area-inset-top) + 6px) 0 6px; }
-  #editorModeHead .title { font-weight: 700; font-size: 14px; white-space: nowrap; }
+  #editorModeHead { flex: none; display: flex; align-items: center; gap: 6px;
+    background: var(--bg); padding: calc(env(safe-area-inset-top) + 4px) 0 4px;
+    overflow-x: auto; scrollbar-width: none; }
+  #editorModeHead::-webkit-scrollbar { display: none; }
+  #editorModeHead > button, #editorMode .size-buttons button {
+    min-height: 38px; padding: 6px 10px; font-size: 13px; flex: none; }
+  #editorMode .size-buttons { margin: 0; gap: 4px; flex: none; }
   #editorMode #saveRow { bottom: env(safe-area-inset-bottom); }
   /* v83: shared page skeleton — actions block + collapsible sections. */
   .wk-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
@@ -279,7 +283,7 @@
   #studioHead { display: flex; align-items: center; gap: 8px; padding: 4px 0 8px;
     flex-wrap: wrap; }
   #studioHead .size-buttons { margin-right: auto; }
-  #studioStage { height: clamp(240px, calc(100dvh - var(--sheet-h, 40vh) - 197px), 560px);
+  #studioStage { height: clamp(300px, calc(100dvh - var(--sheet-h, 40vh) - 140px), 620px);
     display: flex; align-items: center; justify-content: center;
     padding: 14px; overflow: hidden; position: relative;
     border-radius: 16px; transition: height .18s ease;
@@ -338,10 +342,10 @@
   .guide-row .gl { font-size: 10px; letter-spacing: 0.08em; color: var(--accent); font-weight: 700; }
   .guide-row .gn { font-size: 15px; font-weight: 700; }
   .guide-row .gp { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
-  #guideSheet { position: fixed; inset: 0; z-index: 60; background: var(--bg); display: none;
+  #guideSheet, #cloneSheet { position: fixed; inset: 0; z-index: 60; background: var(--bg); display: none;
     flex-direction: column; overscroll-behavior: contain; padding-top: env(safe-area-inset-top); }
-  #guideSheet.open { display: flex; }
-  #guideBody { flex: 1; overflow-y: auto; padding: 16px; -webkit-overflow-scrolling: touch; }
+  #guideSheet.open, #cloneSheet.open { display: flex; }
+  #guideBody, #cloneBody { flex: 1; overflow-y: auto; padding: 16px; -webkit-overflow-scrolling: touch; }
   .wiz-action { display: inline-block; background: var(--accent); color: var(--accent-text);
     border: none; border-radius: 10px; padding: 11px 16px; font-size: 14px; font-weight: 600;
     text-decoration: none; cursor: pointer; }
@@ -463,6 +467,13 @@
   .sec-card { background: var(--card); border-radius: 20px; padding: 14px 16px;
     box-shadow: 0 1px 2px var(--shadow); }
   button .ic { vertical-align: -5px; margin-right: 4px; }
+  #recentStrip { display: flex; gap: 10px; overflow-x: auto; padding: 2px 0 8px;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  #recentStrip::-webkit-scrollbar { display: none; }
+  #recentStrip button { flex: none; background: none; border: none; padding: 2px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 0; }
+  #recentStrip .rname { font-size: 11px; color: var(--muted); max-width: 82px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* v107: gradient hero card (Create's AI entry) */
   section.hero-card { background: linear-gradient(135deg, #6d33e0, #9a55f2 55%, #c77bf0);
     color: #fff; }
@@ -534,6 +545,10 @@
 
 <section id="builderSection" class="pane pane-create">
   <div id="statusCard" class="status-card" style="display:none"></div>
+  <div id="recentRow" style="display:none">
+    <div class="sec-label" style="margin:4px 4px 6px">Jump back in</div>
+    <div id="recentStrip"></div>
+  </div>
   <h2>What are we making today?</h2>
   <div class="method-cards">
     <button id="exploreTabBtn"><svg class="ic" aria-hidden="true"><use href="#i-compass"/></svg> Explore gallery<br><span style="font-size:11px;color:var(--muted)">widgets &amp; icon styles</span></button>
@@ -582,8 +597,7 @@
 
 <div id="editorMode">
 <div id="editorModeHead">
-  <button id="editorDoneBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-back"/></svg> Done</button>
-  <span class="title">Make it yours</span>
+  <button id="editorDoneBtn" aria-label="Done — back to your widgets"><svg class="ic" aria-hidden="true" style="margin:0"><use href="#i-back"/></svg></button>
   <span class="spacer"></span>
 </div>
 
@@ -786,8 +800,8 @@
       </div>
       </div></details>
       <div class="row" id="saveRow">
-        <button class="primary" id="saveBtn" style="flex:2"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-save"/></svg> Save design</button>
-        <button id="newBtn" style="flex:1"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-plus"/></svg> New</button>
+        <button class="primary" id="saveBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-save"/></svg> Save</button>
+        <button id="newBtn" aria-label="New widget"><svg class="ic ic-sm" aria-hidden="true" style="margin:0"><use href="#i-plus"/></svg></button>
       </div>
     </div>
   </div>
@@ -949,8 +963,15 @@
 <section id="studioTabSection" class="pane pane-studio">
   <p class="hint">Design your whole phone at once — a full Home Screen page, or a matching set of app icons.</p>
   <div class="wk-actions">
-    <button class="primary" id="pageStudioBtn" style="flex:1;font-size:15px;padding:14px">📱 Design a page<br><span style="font-size:11px;opacity:.85">whole Home Screen — widgets, icons, wallpaper</span></button>
+    <button class="primary" id="pageStudioBtn" style="flex:1;font-size:15px;padding:14px"><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg> Design a page<br><span style="font-size:11px;opacity:.85">whole Home Screen — widgets, icons, wallpaper</span></button>
   </div>
+  <div class="wk-actions" style="margin-top:10px">
+    <button id="studioNewWidgetBtn" style="flex:1"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-plus"/></svg> Create a widget</button>
+    <button id="studioCloneBtn" style="flex:1"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-camera"/></svg> Clone a widget</button>
+  </div>
+  <button id="studioMagicBtn" style="width:100%;margin-top:10px;background:var(--accent);border-color:var(--accent);color:var(--accent-text);font-size:14px;padding:10px">
+    <svg class="ic ic-sm" aria-hidden="true"><use href="#i-crown"/></svg> Have WidgetKing make it <svg class="ic ic-sm" aria-hidden="true" style="margin:0 0 0 2px"><use href="#i-wand"/></svg>
+  </button>
 </section>
 
 <section id="iconMakerSection" class="pane pane-studio">
@@ -1064,6 +1085,20 @@
     <button id="guideCloseBtn">✕ Done</button>
   </div>
   <div id="guideBody"></div>
+</div>
+<div id="cloneSheet" role="dialog" aria-modal="true" aria-labelledby="cloneTitle">
+  <div style="border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:14px 16px">
+    <span id="cloneTitle" style="font-weight:700;font-size:17px"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg> Clone a widget</span>
+    <button id="cloneCloseBtn"><svg class="ic ic-sm" aria-hidden="true" style="margin:0"><use href="#i-close"/></svg> Done</button>
+  </div>
+  <div id="cloneBody">
+    <p class="hint" style="font-size:14px;margin:0 0 14px">Lost a widget you designed and only have a screenshot? Saw a look somewhere you want to learn from? Upload a photo and WidgetKing studies it and rebuilds the design as YOURS — every piece editable.</p>
+    <div class="wiz-card"><div class="wiz-num">1</div><div class="wiz-text" style="align-self:center">Pick a screenshot — a Home Screen page, an old backup photo, anything showing the widget clearly.</div></div>
+    <div class="wiz-card"><div class="wiz-num">2</div><div class="wiz-text" style="align-self:center">WidgetKing rebuilds it as an editable design — colors, text, pieces, all yours to change.</div></div>
+    <div class="wiz-card"><div class="wiz-num">3</div><div class="wiz-text" style="align-self:center">It lands in the editor. Tweak anything, then Save.</div></div>
+    <p class="hint" style="font-size:12.5px;margin:10px 2px">Play fair: clone your own designs and use others' work as inspiration only — don't recreate paid widgets from other apps or creators to avoid buying them.</p>
+    <button class="primary" id="clonePickBtn" style="width:100%;padding:14px;font-size:15px;margin-top:4px">Choose a screenshot</button>
+  </div>
 </div>
 <div id="setupWizard">
   <div id="wizardHead">
@@ -1196,7 +1231,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 107;
+const WK_VERSION = 108;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -6287,11 +6322,14 @@ function renderPreview() {
   update();
 })();
 function makeThumb(design, scale) {
+  // v108: render at the design's OWN size — a medium design squeezed into a
+  // small square showed with its whole layout distorted.
+  const dims = SIZES[design.fitSize] || SIZES.small;
   const outer = document.createElement("div");
-  outer.style.cssText = "width:" + Math.round(158 * scale) + "px;height:" + Math.round(158 * scale) +
+  outer.style.cssText = "width:" + Math.round(dims[0] * scale) + "px;height:" + Math.round(dims[1] * scale) +
     "px;overflow:hidden;border-radius:" + Math.round(28 * scale) + "px;flex-shrink:0;margin:0 auto";
   const inner = document.createElement("div");
-  inner.style.cssText = "width:158px;height:158px;transform:scale(" + scale + ");transform-origin:top left;" +
+  inner.style.cssText = "width:" + dims[0] + "px;height:" + dims[1] + "px;transform:scale(" + scale + ");transform-origin:top left;" +
     "display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;" +
     "position:relative;overflow:hidden";
   if (design.kind === "playlist") {
@@ -8645,7 +8683,7 @@ function buildTemplates() {
       { kind: "shape", shape: "pill", x: 0.5, y: 0.78, w: 0.78, h: 0.19, colorHex: "#F2B694", opacity: 1 },
       { kind: "weather", wmode: "tomorrow", unit: "f", x: 0.5, y: 0.78, size: 10, colorHex: "#33200F", opacity: 1, bold: true }
     ] } },
-    { category: "Pro", pack: "Pro", size: "medium", design: { name: "Editor's Desk", kind: "freestyle", themeID: "paper", fontStyle: "bodoni", textColorHex: "#26221E", fitSize: "medium", canvasElements: [
+    { category: "Designer", pack: "Designer", size: "medium", design: { name: "Editor's Desk", kind: "freestyle", themeID: "paper", fontStyle: "bodoni", textColorHex: "#26221E", fitSize: "medium", canvasElements: [
       { kind: "date", x: 0.26, y: 0.28, size: 22, colorHex: "#26221E", opacity: 1, bold: true },
       { kind: "shape", shape: "rect", x: 0.26, y: 0.46, w: 0.36, h: 0.007, colorHex: "#26221E", opacity: 0.7 },
       { kind: "weather", wmode: "cond", unit: "f", x: 0.26, y: 0.6, size: 10, colorHex: "#6E675E", opacity: 1 },
@@ -8759,7 +8797,7 @@ function buildTemplates() {
     { category: "Clocks", pack: "Cute", design: { name: "Rose Clock", kind: "clock", themeID: "rosegold", fontStyle: "didot", textColorHex: "#FFF6F2" } },
     { category: "Dates", pack: "Zen", design: { name: "Sage Days", kind: "date", themeID: "sage", fontStyle: "serif", textColorHex: "#F3F8F2" } },
     { category: "Live", pack: "Live", design: { name: "Cozy Battery", kind: "battery", themeID: "mocha", fontStyle: "rounded", textColorHex: "#F5EBE0" } },
-    { category: "Pro", pack: "Pro", design: { name: "Power Hub", kind: "freestyle", themeID: "navy", fontStyle: "avenir", textColorHex: "#FFFFFF", canvasElements: [
+    { category: "Designer", pack: "Designer", design: { name: "Power Hub", kind: "freestyle", themeID: "navy", fontStyle: "avenir", textColorHex: "#FFFFFF", canvasElements: [
       { kind: "ring", source: "battery", x: 0.3, y: 0.5, w: 0.52, size: 7, colorHex: "#8FD3FE", opacity: 1 },
       { kind: "battery", x: 0.3, y: 0.5, size: 21, colorHex: "#FFFFFF", opacity: 1 },
       { kind: "text", text: "POWER", x: 0.72, y: 0.3, size: 10, colorHex: "#8FD3FE", opacity: 0.9, w: 0, align: "center", bold: true },
@@ -8767,13 +8805,13 @@ function buildTemplates() {
       { kind: "shape", shape: "rect", x: 0.72, y: 0.58, w: 0.3, h: 0.006, size: 0, colorHex: "#FFFFFF", opacity: 0.25 },
       { kind: "progress", source: "day", x: 0.72, y: 0.7, w: 0.3, size: 5, colorHex: "#8FD3FE", opacity: 1 }
     ] } },
-    { category: "Pro", pack: "Pro", design: { name: "Golden Hour", kind: "freestyle", themeID: "custom", customColors: ["#2A1A34", "#B0626A"], fontStyle: "didot", textColorHex: "#FFF6EC", canvasElements: [
+    { category: "Designer", pack: "Designer", design: { name: "Golden Hour", kind: "freestyle", themeID: "custom", customColors: ["#2A1A34", "#B0626A"], fontStyle: "didot", textColorHex: "#FFF6EC", canvasElements: [
       { kind: "clock", x: 0.508, y: 0.46, size: 34, colorHex: "#141018", opacity: 0.3 },
       { kind: "clock", x: 0.5, y: 0.45, size: 34, colorHex: "#FFF6EC", opacity: 1 },
       { kind: "text", text: "golden hour", font: "script", x: 0.5, y: 0.66, size: 13, colorHex: "#F2B694", opacity: 1, w: 0, align: "center", bold: true },
       { kind: "icon", text: "☀", x: 0.86, y: 0.16, size: 14, colorHex: "#F2B694", opacity: 0.9 }
     ] } },
-    { category: "Pro", pack: "Pro", design: { name: "Split Card", kind: "freestyle", themeID: "cosmos", fontStyle: "futura", textColorHex: "#FFFFFF", canvasElements: [
+    { category: "Designer", pack: "Designer", design: { name: "Split Card", kind: "freestyle", themeID: "cosmos", fontStyle: "futura", textColorHex: "#FFFFFF", canvasElements: [
       { kind: "shape", shape: "rect", x: 0.27, y: 0.5, w: 0.44, h: 0.92, size: 0, colorHex: "#FFFFFF", opacity: 0.14 },
       { kind: "clock", x: 0.28, y: 0.42, size: 18, colorHex: "#FFFFFF", opacity: 1 },
       { kind: "date", x: 0.27, y: 0.58, size: 10, colorHex: "#C7A6FF", opacity: 0.95 },
@@ -8781,19 +8819,19 @@ function buildTemplates() {
       { kind: "shape", shape: "rect", x: 0.74, y: 0.47, w: 0.32, h: 0.006, size: 0, colorHex: "#FFFFFF", opacity: 0.3 },
       { kind: "calendar", x: 0.74, y: 0.62, size: 10, colorHex: "#FFFFFF", opacity: 0.9 }
     ] } },
-    { category: "Pro", pack: "Pro", design: { name: "Day Stack", kind: "freestyle", themeID: "mist", fontStyle: "optima", textColorHex: "#FFFFFF", canvasElements: [
+    { category: "Designer", pack: "Designer", design: { name: "Day Stack", kind: "freestyle", themeID: "mist", fontStyle: "optima", textColorHex: "#FFFFFF", canvasElements: [
       { kind: "weather", x: 0.5, y: 0.18, size: 22, colorHex: "#FFFFFF", opacity: 1, unit: "f" },
       { kind: "shape", shape: "rect", x: 0.5, y: 0.35, w: 0.68, h: 0.006, size: 0, colorHex: "#FFFFFF", opacity: 0.3 },
       { kind: "calendar", x: 0.5, y: 0.5, size: 12, colorHex: "#FFFFFF", opacity: 1 },
       { kind: "shape", shape: "rect", x: 0.5, y: 0.65, w: 0.68, h: 0.006, size: 0, colorHex: "#FFFFFF", opacity: 0.3 },
       { kind: "progress", source: "day", x: 0.5, y: 0.8, w: 0.68, size: 6, colorHex: "#BFD9EA", opacity: 1 }
     ] } },
-    { category: "Pro", pack: "Pro", design: { name: "Monogram", kind: "freestyle", themeID: "midnight", fontStyle: "copperplate", textColorHex: "#FFFFFF", canvasElements: [
+    { category: "Designer", pack: "Designer", design: { name: "Monogram", kind: "freestyle", themeID: "midnight", fontStyle: "copperplate", textColorHex: "#FFFFFF", canvasElements: [
       { kind: "ring", source: "year", x: 0.5, y: 0.48, w: 0.72, size: 4, colorHex: "#FFD75E", opacity: 0.9 },
       { kind: "text", text: "A", x: 0.5, y: 0.48, size: 52, colorHex: "#FFFFFF", opacity: 1, w: 0, align: "center", bold: true },
       { kind: "text", text: "est. 2026", x: 0.5, y: 0.85, size: 9, colorHex: "#FFD75E", opacity: 0.85, w: 0, align: "center", bold: false }
     ] } },
-    { category: "Pro", pack: "Pro", design: { name: "Neon Glow", kind: "freestyle", themeID: "custom", customColors: ["#0B0018", "#2B0A4E"], fontStyle: "mono", textColorHex: "#FFFFFF", canvasElements: [
+    { category: "Designer", pack: "Designer", design: { name: "Neon Glow", kind: "freestyle", themeID: "custom", customColors: ["#0B0018", "#2B0A4E"], fontStyle: "mono", textColorHex: "#FFFFFF", canvasElements: [
       { kind: "clock", x: 0.5, y: 0.46, size: 34, colorHex: "#FF2079", opacity: 0.3 },
       { kind: "clock", x: 0.5, y: 0.45, size: 34, colorHex: "#FFFFFF", opacity: 1 },
       { kind: "text", text: "S T A Y  E L E C T R I C", x: 0.5, y: 0.68, size: 9, colorHex: "#00F0FF", opacity: 1, w: 0, align: "center", bold: true },
@@ -8920,9 +8958,9 @@ function buildTemplates() {
   ];
 }
 let activePack = "all";
-const PACK_CHIPS = [["all", "✨ All"], ["Picks", "👑 Picks"], ["Bento", "🍱 Bento"], ["Glass", "🫧 Glass"], ["Cute", "🌸 Cute"], ["Minimal", "▫️ Minimal"],
+const PACK_CHIPS = [["all", "✨ All"], ["Picks", "👑 WidgetKing Picks"], ["Bento", "🍱 Bento"], ["Glass", "🫧 Glass"], ["Cute", "🌸 Cute"], ["Minimal", "▫️ Minimal"],
   ["Zen", "🍃 Zen"], ["Sports", "🏈 Sports"], ["Work", "💼 Work"],
-  ["Neon", "⚡ Neon"], ["Live", "🌤 Live"], ["Pro", "💎 Pro"]];
+  ["Neon", "⚡ Neon"], ["Live", "🌤 Live"], ["Designer", "💎 Designer"]];
 function renderTemplates(rowEl, chipEl) {
   const chipRow = chipEl || document.getElementById("packChips");
   chipRow.innerHTML = "";
@@ -9093,8 +9131,39 @@ function loadIntoEditor(design) {
     " upgraded — now opens directly, no Shortcut needed");
   selectedElId = null;
   multiSelect = null;
+  if (designs.some(function (d) { return d.id === current.id; })) recordRecentDesign(current.id);
   syncControls();
   renderAll();
+}
+// "Jump back in" (v108): a small horizontal strip of recently edited designs
+// at the top of Create. Ring of ids; stale ids simply filter out.
+function recordRecentDesign(id) {
+  try {
+    let list = JSON.parse(localStorage.getItem("widgetking.recent.designs") || "[]");
+    list = [id].concat(list.filter(function (v) { return v !== id; })).slice(0, 8);
+    localStorage.setItem("widgetking.recent.designs", JSON.stringify(list));
+  } catch (e) {}
+}
+function renderRecentDesigns() {
+  const wrap = document.getElementById("recentRow");
+  const strip = document.getElementById("recentStrip");
+  let list = [];
+  try { list = JSON.parse(localStorage.getItem("widgetking.recent.designs") || "[]"); } catch (e) {}
+  const items = list.map(function (id) { return designs.find(function (d) { return d.id === id; }); }).filter(Boolean);
+  strip.innerHTML = "";
+  if (!items.length) { wrap.style.display = "none"; return; }
+  wrap.style.display = "";
+  for (const d of items) {
+    const b = document.createElement("button");
+    b.setAttribute("aria-label", "Open " + d.name + " in the editor");
+    b.appendChild(makeThumb(d, 0.3));
+    const label = document.createElement("span");
+    label.className = "rname";
+    label.textContent = d.name;
+    b.appendChild(label);
+    b.onclick = function () { loadIntoEditor(d); switchTab("editor"); popCanvas(); };
+    strip.appendChild(b);
+  }
 }
 function syncControls() {
   document.getElementById("nameInput").value = current.name;
@@ -9533,9 +9602,27 @@ function renderLibrary() {
     };
     const shareButton = document.createElement("button");
     shareButton.innerHTML = '<svg class="ic ic-sm" aria-hidden="true" style="margin:0"><use href="#i-share"/></svg>';
-    shareButton.setAttribute("aria-label", "Share this design as a link");
-    shareButton.title = "Share this design as a link";
-    shareButton.onclick = function () { shareDesign(design); };
+    shareButton.setAttribute("aria-label", "Share this design");
+    shareButton.title = "Share this design";
+    // One share button (v108): tap opens a small inline chooser — link or
+    // image card — instead of two near-identical buttons per row.
+    shareButton.onclick = function () {
+      const existing = item.querySelector(".share-opts");
+      if (existing) { existing.remove(); return; }
+      const opts = document.createElement("div");
+      opts.className = "share-opts row";
+      opts.style.cssText = "width:100%;gap:8px;margin-top:4px";
+      const linkBtn = document.createElement("button");
+      linkBtn.textContent = "Copy link";
+      linkBtn.style.flex = "1";
+      linkBtn.onclick = function () { opts.remove(); shareDesign(design); };
+      const cardBtn = document.createElement("button");
+      cardBtn.textContent = "Image card";
+      cardBtn.style.flex = "1";
+      cardBtn.onclick = function () { opts.remove(); shareCard(design); };
+      opts.append(linkBtn, cardBtn);
+      item.appendChild(opts);
+    };
     const folderButton = document.createElement("button");
     folderButton.innerHTML = '<svg class="ic ic-sm" aria-hidden="true" style="margin:0"><use href="#i-folder"/></svg>';
     folderButton.setAttribute("aria-label", "Move to a folder");
@@ -9548,14 +9635,9 @@ function renderLibrary() {
       persist();
       renderLibrary();
     };
-    const cardButton = document.createElement("button");
-    cardButton.innerHTML = '<svg class="ic ic-sm" aria-hidden="true" style="margin:0"><use href="#i-photo"/></svg>';
-    cardButton.setAttribute("aria-label", "Share as an image card");
-    cardButton.title = "Share as an image card";
-    cardButton.onclick = function () { shareCard(design); };
     const actions = document.createElement("div");
     actions.className = "actions";
-    actions.append(editButton, dupButton, shareButton, cardButton, folderButton, deleteButton);
+    actions.append(editButton, dupButton, shareButton, folderButton, deleteButton);
     item.append(meta, actions);
     library.appendChild(item);
   }
@@ -9855,11 +9937,28 @@ document.getElementById("newWidgetBtn").onclick = function () {
   switchTab("editor");
 };
 document.getElementById("cloneBtn").onclick = function () {
+  document.getElementById("cloneSheet").classList.add("open");
+  document.body.style.overflow = "hidden";
+};
+// Studio's entry points (v108) reuse the Create handlers.
+document.getElementById("studioNewWidgetBtn").onclick = function () { document.getElementById("newWidgetBtn").onclick(); };
+document.getElementById("studioCloneBtn").onclick = function () { document.getElementById("cloneBtn").onclick(); };
+document.getElementById("studioMagicBtn").onclick = function () {
+  switchTab("create");
+  document.getElementById("magicSection").scrollIntoView({ behavior: "smooth", block: "start" });
+};
+document.getElementById("cloneCloseBtn").onclick = function () {
+  document.getElementById("cloneSheet").classList.remove("open");
+  document.body.style.overflow = "";
+};
+document.getElementById("clonePickBtn").onclick = function () {
   if (!getApiKey()) {
+    document.getElementById("cloneCloseBtn").onclick();
     openDesignerSetup();
-    toast("📷 Cloning needs the full designer — finish ⚙️ setup first");
+    toast("Cloning needs the full designer — finish setup first");
     return;
   }
+  document.getElementById("cloneCloseBtn").onclick();
   document.getElementById("cloneInput").click();
 };
 document.getElementById("cloneInput").onchange = function (event) {
@@ -10801,7 +10900,7 @@ function switchTab(name) {
   if (name === "explore" && !lazyTabRendered.explore) { lazyTabRendered.explore = true; renderExplore(); }
   if (name === "studio" && !lazyTabRendered.studio) { lazyTabRendered.studio = true; renderIconMaker(); }
   if (name === "widgets") renderInstallChecklist();
-  if (name === "create") renderStatusCard();
+  if (name === "create") { renderStatusCard(); renderRecentDesigns(); }
   window.scrollTo({ top: 0 });
 }
 document.getElementById("editorDoneBtn").onclick = closeEditor;
@@ -10840,7 +10939,7 @@ function applySheetDetent(name) {
   // Rule 1: the canvas may shrink but is never covered — cap the sheet so
   // at least the minimum stage (150px) plus chrome always fits above it.
   const vh = window.innerHeight;
-  const px = Math.min(Math.round(vh * SHEET_DETENTS[name]), vh - 437);
+  const px = Math.min(Math.round(vh * SHEET_DETENTS[name]), vh - 440);
   document.documentElement.style.setProperty("--sheet-h", px + "px");
   studioScaleCache = null;
   if (studioOpen) renderStudioCanvas();
@@ -10857,7 +10956,7 @@ function nearestDetent() {
   const h = currentSheetPx();
   let name = "half", dist = Infinity;
   for (const k of Object.keys(SHEET_DETENTS)) {
-    const d = Math.abs(h - Math.min(vh * SHEET_DETENTS[k], vh - 437));
+    const d = Math.abs(h - Math.min(vh * SHEET_DETENTS[k], vh - 440));
     if (d < dist) { dist = d; name = k; }
   }
   return name;
@@ -11250,7 +11349,7 @@ document.getElementById("tweakInput").addEventListener("keydown", function (e) {
     const move = function (ev) {
       const dy = startY - ev.clientY;
       if (Math.abs(dy) > 6) moved = true;
-      const h = Math.max(window.innerHeight * 0.12, Math.min(window.innerHeight - 437, startH + dy));
+      const h = Math.max(window.innerHeight * 0.12, Math.min(window.innerHeight - 440, startH + dy));
       document.documentElement.style.setProperty("--sheet-h", Math.round(h) + "px");
     };
     const up = function () {
@@ -11304,7 +11403,7 @@ document.getElementById("tweakInput").addEventListener("keydown", function (e) {
       else return;
     }
     if (e.cancelable) e.preventDefault();
-    const h = Math.max(window.innerHeight * 0.12, Math.min(window.innerHeight - 437, startH - dy));
+    const h = Math.max(window.innerHeight * 0.12, Math.min(window.innerHeight - 440, startH - dy));
     document.documentElement.style.setProperty("--sheet-h", Math.round(h) + "px");
   }, { passive: false });
   const end = function () {
@@ -11345,7 +11444,19 @@ document.getElementById("studioStage").addEventListener("click", function (e) {
   document.getElementById("studioEditPane").style.display = "block";
   document.getElementById("studioLayersPane").style.display = "block";
   document.getElementById("studioPanel").style.display = "none";
-  document.getElementById("editorModeHead").appendChild(document.getElementById("saveRow"));
+  // v108: ONE chrome row — sizes and undo/redo join Done/Save up top, the
+  // whole second header row disappears and its height goes to the canvas.
+  const head = document.getElementById("editorModeHead");
+  const headSpacer = head.querySelector(".spacer");
+  head.insertBefore(document.getElementById("studioSizeButtons"), headSpacer);
+  head.insertBefore(document.getElementById("studioUndoBtn"), headSpacer);
+  head.insertBefore(document.getElementById("studioRedoBtn"), headSpacer);
+  document.getElementById("studioHead").style.display = "none";
+  // Save/New join the row directly — the old saveRow wrapper stacked its
+  // buttons vertically in the tight remaining width.
+  head.appendChild(document.getElementById("saveBtn"));
+  head.appendChild(document.getElementById("newBtn"));
+  document.getElementById("saveRow").style.display = "none";
   setSheetTool(sheetTool);
 })();
 function openDesignerSetup() {
@@ -11993,7 +12104,7 @@ function renderPageFrame() {
   const layout = PAGE_LAYOUTS[pageState.layout];
   if (!layout) { // "auto" — the AI chooses the arrangement when it designs
     frame.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;text-align:center">' +
-      '<span class="hint" style="margin:0">🤖 The AI will pick the best layout for your idea — describe the page below and tap ✨ Design my page.</span></div>';
+      '<span class="hint" style="margin:0">WidgetKing will pick the best layout for your idea — describe the page below and tap Design my page.</span></div>';
     return;
   }
   for (const slot of layout.slots) {
@@ -12010,6 +12121,14 @@ function renderPageFrame() {
       // v92: slots show flat PNG snapshots instead of live widget DOM — six
       // live previews (gradients, shadows) in the compositor was the memory
       // that crashed phones when the keyboard opened. Cached per design+size.
+      // v108: refit to the SLOT's size first — rendering a small-authored
+      // design raw at medium stretched its layout apart (Andrew's report).
+      let fitted = design;
+      if (design.fitSize !== slot.size && SIZES[design.fitSize] && SIZES[slot.size]) {
+        fitted = normalizeDesign(JSON.parse(JSON.stringify(design)));
+        refitElements(fitted, design.fitSize, slot.size);
+        fitted.fitSize = slot.size;
+      }
       const snapKey = design.id + "|" + slot.size + "|" + (design.schemaVersion || 0);
       const img = document.createElement("img");
       img.alt = design.name;
@@ -12018,12 +12137,12 @@ function renderPageFrame() {
       if (pageSnapCache[snapKey]) {
         img.src = pageSnapCache[snapKey];
       } else {
-        renderDesignPng(design, slot.size).then(function (png) {
+        renderDesignPng(fitted, slot.size).then(function (png) {
           if (png) { pageSnapCache[snapKey] = png; img.src = png; }
           else {
             // Snapshot failed (rare) — fall back to the live preview node.
             img.remove();
-            const inner = renderDesignNode(design, slot.size);
+            const inner = renderDesignNode(fitted, slot.size);
             inner.style.position = "absolute";
             inner.style.left = "0";
             inner.style.top = "0";
@@ -12133,7 +12252,7 @@ function renderPageStudio() {
     const aiMini = document.createElement("span");
     aiMini.className = "lay-mini ai";
     aiMini.textContent = "🤖";
-    layoutChip("AI picks", "auto", aiMini);
+    layoutChip("WidgetKing picks", "auto", aiMini);
   }
   for (const id of Object.keys(PAGE_LAYOUTS)) {
     layoutChip(PAGE_LAYOUTS[id].name, id, layoutMini(PAGE_LAYOUTS[id]));
