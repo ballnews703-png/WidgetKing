@@ -1268,7 +1268,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 111;
+const WK_VERSION = 112;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -12365,14 +12365,19 @@ function renderPageFrame() {
       }
       fitted.fitSize = slot.size;
     }
-    // v111: two design classes can't ride the SVG snapshot path — launchers
-    // with remote App Store icon art (foreignObject can't load them: the
-    // tile came out empty) and clear backgrounds (the checkerboard standin
-    // baked in; on a page, clear should show the wallpaper through).
-    const needsLive = (design.kind === "launcher" &&
-        (design.apps || []).some(function (a) { return a.iconUrl && /^http/.test(a.iconUrl); })) ||
-      (design.canvasElements || []).some(function (el) { return el.kind === "app" && el.iconUrl && /^http/.test(el.iconUrl); }) ||
-      design.background === "clear";
+    // v112: ANY image-bearing design skips the SVG snapshot. Safari
+    // rasterizes SVG-as-img before embedded images decode, so photos, baked
+    // art, and app icons all came out BLANK on-device (Andrew's chess
+    // widgets) even though headless Chromium painted them. Clear backgrounds
+    // also go live so the wallpaper shows through instead of a baked
+    // checkerboard. A page has at most six tiles and the typing shield
+    // still drops them while the keyboard is up, so live nodes are safe.
+    const needsLive = design.kind === "launcher" ||
+      design.background === "clear" ||
+      (design.canvasElements || []).some(function (el) {
+        return el.kind === "photo" || el.kind === "art" || el.kind === "app" ||
+          el.customB64 || el.dataUrl || (el.photos && el.photos.length);
+      });
     const mountLive = function () {
       const inner = renderDesignNode(fitted, slot.size);
       if (design.background === "clear") inner.style.background = "transparent";
