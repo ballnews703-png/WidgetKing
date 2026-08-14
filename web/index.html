@@ -279,7 +279,7 @@
   #studioHead { display: flex; align-items: center; gap: 8px; padding: 4px 0 8px;
     flex-wrap: wrap; }
   #studioHead .size-buttons { margin-right: auto; }
-  #studioStage { height: clamp(150px, calc(100dvh - var(--sheet-h, 40vh) - 197px), 560px);
+  #studioStage { height: clamp(240px, calc(100dvh - var(--sheet-h, 40vh) - 197px), 560px);
     display: flex; align-items: center; justify-content: center;
     padding: 14px; overflow: hidden; position: relative;
     border-radius: 16px; transition: height .18s ease;
@@ -420,10 +420,10 @@
   .lib-empty h3 { font-size: 21px; margin: 14px 0 6px; }
   .lib-empty p { font-size: 14px; color: var(--muted); margin: 0 auto 18px; max-width: 300px; }
   .lib-empty button { display: block; width: 100%; max-width: 320px; margin: 0 auto 10px; padding: 14px; font-size: 15px; }
-  .lib-item { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 10px;
-    border-radius: 12px; background: var(--card2); margin-bottom: 8px; }
+  .lib-item { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; padding: 14px;
+    background: var(--card2); border: 1px solid var(--line); border-radius: 18px; margin-bottom: 10px; }
   .lib-item .meta { flex: 1; min-width: 110px; overflow: hidden; }
-  .lib-item .name { font-weight: 600; font-size: 14px; white-space: nowrap;
+  .lib-item .name { font-weight: 700; font-size: 15px; white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; }
   .lib-item .kind { color: var(--muted); font-size: 12px; }
   .lib-item .actions { display: flex; gap: 6px; margin-left: auto;
@@ -463,6 +463,17 @@
   .sec-card { background: var(--card); border-radius: 20px; padding: 14px 16px;
     box-shadow: 0 1px 2px var(--shadow); }
   button .ic { vertical-align: -5px; margin-right: 4px; }
+  /* v107: gradient hero card (Create's AI entry) */
+  section.hero-card { background: linear-gradient(135deg, #6d33e0, #9a55f2 55%, #c77bf0);
+    color: #fff; }
+  .hero-card h2, .hero-card h3 { color: #fff; }
+  .hero-card .hint { color: rgba(255,255,255,.85); }
+  .hero-card textarea, .hero-card input {
+    background: rgba(255,255,255,.16); color: #fff; border-color: rgba(255,255,255,.28); }
+  .hero-card textarea::placeholder, .hero-card input::placeholder { color: rgba(255,255,255,.65); }
+  .hero-card .chips button, .hero-card .row button {
+    background: rgba(255,255,255,.16); border-color: rgba(255,255,255,.25); color: #fff; }
+  .hero-card button.primary { background: #17121f; border-color: transparent; color: #fff; }
 </style>
 </head>
 <body>
@@ -505,6 +516,8 @@
   <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></symbol>
   <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20S5 15.5 3.3 11A4.8 4.8 0 0 1 12 7a4.8 4.8 0 0 1 8.7 4C19 15.5 12 20 12 20Z"/></symbol>
   <symbol id="i-broom" viewBox="0 0 24 24"><path d="M13.5 3 10 11.5"/><path d="M5.5 21l1-5.5 4.5-2.5 3.5 1.5-1 5.5M5 21h10"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 6.5A1.5 1.5 0 0 1 5 5h4.5l2 2.5H19a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 19.5H5a1.5 1.5 0 0 1-1.5-1.5Z"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 6.5h15M9.5 6.5V4.5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2M6.5 6.5 7.5 20a1.5 1.5 0 0 0 1.5 1.4h6A1.5 1.5 0 0 0 16.5 20l1-13.5"/></symbol>
 </svg>
 
 <header>
@@ -523,9 +536,9 @@
   <div id="statusCard" class="status-card" style="display:none"></div>
   <h2>What are we making today?</h2>
   <div class="method-cards">
-    <button id="exploreTabBtn">🧭 Explore gallery<br><span style="font-size:11px;color:var(--muted)">widgets &amp; icon styles</span></button>
-    <button id="newWidgetBtn">➕ Create new widget<br><span style="font-size:11px;color:var(--muted)">start from scratch</span></button>
-    <button id="cloneBtn">📷 Clone a widget<br><span style="font-size:11px;color:var(--muted)">from any photo</span></button>
+    <button id="exploreTabBtn"><svg class="ic" aria-hidden="true"><use href="#i-compass"/></svg> Explore gallery<br><span style="font-size:11px;color:var(--muted)">widgets &amp; icon styles</span></button>
+    <button id="newWidgetBtn"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Create new widget<br><span style="font-size:11px;color:var(--muted)">start from scratch</span></button>
+    <button id="cloneBtn"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg> Clone a widget<br><span style="font-size:11px;color:var(--muted)">from any photo</span></button>
   </div>
   <input type="file" id="cloneInput" accept="image/*" style="display:none">
 </section>
@@ -548,23 +561,23 @@
   <p class="hint">Tap a sheet to use it for your app icons (works in launchers too). Packs you upload appear here as well — and publishing your own styles for everyone is coming with accounts.</p>
 </section>
 
-<section id="magicSection" class="pane pane-create">
-  <h2>🪄 Have WidgetKing make it for you</h2>
-  <button class="primary" id="builderBtn" style="width:100%;font-size:16px;padding:15px">✨ Build it for me — 3 quick questions</button>
-  <h3 style="margin:14px 0 4px">…or ✨ describe it</h3>
+<section id="magicSection" class="pane pane-create hero-card">
+  <h2><svg class="ic ic-lg" aria-hidden="true"><use href="#i-wand"/></svg> Have WidgetKing make it</h2>
+  <button class="primary" id="builderBtn" style="width:100%;font-size:16px;padding:15px">Build it for me — 3 quick questions</button>
+  <h3 style="margin:14px 0 4px">…or describe it</h3>
   <p class="hint" id="magicHint"></p>
   <textarea id="magicInput" placeholder="A launcher with Spotify, Instagram and YouTube"></textarea>
   <div class="chips" id="magicChips"></div>
-  <button class="primary" id="magicBtn">Build it ✨</button>
+  <button class="primary" id="magicBtn">Build it</button>
   <div id="magicFallback" style="display:none;margin-top:10px">
     <p class="hint">🤔 That idea needs WidgetKing's full designer, which isn't set up on this device yet. Options:</p>
     <div class="row">
-      <button id="mfBuilder">🪄 Answer 3 quick questions</button>
-      <button id="mfAI">⚙️ Finish designer setup</button>
-      <button id="mfNote">📝 Keep it as a note</button>
+      <button id="mfBuilder">Answer 3 quick questions</button>
+      <button id="mfAI">Finish designer setup</button>
+      <button id="mfNote">Keep it as a note</button>
     </div>
   </div>
-  <p class="hint" style="margin-top:6px" id="setupPointer">⚙️ AI setup lives in <b>Settings</b> — key, model, and review options.</p>
+  <p class="hint" style="margin-top:6px" id="setupPointer">AI setup lives in <b>Settings</b> — key, model, and review options.</p>
 </section>
 
 <div id="editorMode">
@@ -855,11 +868,11 @@
   <div class="row" id="libSortRow" style="margin-bottom:8px"></div>
   <div id="library"></div>
   <div class="row" style="margin-top:12px">
-    <button class="primary" id="pushUpdateBtn">🔁 Update phone (one tap)</button>
-    <button id="copyScriptBtn">📋 Copy Scriptable Script</button>
+    <button class="primary" id="pushUpdateBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-refresh"/></svg> Update phone (one tap)</button>
+    <button id="copyScriptBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-copy"/></svg> Copy Scriptable Script</button>
     <button id="installScriptBtn">⚡ Install in Scriptable (first time)</button>
     <button id="downloadScriptBtn">⬇️ Download Script</button>
-    <button id="backupBtn">💾 Back up all designs</button>
+    <button id="backupBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-save"/></svg> Back up all designs</button>
     <button id="importJsonBtn">📂 Restore / Import</button>
     <button id="syncAllBtn">📲 Send all to my other device</button>
     <input type="file" id="importFile" accept=".json,application/json" style="display:none">
@@ -1183,7 +1196,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 106;
+const WK_VERSION = 107;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -3200,7 +3213,7 @@ async function applyClipboardUpdate() {
   const looksRight = m && text.indexOf("WidgetKing") >= 0 &&
     text.indexOf("const DESIGNS = ") >= 0 && text.indexOf("Script.complete()") > 0;
   if (!looksRight) {
-    await say("Nothing to install", "Use the 🔁 Update phone button in the WidgetKing designer — it loads the update and opens this screen for you.");
+    await say("Nothing to install", "Use the Update phone button in the WidgetKing designer — it loads the update and opens this screen for you.");
     return;
   }
   let fm = FileManager.local();
@@ -3411,7 +3424,7 @@ if (config.runsInWidget || runPreview) {
       fontStyle: "rounded", textColorHex: "#FFFFFF", background: "gradient",
       canvasElements: [], apps: [],
       primaryText: "This Day Flow has no design for its " + slotKey +
-        " slot.\nOpen it in WidgetKing, pick designs, then 🔁 Update phone." };
+        " slot.\nOpen it in WidgetKing, pick designs, then Update phone." };
   }
   if (!design) {
     const w = new ListWidget();
@@ -9424,7 +9437,7 @@ function renderLibrary() {
       '<div class="crown" aria-hidden="true">♛</div>' +
       '<h3>Your first widget starts here</h3>' +
       '<p>Describe it, pick a template, or drag pieces onto a blank canvas — a minute is plenty.</p>' +
-      '<button class="primary" id="libEmptyCreate">✨ Create a widget</button>' +
+      '<button class="primary" id="libEmptyCreate">Create a widget</button>' +
       '<button id="libEmptyTour">Show me around</button>' +
       '</div>';
     document.getElementById("libEmptyCreate").onclick = function () {
@@ -9479,7 +9492,7 @@ function renderLibrary() {
   else if (libSort === "kind") shown = shown.slice().sort(function (a, b) { return (a.kind || "").localeCompare(b.kind || "") || (a.name || "").localeCompare(b.name || ""); });
   else shown = shown.slice().reverse(); // newest saves last in the array
   if (!shown.length) {
-    library.innerHTML = '<p class="hint">Nothing in this folder yet — use 📁 on a widget to move it here.</p>';
+    library.innerHTML = '<p class="hint">Nothing in this folder yet — use the folder button on a widget to move it here.</p>';
   }
   // Numbered slots (v83): each design occupies a visible, named box —
   // "Small #2" — so the collection feels concrete and any future per-device
@@ -9493,15 +9506,14 @@ function renderLibrary() {
   for (const design of shown) {
     const item = document.createElement("div");
     item.className = "lib-item";
-    item.appendChild(makeThumb(design, 0.3));
+    item.appendChild(makeThumb(design, 0.45));
     const meta = document.createElement("div");
     meta.className = "meta";
     meta.innerHTML = '<div class="name">' + esc(design.name) +
       ' <span class="slot-badge">' + slotOf[design.id] + '</span>' +
-      (design.starter ? ' <span style="font-size:10px;background:rgba(240,196,69,.25);border-radius:8px;padding:2px 6px">✨ Starter</span>' : '') +
-      '</div><div class="kind">' +
-      (KIND_ICONS[design.kind] || "🧩") + ' ' + esc(design.kind) +
-      (design.folder ? ' · 📁 ' + esc(design.folder) : '') + '</div>';
+      (design.starter ? ' <span style="font-size:10px;background:rgba(240,196,69,.25);border-radius:8px;padding:2px 6px">Starter</span>' : '') +
+      '</div><div class="kind">' + esc(design.kind) +
+      (design.folder ? ' · ' + esc(design.folder) : '') + '</div>';
     const editButton = document.createElement("button");
     editButton.textContent = "Edit";
     editButton.onclick = function () {
@@ -9520,11 +9532,13 @@ function renderLibrary() {
       renderLibrary();
     };
     const shareButton = document.createElement("button");
-    shareButton.textContent = "🔗";
+    shareButton.innerHTML = '<svg class="ic ic-sm" aria-hidden="true" style="margin:0"><use href="#i-share"/></svg>';
+    shareButton.setAttribute("aria-label", "Share this design as a link");
     shareButton.title = "Share this design as a link";
     shareButton.onclick = function () { shareDesign(design); };
     const folderButton = document.createElement("button");
-    folderButton.textContent = "📁";
+    folderButton.innerHTML = '<svg class="ic ic-sm" aria-hidden="true" style="margin:0"><use href="#i-folder"/></svg>';
+    folderButton.setAttribute("aria-label", "Move to a folder");
     folderButton.title = "Move to a folder";
     folderButton.onclick = function () { setDesignFolder(design); };
     const deleteButton = document.createElement("button");
@@ -9535,7 +9549,8 @@ function renderLibrary() {
       renderLibrary();
     };
     const cardButton = document.createElement("button");
-    cardButton.textContent = "📤";
+    cardButton.innerHTML = '<svg class="ic ic-sm" aria-hidden="true" style="margin:0"><use href="#i-photo"/></svg>';
+    cardButton.setAttribute("aria-label", "Share as an image card");
     cardButton.title = "Share as an image card";
     cardButton.onclick = function () { shareCard(design); };
     const actions = document.createElement("div");
@@ -9794,7 +9809,7 @@ document.getElementById("magicBtn").onclick = async function () {
       toast("⚠️ The AI couldn't build it: " + error.message);
     } finally {
       button.disabled = false;
-      button.textContent = "Build it ✨";
+      button.textContent = "Build it";
     }
     return;
   }
@@ -10159,7 +10174,7 @@ async function buildScript() {
     // Photos don't travel inside sync links — designs that arrived that way
     // have empty photo boxes, and the widget would render without them.
     alert("⚠️ No photo attached in: " + missingPhotos.join(", ") +
-      "\n\nThose widgets will show “photo missing” on your phone. Open each one in the Editor, tap its photo box, and re-add the picture (photos don't travel in sync links — use 💾 Back up for full copies). Then copy the script again.");
+      "\n\nThose widgets will show “photo missing” on your phone. Open each one in the Editor, tap its photo box, and re-add the picture (photos don't travel in sync links — use Back up for full copies). Then copy the script again.");
   }
   // Stamp where this copy came from so the script can self-update from it.
   const pageUrl = location.protocol.indexOf("http") === 0 ? location.origin + location.pathname : "";
@@ -10180,7 +10195,7 @@ async function buildInstallFile() {
 document.getElementById("installScriptBtn").onclick = async function () {
   download("WidgetKing.scriptable", await buildInstallFile(), "application/json");
   markCopied();
-  toast("⬇️ Open the file and share it to Scriptable — one tap installs it. (First installs only; afterwards 🔁 Update phone handles everything.)");
+  toast("⬇️ Open the file and share it to Scriptable — one tap installs it. (First installs only; afterwards Update phone handles everything.)");
 };
 // One-push update: load the fresh script onto the clipboard, then hand off to
 // Scriptable, where the script installs it over itself (wkupdate=1 run).
@@ -10236,7 +10251,7 @@ function updateCopyButtons() {
   if (!btn) return;
   const dirty = Number(localStorage.getItem("widgetking.libstamp") || 0) >
     Number(localStorage.getItem("widgetking.lastcopy") || 0);
-  btn.textContent = dirty ? "📋 Copy Scriptable Script — updates waiting" : "📋 Copy Scriptable Script";
+  btn.innerHTML = '<svg class="ic ic-sm" aria-hidden="true"><use href="#i-copy"/></svg> ' + (dirty ? "Copy Scriptable Script — updates waiting" : "Copy Scriptable Script");
 }
 function markCopied() {
   localStorage.setItem("widgetking.lastcopy", String(Date.now()));
@@ -10816,13 +10831,16 @@ if (!PANEL_FOR[sheetTool] || sheetTool === "edit") sheetTool = "widget";
 const panelBuilt = {};
 function sheetDetentFor(tool) {
   const saved = localStorage.getItem("widgetking.sheet." + tool);
+  // v107: never REOPEN covered — full is a transient in-session state you
+  // reach by dragging, never the posture a tool greets you with.
+  if (saved === "full") return "half";
   return SHEET_DETENTS[saved] ? saved : "half";
 }
 function applySheetDetent(name) {
   // Rule 1: the canvas may shrink but is never covered — cap the sheet so
   // at least the minimum stage (150px) plus chrome always fits above it.
   const vh = window.innerHeight;
-  const px = Math.min(Math.round(vh * SHEET_DETENTS[name]), vh - 352);
+  const px = Math.min(Math.round(vh * SHEET_DETENTS[name]), vh - 437);
   document.documentElement.style.setProperty("--sheet-h", px + "px");
   studioScaleCache = null;
   if (studioOpen) renderStudioCanvas();
@@ -10839,7 +10857,7 @@ function nearestDetent() {
   const h = currentSheetPx();
   let name = "half", dist = Infinity;
   for (const k of Object.keys(SHEET_DETENTS)) {
-    const d = Math.abs(h - Math.min(vh * SHEET_DETENTS[k], vh - 352));
+    const d = Math.abs(h - Math.min(vh * SHEET_DETENTS[k], vh - 437));
     if (d < dist) { dist = d; name = k; }
   }
   return name;
@@ -11232,7 +11250,7 @@ document.getElementById("tweakInput").addEventListener("keydown", function (e) {
     const move = function (ev) {
       const dy = startY - ev.clientY;
       if (Math.abs(dy) > 6) moved = true;
-      const h = Math.max(window.innerHeight * 0.12, Math.min(window.innerHeight - 352, startH + dy));
+      const h = Math.max(window.innerHeight * 0.12, Math.min(window.innerHeight - 437, startH + dy));
       document.documentElement.style.setProperty("--sheet-h", Math.round(h) + "px");
     };
     const up = function () {
@@ -11243,8 +11261,10 @@ document.getElementById("tweakInput").addEventListener("keydown", function (e) {
       stage.style.transition = "";
       let name;
       if (!moved) {
+        // Cycle from where the sheet actually IS, not the stored detent
+        // (a stored "full" reads back "half" since v107's reopen clamp).
         const order = ["half", "full", "peek"];
-        name = order[(order.indexOf(sheetDetentFor(sheetTool)) + 1) % 3];
+        name = order[(order.indexOf(nearestDetent()) + 1) % 3];
       } else {
         name = nearestDetent();
       }
@@ -11284,7 +11304,7 @@ document.getElementById("tweakInput").addEventListener("keydown", function (e) {
       else return;
     }
     if (e.cancelable) e.preventDefault();
-    const h = Math.max(window.innerHeight * 0.12, Math.min(window.innerHeight - 352, startH - dy));
+    const h = Math.max(window.innerHeight * 0.12, Math.min(window.innerHeight - 437, startH - dy));
     document.documentElement.style.setProperty("--sheet-h", Math.round(h) + "px");
   }, { passive: false });
   const end = function () {

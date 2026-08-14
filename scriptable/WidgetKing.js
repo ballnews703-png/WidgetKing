@@ -30,7 +30,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 106;
+const WK_VERSION = 107;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -2047,7 +2047,7 @@ async function applyClipboardUpdate() {
   const looksRight = m && text.indexOf("WidgetKing") >= 0 &&
     text.indexOf("const DESIGNS = ") >= 0 && text.indexOf("Script.complete()") > 0;
   if (!looksRight) {
-    await say("Nothing to install", "Use the 🔁 Update phone button in the WidgetKing designer — it loads the update and opens this screen for you.");
+    await say("Nothing to install", "Use the Update phone button in the WidgetKing designer — it loads the update and opens this screen for you.");
     return;
   }
   let fm = FileManager.local();
@@ -2258,7 +2258,7 @@ if (config.runsInWidget || runPreview) {
       fontStyle: "rounded", textColorHex: "#FFFFFF", background: "gradient",
       canvasElements: [], apps: [],
       primaryText: "This Day Flow has no design for its " + slotKey +
-        " slot.\nOpen it in WidgetKing, pick designs, then 🔁 Update phone." };
+        " slot.\nOpen it in WidgetKing, pick designs, then Update phone." };
   }
   if (!design) {
     const w = new ListWidget();
