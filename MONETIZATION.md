@@ -93,6 +93,14 @@ our numbers — reference only, not a template:
 - Their paywall sells feature *outcomes* ("iterate without hitting the wall")
   rather than feature names; their footer covers auto-renew terms + restore
   purchases + a real "Not now" escape. All three are the standard to meet.
+- **Referral program**: "Give a month, get a month" — both sides get a free
+  month of Pro on code redemption, and referral months stack per friend. Cheap
+  to run (marginal cost of Pro is near zero pre-AI-usage), turns happy users
+  into distribution, and fits our word-of-mouth thesis. Needs the accounts
+  backend; add to the build order when that phase is greenlit.
+- Their account screen frames the FREE plan as a benefits card ("Current plan"
+  with a bullet list of what you get) rather than a wall of limits — the free
+  tier is presented with the same dignity as Pro. Keep that.
 
 ## Build order (when greenlit)
 
