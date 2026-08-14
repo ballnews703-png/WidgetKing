@@ -189,9 +189,11 @@
   .wt-pane h2 { font-size: 24px; margin: 8px 0 0; line-height: 1.2; }
   .wt-pane p { color: var(--muted); font-size: 15px; margin: 0; line-height: 1.5; }
   .wt-art { border-radius: 24px; overflow: hidden; box-shadow: 0 14px 40px var(--shadow); }
-  .wt-bubble { border-radius: 16px; padding: 8px 14px; font-size: 14px; max-width: 85%; }
-  .wt-ask { background: var(--accent); color: var(--accent-text); align-self: flex-end; }
-  .wt-reply { background: rgba(127,127,127,.15); align-self: flex-start; }
+  /* The royal spread: three real designs fanned like a hand of cards. */
+  .wt-fan { display: flex; align-items: center; justify-content: center; padding: 12px 0 6px; }
+  .wt-fan-l { transform: rotate(-9deg) translateY(10px); margin-right: -26px; z-index: 1; opacity: .95; }
+  .wt-fan-c { z-index: 3; box-shadow: 0 18px 48px var(--shadow); }
+  .wt-fan-r { transform: rotate(9deg) translateY(10px); margin-left: -26px; z-index: 2; opacity: .95; }
   .wt-big { font-size: 52px; line-height: 1; }
   .wt-rows { display: flex; flex-direction: column; gap: 10px; text-align: left; font-size: 14px; }
   .wt-rows > div { background: rgba(127,127,127,.09); border-radius: 14px; padding: 10px 14px; }
@@ -893,11 +895,14 @@
 
 <div id="welcomeTour" role="dialog" aria-label="Welcome to WidgetKing">
   <div class="wt-pane" data-p="0">
-    <div class="wt-art" id="wtArt0"></div>
-    <div class="wt-bubble wt-ask">a cozy sunset clock with the weather</div>
-    <div class="wt-bubble wt-reply">Done — make it yours ✨</div>
-    <h2>Describe it. WidgetKing designs it.</h2>
-    <p>Say what you want in plain English — a real Home Screen widget comes back, ready to tweak.</p>
+    <div style="font-size:34px" aria-hidden="true">👑</div>
+    <div class="wt-fan">
+      <div class="wt-art wt-fan-l" id="wtArtL"></div>
+      <div class="wt-art wt-fan-c" id="wtArt0"></div>
+      <div class="wt-art wt-fan-r" id="wtArtR"></div>
+    </div>
+    <h2>Widgets that feel like you.</h2>
+    <p>Build them by hand, start from a template, or tell WidgetKing your idea and watch it design one — every one becomes a real widget on your real Home Screen.</p>
   </div>
   <div class="wt-pane" data-p="1" style="display:none">
     <div class="chips wt-chips"><span>☀️ Weather</span><span>📅 Calendar</span><span>🔋 Battery</span><span>🏈 Fantasy</span><span>📰 News</span></div>
@@ -1070,7 +1075,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 98;
+const WK_VERSION = 99;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -11025,10 +11030,18 @@ function wtArt(targetId, design, sizeKey, scale) {
   box.appendChild(node);
 }
 function showWelcomeTour() {
+  wtArt("wtArtL", { name: "TourL", kind: "freestyle", themeID: "forest", bgPattern: "waves", canvasElements: [
+    { id: "l1", kind: "greeting", x: 0.5, y: 0.34, size: 15 },
+    { id: "l2", kind: "date", x: 0.5, y: 0.62, size: 11, opacity: 0.85 }
+  ] }, "small", 0.72);
   wtArt("wtArt0", { name: "Tour", kind: "freestyle", themeID: "sunset", gradientDir: "mesh", canvasElements: [
     { id: "w1", kind: "clock", x: 0.5, y: 0.38, size: 26, font: "serif" },
     { id: "w2", kind: "weather", x: 0.5, y: 0.72, size: 12 }
-  ] }, "small", 1.05);
+  ] }, "small", 0.95);
+  wtArt("wtArtR", { name: "TourR", kind: "freestyle", themeID: "midnight", bgPattern: "grain", canvasElements: [
+    { id: "r1", kind: "text", text: "dream big", x: 0.5, y: 0.42, size: 14, font: "cochin" },
+    { id: "r2", kind: "progress", x: 0.5, y: 0.7, w: 0.55, size: 5, source: "day" }
+  ] }, "small", 0.72);
   wtArt("wtArt1", { name: "Tour2", kind: "freestyle", themeID: "midnight", canvasElements: [
     { id: "d1", kind: "text", text: "TODAY", x: 0.24, y: 0.2, size: 9, opacity: 0.75 },
     { id: "d2", kind: "date", x: 0.26, y: 0.42, size: 15 },
