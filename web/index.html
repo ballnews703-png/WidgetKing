@@ -384,6 +384,11 @@
   .tpl-name { font-size: 12px; font-weight: 600; margin-top: 8px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tpl-cat { font-size: 10px; color: var(--muted); margin-top: 1px; }
+  .lib-empty { text-align: center; padding: 36px 18px 28px; }
+  .lib-empty .crown { font-size: 44px; line-height: 1; color: var(--accent); }
+  .lib-empty h3 { font-size: 21px; margin: 14px 0 6px; }
+  .lib-empty p { font-size: 14px; color: var(--muted); margin: 0 auto 18px; max-width: 300px; }
+  .lib-empty button { display: block; width: 100%; max-width: 320px; margin: 0 auto 10px; padding: 14px; font-size: 15px; }
   .lib-item { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 10px;
     border-radius: 12px; background: var(--card2); margin-bottom: 8px; }
   .lib-item .meta { flex: 1; min-width: 110px; overflow: hidden; }
@@ -1075,7 +1080,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 100;
+const WK_VERSION = 101;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -9308,7 +9313,21 @@ function renderLibrary() {
   const library = document.getElementById("library");
   library.innerHTML = "";
   if (designs.length === 0) {
-    library.innerHTML = '<p class="hint">No saved designs yet. Pick a template or build one above and hit Save.</p>';
+    // First-widget welcome: a real invitation, not a shrug. The primary
+    // button drops into the editor's three-door welcome; the secondary
+    // replays the tour for anyone who skipped it.
+    library.innerHTML =
+      '<div class="lib-empty">' +
+      '<div class="crown" aria-hidden="true">♛</div>' +
+      '<h3>Your first widget starts here</h3>' +
+      '<p>Describe it, pick a template, or drag pieces onto a blank canvas — a minute is plenty.</p>' +
+      '<button class="primary" id="libEmptyCreate">✨ Create a widget</button>' +
+      '<button id="libEmptyTour">Show me around</button>' +
+      '</div>';
+    document.getElementById("libEmptyCreate").onclick = function () {
+      document.getElementById("newWidgetBtn").onclick();
+    };
+    document.getElementById("libEmptyTour").onclick = function () { showWelcomeTour(); };
     return;
   }
   const folders = libFolderNames();

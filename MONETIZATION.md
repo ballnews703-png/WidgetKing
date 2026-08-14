@@ -77,6 +77,23 @@ that build.
 - Never in a user's first session. Never for Pro users.
 - Frequency is a tunable dial; launch at the above and adjust with real data.
 
+## Market reference points (observed Aug 2026)
+
+A competing AI widget maker's live pricing, recorded here as a sanity check for
+our numbers — reference only, not a template:
+
+- Free tier: **2 widgets and 5 AI edits/month** (tighter than our free tier on
+  widgets, looser on AI). Their upsell screen leads with the free-tier limits in
+  plain language before listing Pro benefits — worth keeping.
+- Pro: **$2.99/month or $24.99/year**, both displayed against struck-through
+  "regular" prices ($9.99 / $119.99) as a permanent "70% off." Our agreed
+  $2–4 monthly band sits exactly at market. The fake-discount anchoring is a
+  dark pattern — App Store review increasingly flags it, and it reads as
+  distrust; we frame yearly as "2 months free" instead (already agreed above).
+- Their paywall sells feature *outcomes* ("iterate without hitting the wall")
+  rather than feature names; their footer covers auto-renew terms + restore
+  purchases + a real "Not now" escape. All three are the standard to meet.
+
 ## Build order (when greenlit)
 
 1. Accounts backend (email OTP, design sync) — also unlocks Explore publishing;
