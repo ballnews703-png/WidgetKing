@@ -1823,6 +1823,13 @@ async function liveDataFor(design) {
     }));
     live.news = await fetchNews(maxN);
   }
+  const stickerEls = els.filter(function (e) { return e.kind === "sticker" && e.stockId; });
+  if (stickerEls.length) {
+    live.stickers = {};
+    for (const el of stickerEls) {
+      if (!live.stickers[el.stockId]) live.stickers[el.stockId] = await loadStickerImage(el.stockId);
+    }
+  }
   return live;
 }
 // The feed's own name is never a headline — it appears as the channel
@@ -2365,6 +2372,17 @@ function drawFreestyle(design, family, bgImg, live) {
         ctx.setFont(Font.mediumSystemFont(9));
         ctx.setTextColor(new Color("#606060", 0.95));
         ctx.drawTextInRect("art missing - re-copy the script", new Rect(px - 70, py - 6, 140, 14));
+      }
+      continue;
+    }
+    if (el.kind === "sticker") {
+      // v117: stock artwork fetched from the WidgetKing site (prefetched in
+      // liveDataFor, cached on device). A failed fetch draws nothing — a
+      // decoration is never worth crashing or blanking a widget.
+      const stImg = live && live.stickers ? live.stickers[el.stockId] : null;
+      if (stImg) {
+        const side = (el.w || 0.35) * Math.min(W, H);
+        try { ctx.drawImageInRect(stImg, new Rect(px - side / 2, py - side / 2, side, side)); } catch (e) {}
       }
       continue;
     }
@@ -3046,6 +3064,38 @@ async function loadIcon(url) {
       img = dc.getImage();
     }
     fm.writeImage(path, img);
+    return img;
+  } catch (e) { return null; }
+}
+// v117: stock stickers live on the WidgetKing site in a flat directory, so
+// the URL derives from the id alone. Cached like real icons; capped at
+// 432px so a few hero stickers can't blow the widget memory budget.
+function stickerUrlFor(stockId) {
+  if (!/^[a-z0-9-]{1,40}$/.test(String(stockId || ""))) return "";
+  let base = String(WK_PAGE_URL || "");
+  if (base.indexOf("http") !== 0) base = "https://ballnews703-png.github.io/WidgetKing/";
+  base = base.split("#")[0].split("?")[0];
+  if (base.slice(-10) === "index.html") base = base.slice(0, -10);
+  if (base.charAt(base.length - 1) !== "/") base = base + "/";
+  return base + "stock/art/" + stockId + ".png";
+}
+async function loadStickerImage(stockId) {
+  try {
+    const url = stickerUrlFor(stockId);
+    if (!url) return null;
+    const fm = FileManager.local();
+    const path = fm.joinPath(fm.cacheDirectory(), "wk_stk_" + hashString(url) + ".png");
+    if (fm.fileExists(path)) return fm.readImage(path);
+    let img = await new Request(url).loadImage();
+    if (img && img.size && img.size.width > 460) {
+      const dc = new DrawContext();
+      dc.size = new Size(432, 432);
+      dc.opaque = false;
+      dc.respectScreenScale = false;
+      dc.drawImageInRect(img, new Rect(0, 0, 432, 432));
+      img = dc.getImage();
+    }
+    if (img) fm.writeImage(path, img);
     return img;
   } catch (e) { return null; }
 }
@@ -4001,8 +4051,45 @@ function saveIconPacks() {
   try { localStorage.setItem("widgetking.iconpacks", JSON.stringify(iconPacks)); }
   catch (e) { toast("⚠️ Storage is full — delete an icon pack or upload fewer icons"); }
 }
+// ==================== Stock library (v117) ====================
+// Built-in artwork served from the deployed site (web/stock/). Designs
+// reference assets by tiny id — never base64 — so they stay cheap to store
+// and share. The import pipeline rewrites everything between the markers.
+//   STOCK_ART entries:      { id, pack, name, tags[] }
+//     -> web/stock/art/<id>.png (transparent, ≤512px; FLAT dir — the
+//        Scriptable renderer derives the URL from the id alone, no lookup)
+//   STOCK_ART_PACKS entries: { id, name }
+//   STOCK_ICON_PACKS entries: { id, name, tags[], icons: [{file, name}] }
+//     -> web/stock/icons/<packId>/<file>.png (square app-icon tiles)
+// STOCK-MANIFEST-START
+const STOCK_ART = [];
+const STOCK_ART_PACKS = [];
+const STOCK_ICON_PACKS = [];
+// STOCK-MANIFEST-END
+const STOCK_BASE = "stock/";
+function stockArtById(id) {
+  return STOCK_ART.find(function (a) { return a.id === id; }) || null;
+}
+function stockArtUrl(id) {
+  return /^[a-z0-9-]{1,40}$/.test(id || "") ? STOCK_BASE + "art/" + id + ".png" : "";
+}
+function stockPackById(id) {
+  return STOCK_ICON_PACKS.find(function (p) { return p.id === id; }) || null;
+}
+function stockArtPackName(packId) {
+  const p = STOCK_ART_PACKS.find(function (x) { return x.id === packId; });
+  return p ? p.name : packId;
+}
+function stockIconUrl(packId, file) {
+  return STOCK_BASE + "icons/" + packId + "/" + file + ".png";
+}
 function packIconFor(themeName, index) {
   if (!themeName || String(themeName).indexOf("pack:") !== 0) return null;
+  if (themeName.indexOf("pack:stock:") === 0) {
+    const sp = stockPackById(themeName.slice(11));
+    if (!sp || !sp.icons.length) return null;
+    return stockIconUrl(sp.id, sp.icons[index % sp.icons.length].file);
+  }
   const pack = iconPacks.find(function (p) { return "pack:" + p.id === themeName; });
   if (!pack || !pack.icons.length) return null;
   return pack.icons[index % pack.icons.length];
@@ -4855,6 +4942,11 @@ function normalizeDesign(design) {
       if (!["rect", "pill", "circle"].includes(el.shape)) el.shape = "pill";
       if (el.flip !== true) el.flip = false;
     }
+    if (el.kind === "sticker") {
+      // v117: a sticker is a STOCK image referenced by tiny id — never base64.
+      if (typeof el.stockId !== "string" || !/^[a-z0-9-]{1,40}$/.test(el.stockId)) el.stockId = "";
+      if (typeof el.w !== "number" || el.w <= 0 || el.w > 1) el.w = 0.35;
+    }
     if (el.kind === "month") {
       if (typeof el.size !== "number" || el.size < 6 || el.size > 16) el.size = 9;
       if (typeof el.w !== "number" || el.w <= 0 || el.w > 1) el.w = 0.6;
@@ -5242,7 +5334,7 @@ const AI_SCHEMA = {
       items: {
         type: "object",
         properties: {
-          kind: { type: "string", "enum": ["text", "clock", "date", "emoji", "icon", "shape", "battery", "countdown", "app", "weather", "calendar", "progress", "ring", "sleeper", "sleeperlogo", "month", "art", "astro", "stock", "worldclock", "reminders", "news", "greeting", "week"] },
+          kind: { type: "string", "enum": ["text", "clock", "date", "emoji", "icon", "shape", "battery", "countdown", "app", "weather", "calendar", "progress", "ring", "sleeper", "sleeperlogo", "month", "art", "sticker", "astro", "stock", "worldclock", "reminders", "news", "greeting", "week"] },
           text: { type: "string", description: "Text or emoji content; for kind=icon a single glyph like ★ ♥ ● ▲ ☾ ⚡ ✈ ⚙ →; empty for other kinds" },
           label: { type: "string", description: "App name for kind=app; empty otherwise" },
           url: { type: "string", description: "URL scheme to open for kind=app (e.g. spotify://); empty otherwise" },
@@ -5265,9 +5357,10 @@ const AI_SCHEMA = {
           mode: { type: "string", "enum": ["", "score", "record", "myteam", "opponent", "arc", "rotated", "gradshape"], description: "For kind=sleeper: score/record/myteam/opponent. For kind=sleeperlogo: myteam or opponent. For kind=art: arc (text curved along a circle, w=diameter), rotated (tilted text, use angle), or gradshape (gradient-filled shape colorHex->borderHex at angle; w/h/shape/radius apply). Empty otherwise" },
           source: { type: "string", "enum": ["", "day", "year", "battery", "countdown"], description: "For kind=progress (bar) and kind=ring (circular gauge): what it measures; empty otherwise. Rings: w = diameter 0-1 of the short side, size = stroke thickness pt (5-10)" },
           bold: { type: "boolean", description: "For kind=text: false for lighter body text; true otherwise" },
-          dateISO: { type: "string", description: "yyyy-MM-dd for countdown elements; empty otherwise" }
+          dateISO: { type: "string", description: "yyyy-MM-dd for countdown elements; empty otherwise" },
+          stockId: { type: "string", "enum": [""].concat(STOCK_ART.map(function (a) { return a.id; })), description: "For kind=sticker only: a stock artwork id from the STICKERS list (w = its width 0-1 of the short side); empty otherwise" }
         },
-        required: ["kind", "text", "label", "url", "font", "x", "y", "size", "colorHex", "opacity", "shape", "w", "h", "align", "bold", "radius", "border", "borderHex", "count", "accentHex", "angle", "mode", "source", "dateISO"],
+        required: ["kind", "text", "label", "url", "font", "x", "y", "size", "colorHex", "opacity", "shape", "w", "h", "align", "bold", "radius", "border", "borderHex", "count", "accentHex", "angle", "mode", "source", "dateISO", "stockId"],
         additionalProperties: false
       }
     }
@@ -5427,6 +5520,11 @@ function aiSystemPrompt(requestText) {
     "Design at the level of the most beautiful Home Screen setups people share online: intentional composition, real hierarchy, restraint. The user describes a widget; return a spec.\n" +
     "Kinds: clock (time+date), date (big day), countdown, quote, note, launcher (tappable app grid), battery, freestyle (a canvas of elements — PREFER freestyle for anything creative; simple kinds are only for plain requests).\n" +
     "FREESTYLE ELEMENTS (max 24; array order is z-order, bottom first): text, clock, date, emoji, icon (monochrome glyph ★ ☆ ♥ ● ◆ ▲ ✦ ❀ ☀ ☾ ☁ ⚡ ♪ ☕ ✈ ⌂ ✉ ⚙ ✓ → ∞, tinted via colorHex — prefer over emoji for elegance), shape (rect/pill/circle), battery, countdown, app (tappable icon: set label+url), weather (live temp), calendar (next event), progress (bar), ring (circular gauge; w=diameter 0-1 of short side, size=stroke pt 5-10; source day/year/battery/countdown), month (full mini month-calendar grid with today circled: size=day-number pt 8-10, w=grid width, accentHex=today circle color — a month grid OWNS its area: NOTHING may sit inside its span (x ± w/2, y ± .36). Pair it with a side column: month at x .27 w .44-.48 and texts at x .72-.78, or give the month the whole widget alone), calendar with count 2-4 = a multi-line upcoming-events list, art (baked decorative graphics — mode arc: STATIC text curved along a circle (w=diameter, size=font pt); mode rotated: tilted static text (angle deg); mode gradshape: gradient-filled shape colorHex to borderHex at angle. Art is for decoration only, NEVER for live values like time), astro (LIVE sunrise/sunset: mode sun both, sunrise, sunset; mode moon = moon phase emoji + name, moonicon = big emoji only), stock (LIVE market quote — put the ticker in text: AAPL, TSLA, BTC-USD, ETH-USD; renders 'AAPL 229 ▲1.2%' auto-colored green/red), worldclock (another city's current time — put the city in text; known: Tokyo, London, Paris, New York, Los Angeles, Sydney, Dubai, Hong Kong, Singapore, Berlin, Chicago, Honolulu), reminders (the user's REAL iOS Reminders to-do list; count 1-4 lines — great for productivity widgets), greeting (LIVE time-of-day greeting — 'Good morning ☀️' that changes through the day; the user adds their own name afterward), week ('Week 32', ISO week number). WEATHER MODES via the element's mode field: now (temp), full (temp + high/low), hilo, cond (words + temp), rain (chance %), hourly (next hours strip — needs medium width), tomorrow. Stack 2-3 weather modes for a real forecast card.\n" +
+    (STOCK_ART.length ? "STICKERS (kind=sticker, set stockId + w 0.2-0.45): drawn artwork from WidgetKing's own library — decorative only, never for live values. Ids by pack — " +
+      STOCK_ART_PACKS.map(function (p) {
+        return p.name + ": " + STOCK_ART.filter(function (a) { return a.pack === p.id; }).map(function (a) { return a.id; }).join(" ");
+      }).join(" · ") +
+      ". Prefer a sticker over an emoji when one matches the mood. If none fits, use the library as INSPIRATION: compose the idea from shapes/icons/art elements in the same palette instead.\n" : "") +
     "ARCHETYPES — proven layouts; pick one and adapt, or blend two:\n" +
     "1 Ring Dashboard: ring at x .3 y .5 w .5 + its stat text centered on it (battery/countdown, size 18-22) + right column at x .72: label 10pt, date/calendar 11pt, thin divider, small progress bar.\n" +
     "2 Hero Type: one oversized clock/countdown/date size 44-58 at y .42-.48, tiny styled caption .16 below, one accent glyph in a corner.\n" +
@@ -6087,6 +6185,30 @@ function renderFreestyleInto(node, design, w, h, interactive) {
           div.appendChild(tip);
         }
       }
+    } else if (el.kind === "sticker") {
+      // v117: stock artwork by id — an <img> from the site's own stock/ tree.
+      const side = (el.w || 0.35) * Math.min(w, h);
+      div.style.width = side + "px";
+      div.style.height = side + "px";
+      div.style.opacity = el.opacity;
+      div.classList.add("cel-photo");
+      const url = stockArtUrl(el.stockId);
+      if (url) {
+        const img = document.createElement("img");
+        img.src = url;
+        img.alt = (stockArtById(el.stockId) || {}).name || "sticker";
+        img.style.objectFit = "contain";
+        img.onerror = function () {
+          div.textContent = "🖼";
+          div.style.cssText += "display:flex;align-items:center;justify-content:center;" +
+            "border:1.5px dashed rgba(255,255,255,.4);font-size:" + Math.round(side * 0.4) + "px";
+        };
+        div.appendChild(img);
+      } else {
+        div.textContent = "✨";
+        div.style.cssText += "display:flex;align-items:center;justify-content:center;" +
+          "border:1.5px dashed rgba(255,255,255,.4);font-size:" + Math.round(side * 0.4) + "px";
+      }
     } else if (el.kind === "ring") {
       const pct = Math.min(Math.max(progressPctPreview(el), 0), 1);
       const dia = (el.w || 0.55) * Math.min(w, h);
@@ -6534,7 +6656,7 @@ function applyPinch(el, base, ratio) {
   if (el.kind === "shape" || el.kind === "art") {
     el.w = lim(base.w * ratio, 0.05, 1);
     el.h = lim(base.h * ratio, 0.05, 1);
-  } else if (el.kind === "photo" || el.kind === "ring" || el.kind === "month" || el.kind === "progress") {
+  } else if (el.kind === "photo" || el.kind === "ring" || el.kind === "month" || el.kind === "progress" || el.kind === "sticker") {
     el.w = lim((base.w || 0.55) * ratio, 0.1, 1);
   } else {
     el.size = lim(Math.round(base.size * ratio), 6, 120);
@@ -6763,7 +6885,7 @@ const ELEMENT_PALETTE = [["text", "Text"], ["photo", "🖼 Photo"], ["app", "�
   ["clock", "🕐 Clock"], ["date", "📅 Date"], ["greeting", "👋 Greeting"], ["weather", "☀️ Weather"], ["calendar", "📆 Calendar"], ["month", "🗓 Month"], ["week", "🔢 Week #"],
   ["reminders", "✅ Reminders"], ["news", "📰 News"], ["worldclock", "🌍 World clock"], ["stock", "📈 Stocks"], ["astro", "🌗 Sun & moon"],
   ["progress", "▬ Progress"], ["ring", "◯ Ring"], ["sleeper", "🏈 Fantasy"], ["sleeperlogo", "🛡 Team logo"], ["icon", "◆ Icon"], ["emoji", "✨ Emoji"],
-  ["shape", "▢ Shape"], ["art", "🌀 Art"], ["battery", "🔋 Battery"], ["countdown", "⏳ Countdown"]];
+  ["shape", "▢ Shape"], ["art", "🌀 Art"], ["sticker", "✨ Sticker"], ["battery", "🔋 Battery"], ["countdown", "⏳ Countdown"]];
 
 // City list for world clocks: label, IANA zone (real DST-aware math), and a
 // UTC offset fallback for runtimes without time-zone data.
@@ -6902,6 +7024,7 @@ function addElement(kind) {
   if (kind === "ring") { el.source = "battery"; el.w = 0.55; }
   if (kind === "month") { el.w = 0.6; el.accentHex = "#4A90F6"; }
   if (kind === "art") { el.artType = "arc"; el.text = "curved text"; el.w = 0.7; el.size = 15; el.angle = 0; el.color2Hex = "#8F52FA"; el.flip = false; }
+  if (kind === "sticker") { el.stockId = (STOCK_ART[0] || {}).id || ""; el.w = 0.35; }
   if (kind === "calendar") { el.count = 1; }
   if (kind === "reminders") { el.count = 2; }
   if (kind === "news") { el.count = 2; }
@@ -6997,6 +7120,7 @@ function labelForElement(el) {
   if (el.kind === "worldclock") return "🌍 " + (el.city || "City");
   if (el.kind === "month") return "🗓 Month";
   if (el.kind === "art") return "🌀 " + (el.artType === "gradshape" ? "Gradient" : el.artType === "rotated" ? "Tilted" : "Curve");
+  if (el.kind === "sticker") return "✨ " + ((stockArtById(el.stockId) || {}).name || "Sticker");
   if (el.kind === "progress") return "▬ " + (el.source || "day");
   if (el.kind === "ring") return "◯ " + (el.source || "battery");
   if (el.kind === "sleeper") return "🏈 " + (el.leagueName || "Fantasy");
@@ -7013,7 +7137,7 @@ function labelForElement(el) {
 
 // Canva-style categorized grid: big tappable tiles instead of a chip soup.
 const PALETTE_GROUPS = [
-  ["Basics", ["text", "photo", "shape", "icon", "emoji", "art", "app"]],
+  ["Basics", ["text", "photo", "shape", "icon", "emoji", "art", "sticker", "app"]],
   ["Live info", ["clock", "date", "greeting", "weather", "calendar", "month", "week",
     "reminders", "news", "worldclock", "stock", "astro", "battery", "countdown", "progress", "ring"]],
   ["Sports", ["sleeper", "sleeperlogo"]]
@@ -7289,6 +7413,11 @@ function buildInspectorContent(inspector) {
       option.value = id; option.textContent = ICON_THEMES[id].name;
       themeSel.appendChild(option);
     }
+    for (const sp of STOCK_ICON_PACKS) {
+      const option = document.createElement("option");
+      option.value = "pack:stock:" + sp.id; option.textContent = "👑 " + sp.name;
+      themeSel.appendChild(option);
+    }
     for (const pack of iconPacks) {
       const option = document.createElement("option");
       option.value = "pack:" + pack.id; option.textContent = "📁 " + pack.name;
@@ -7546,6 +7675,55 @@ function buildInspectorContent(inspector) {
     wcHint.className = "hint";
     wcHint.textContent = "That city's current time, DST handled automatically. Refreshes with the widget (every few minutes).";
     inspector.appendChild(wcHint);
+  }
+
+  if (el.kind === "sticker") {
+    if (!STOCK_ART.length) {
+      const emptyHint = document.createElement("p");
+      emptyHint.className = "hint";
+      emptyHint.textContent = "The sticker library loads from the WidgetKing site — open the app online to browse it.";
+      inspector.appendChild(emptyHint);
+    } else {
+      const packRow = document.createElement("div");
+      packRow.className = "row";
+      const packSel = document.createElement("select");
+      const packIds = [];
+      STOCK_ART.forEach(function (a) { if (packIds.indexOf(a.pack) < 0) packIds.push(a.pack); });
+      for (const pid of packIds) {
+        const option = document.createElement("option");
+        option.value = pid;
+        option.textContent = stockArtPackName(pid);
+        packSel.appendChild(option);
+      }
+      const curArt = stockArtById(el.stockId);
+      packSel.value = curArt ? curArt.pack : packIds[0];
+      packRow.appendChild(packSel);
+      inspector.appendChild(packRow);
+      const grid = document.createElement("div");
+      grid.style.cssText = "display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0;max-height:220px;overflow-y:auto";
+      const fillGrid = function () {
+        grid.innerHTML = "";
+        STOCK_ART.filter(function (a) { return a.pack === packSel.value; }).forEach(function (a) {
+          const cell = document.createElement("button");
+          cell.title = a.name;
+          cell.setAttribute("aria-label", a.name);
+          cell.style.cssText = "padding:6px;min-height:0;border-radius:10px" +
+            (a.id === el.stockId ? ";outline:2px solid var(--accent)" : "");
+          const img = document.createElement("img");
+          img.src = stockArtUrl(a.id);
+          img.alt = a.name;
+          img.loading = "lazy";
+          img.style.cssText = "width:100%;aspect-ratio:1;object-fit:contain;display:block";
+          cell.appendChild(img);
+          cell.onclick = function () { el.stockId = a.id; refreshEditors(); };
+          grid.appendChild(cell);
+        });
+      };
+      packSel.onchange = fillGrid;
+      fillGrid();
+      inspector.appendChild(grid);
+      sliderRow("Size", 10, 100, Math.round((el.w || 0.35) * 100), function (v) { el.w = v / 100; });
+    }
   }
 
   if (el.kind === "art") {
@@ -8463,6 +8641,11 @@ function renderLauncherUI() {
   for (const id of Object.keys(ICON_THEMES)) {
     const option = document.createElement("option");
     option.value = id; option.textContent = ICON_THEMES[id].name;
+    themeSelect.appendChild(option);
+  }
+  for (const sp of STOCK_ICON_PACKS) {
+    const option = document.createElement("option");
+    option.value = "pack:stock:" + sp.id; option.textContent = "👑 " + sp.name;
     themeSelect.appendChild(option);
   }
   for (const pack of iconPacks) {
@@ -10377,9 +10560,23 @@ async function buildScript() {
     (design.apps || []).forEach(exportUpgrade);
     (design.canvasElements || []).filter(function (e) { return e.kind === "app"; }).forEach(exportUpgrade);
     // Custom icon packs live only in this browser — bake their images into
-    // the script so the widget can render them anywhere.
+    // the script so the widget can render them anywhere. Built-in stock
+    // packs are hosted on the site, so they export as URLs instead (the
+    // script's loadIcon fetches and caches them like real App Store art).
+    const stockAbs = function (rel) {
+      return (location.protocol.indexOf("http") === 0
+        ? location.origin + location.pathname.replace(/[^/]*$/, "")
+        : "https://ballnews703-png.github.io/WidgetKing/") + rel;
+    };
     const lsTheme = String((design.launcherStyle || {}).iconTheme || "");
-    if (lsTheme.indexOf("pack:") === 0) {
+    if (lsTheme.indexOf("pack:stock:") === 0) {
+      (design.apps || []).forEach(function (app, i) {
+        const icon = packIconFor(lsTheme, i);
+        if (icon) { app.iconUrl = stockAbs(icon); app.iconB64 = ""; }
+      });
+      design.launcherStyle.iconTheme = "real";
+      design.launcherStyle.realStyle = "original";
+    } else if (lsTheme.indexOf("pack:") === 0) {
       (design.apps || []).forEach(function (app, i) {
         const icon = packIconFor(lsTheme, i);
         if (icon) { app.iconB64 = icon.split(",")[1] || ""; app.iconUrl = ""; }
@@ -10388,7 +10585,11 @@ async function buildScript() {
     }
     const appEls = (design.canvasElements || []).filter(function (e) { return e.kind === "app"; });
     appEls.forEach(function (el, i) {
-      if (el.iconTheme && String(el.iconTheme).indexOf("pack:") === 0) {
+      if (el.iconTheme && String(el.iconTheme).indexOf("pack:stock:") === 0) {
+        const icon = packIconFor(el.iconTheme, i);
+        if (icon) { el.iconUrl = stockAbs(icon); el.iconB64 = ""; el.realStyle = "original"; }
+        delete el.iconTheme;
+      } else if (el.iconTheme && String(el.iconTheme).indexOf("pack:") === 0) {
         const icon = packIconFor(el.iconTheme, i);
         if (icon) { el.iconB64 = icon.split(",")[1] || ""; el.iconUrl = ""; }
         delete el.iconTheme;
@@ -12451,7 +12652,7 @@ function renderPageFrame() {
     const needsLive = design.kind === "launcher" ||
       design.background === "clear" ||
       (design.canvasElements || []).some(function (el) {
-        return el.kind === "photo" || el.kind === "art" || el.kind === "app" ||
+        return el.kind === "photo" || el.kind === "art" || el.kind === "app" || el.kind === "sticker" ||
           el.customB64 || el.dataUrl || (el.photos && el.photos.length);
       });
     const mountLive = function () {

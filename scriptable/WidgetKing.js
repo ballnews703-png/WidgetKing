@@ -582,6 +582,13 @@ async function liveDataFor(design) {
     }));
     live.news = await fetchNews(maxN);
   }
+  const stickerEls = els.filter(function (e) { return e.kind === "sticker" && e.stockId; });
+  if (stickerEls.length) {
+    live.stickers = {};
+    for (const el of stickerEls) {
+      if (!live.stickers[el.stockId]) live.stickers[el.stockId] = await loadStickerImage(el.stockId);
+    }
+  }
   return live;
 }
 // The feed's own name is never a headline — it appears as the channel
@@ -1124,6 +1131,17 @@ function drawFreestyle(design, family, bgImg, live) {
         ctx.setFont(Font.mediumSystemFont(9));
         ctx.setTextColor(new Color("#606060", 0.95));
         ctx.drawTextInRect("art missing - re-copy the script", new Rect(px - 70, py - 6, 140, 14));
+      }
+      continue;
+    }
+    if (el.kind === "sticker") {
+      // v117: stock artwork fetched from the WidgetKing site (prefetched in
+      // liveDataFor, cached on device). A failed fetch draws nothing — a
+      // decoration is never worth crashing or blanking a widget.
+      const stImg = live && live.stickers ? live.stickers[el.stockId] : null;
+      if (stImg) {
+        const side = (el.w || 0.35) * Math.min(W, H);
+        try { ctx.drawImageInRect(stImg, new Rect(px - side / 2, py - side / 2, side, side)); } catch (e) {}
       }
       continue;
     }
@@ -1805,6 +1823,38 @@ async function loadIcon(url) {
       img = dc.getImage();
     }
     fm.writeImage(path, img);
+    return img;
+  } catch (e) { return null; }
+}
+// v117: stock stickers live on the WidgetKing site in a flat directory, so
+// the URL derives from the id alone. Cached like real icons; capped at
+// 432px so a few hero stickers can't blow the widget memory budget.
+function stickerUrlFor(stockId) {
+  if (!/^[a-z0-9-]{1,40}$/.test(String(stockId || ""))) return "";
+  let base = String(WK_PAGE_URL || "");
+  if (base.indexOf("http") !== 0) base = "https://ballnews703-png.github.io/WidgetKing/";
+  base = base.split("#")[0].split("?")[0];
+  if (base.slice(-10) === "index.html") base = base.slice(0, -10);
+  if (base.charAt(base.length - 1) !== "/") base = base + "/";
+  return base + "stock/art/" + stockId + ".png";
+}
+async function loadStickerImage(stockId) {
+  try {
+    const url = stickerUrlFor(stockId);
+    if (!url) return null;
+    const fm = FileManager.local();
+    const path = fm.joinPath(fm.cacheDirectory(), "wk_stk_" + hashString(url) + ".png");
+    if (fm.fileExists(path)) return fm.readImage(path);
+    let img = await new Request(url).loadImage();
+    if (img && img.size && img.size.width > 460) {
+      const dc = new DrawContext();
+      dc.size = new Size(432, 432);
+      dc.opaque = false;
+      dc.respectScreenScale = false;
+      dc.drawImageInRect(img, new Rect(0, 0, 432, 432));
+      img = dc.getImage();
+    }
+    if (img) fm.writeImage(path, img);
     return img;
   } catch (e) { return null; }
 }
