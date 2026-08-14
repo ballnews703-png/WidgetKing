@@ -1270,7 +1270,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 115;
+const WK_VERSION = 116;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -4179,6 +4179,9 @@ const REAL_STYLES = [["original", "🎨 Original"], ["mono", "⚪ Mono"], ["tint
   ["logotile", "🔘 Logo tile"], ["logoglitter", "✨ Glitter logo"], ["logoline", "🌈 Gradient outline"],
   ["logocircle", "🔵 Brand button"], ["logosquare", "🟦 Brand square"], ["logoframe", "◻️ Framed mono"],
   ["logopastel", "🎀 Soft pastel"], ["logosticker", "🧵 Sticker"], ["logocloud", "☁️ Cloud cute"]];
+// v116: every sanitizer derives from this list — hand-copied allowlists let
+// a future style silently strip itself from saved designs.
+const REAL_STYLE_KEYS = REAL_STYLES.map(function (pair) { return pair[0]; });
 function hueShiftHex(hex, degrees) {
   const rgb = hexToRgb(hex).map(function (v) { return v / 255; });
   const mx = Math.max(rgb[0], rgb[1], rgb[2]), mn = Math.min(rgb[0], rgb[1], rgb[2]);
@@ -4705,7 +4708,7 @@ function launcherStyleOf(design) {
     labels: style.labels !== false,
     columns: Math.min(Math.max(Math.round(Number(style.columns) || 0), 0), 6),
     iconTheme: (ICON_THEMES[style.iconTheme] || String(style.iconTheme || "").indexOf("pack:") === 0) ? style.iconTheme : "real",
-    realStyle: ["mono", "tint", "darktile", "lighttile", "logotile", "logoglitter", "logoline", "logocircle", "logosquare", "logoframe", "logopastel", "logosticker", "logocloud"].indexOf(style.realStyle) >= 0 ? style.realStyle : "original",
+    realStyle: REAL_STYLE_KEYS.indexOf(style.realStyle) >= 0 ? style.realStyle : "original",
     tintHex: /^#[0-9a-fA-F]{6}$/.test(style.tintHex || "") ? style.tintHex : "#8F52FA"
   };
 }
@@ -4890,7 +4893,7 @@ function normalizeDesign(design) {
         if (scheme) el.url = scheme;
       }
       if (el.iconTheme != null && !ICON_THEMES[el.iconTheme] && String(el.iconTheme).indexOf("pack:") !== 0) delete el.iconTheme;
-      if (el.realStyle != null && ["mono", "tint", "darktile", "lighttile", "logotile", "logoglitter", "logoline", "logocircle", "logosquare", "logoframe", "logopastel", "logosticker", "logocloud"].indexOf(el.realStyle) < 0) delete el.realStyle;
+      if (el.realStyle != null && REAL_STYLE_KEYS.indexOf(el.realStyle) < 0) delete el.realStyle;
       if (el.tintHex != null && !/^#[0-9a-fA-F]{6}$/.test(el.tintHex)) delete el.tintHex;
     }
     if (el.font != null && !FONT_CSS[el.font]) delete el.font;
@@ -12954,7 +12957,11 @@ function renderIconMaker() {
   if (iconMakerStyle === "real") {
     // Koco-style variants of the genuine App Store artwork.
     const variantRow = document.createElement("div");
-    variantRow.style.cssText = "flex-basis:100%;display:flex;gap:6px;flex-wrap:wrap;margin-top:4px";
+    variantRow.style.cssText = "flex-basis:100%;display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;align-items:center";
+    const variantLabel = document.createElement("span");
+    variantLabel.textContent = "Real-icon looks:";
+    variantLabel.style.cssText = "font-size:11px;color:var(--muted)";
+    variantRow.appendChild(variantLabel);
     for (const [value, label] of REAL_STYLES) {
       const chip = document.createElement("button");
       chip.textContent = label;
@@ -13271,14 +13278,28 @@ const EXPLORE_SAMPLES = [
   { label: "Calendar" }, { label: "Maps" }, { label: "Mail" }, { label: "Clock" }
 ];
 let exploreTag = "all";
-const EXPLORE_TAG_CHIPS = [["all", "✨ All"], ["dark", "🌑 Dark"], ["minimal", "▫️ Minimal"],
-  ["cute", "🎀 Cute"], ["pastel", "🌸 Pastel"], ["neon", "⚡ Neon"], ["bold", "🔥 Bold"],
-  ["words", "🔤 Words"], ["aesthetic", "🖼 Aesthetic"], ["retro", "🕹 Retro"]];
+const EXPLORE_TAG_CHIPS = [["all", "✨ All"], ["real", "📱 Real icon"], ["dark", "🌑 Dark"],
+  ["minimal", "▫️ Minimal"], ["cute", "🎀 Cute"], ["pastel", "🌸 Pastel"], ["neon", "⚡ Neon"],
+  ["bold", "🔥 Bold"], ["words", "🔤 Words"], ["aesthetic", "🖼 Aesthetic"], ["retro", "🕹 Retro"]];
+// v116: the 13 real-icon remixes (Cloud cute & friends) were only reachable
+// through a nested chip row in the maker — browsers of THE gallery never saw
+// them. They get their own entries, sampled on drawn tiles so no network is
+// needed to preview the treatment.
+const REAL_REMIX_TAGS = { mono: ["minimal"], tint: ["bold"], darktile: ["dark"],
+  lighttile: ["minimal"], logotile: ["minimal"], logoglitter: ["aesthetic"],
+  logoline: ["aesthetic"], logocircle: ["bold"], logosquare: ["bold"],
+  logoframe: ["minimal"], logopastel: ["pastel", "cute"], logosticker: ["cute"],
+  logocloud: ["cute"] };
 function exploreEntries() {
   const entries = [];
   const names = { mono: "🅰️ Monogram", ringmono: "⭕ Ring letter" };
   for (const id of Object.keys(ICON_THEMES).concat(["mono", "ringmono"])) {
     entries.push({ id: id, name: names[id] || ICON_THEMES[id].name, tags: ICON_TAGS[id] || [] });
+  }
+  for (const pair of REAL_STYLES) {
+    if (pair[0] === "original") continue;
+    entries.push({ id: "real:" + pair[0], name: pair[1] + " · your real icons",
+      tags: ["real"].concat(REAL_REMIX_TAGS[pair[0]] || []), real: pair[0] });
   }
   for (const pack of iconPacks) {
     entries.push({ id: "pack:" + pack.id, name: "📁 " + pack.name, tags: ["custom", "mine"], pack: pack });
@@ -13326,6 +13347,14 @@ function renderExplore() {
       const img = document.createElement("img");
       if (entry.pack) {
         img.src = entry.pack.icons[index % entry.pack.icons.length];
+      } else if (entry.real) {
+        // Sample the remix on a drawn tile (no network): show the fallback
+        // instantly, then swap in the styled version when the canvas is done.
+        const src = drawHomeIcon(app, "candy", index, 112);
+        img.src = src;
+        styledRealIcon(src, entry.real, "#8F52FA", 112).then(function (styled) {
+          if (styled && img.isConnected) img.src = styled;
+        });
       } else if (entry.id === "mono" || entry.id === "ringmono") {
         img.src = drawHomeIcon(app, entry.id, index, 192);
       } else {
@@ -13339,6 +13368,11 @@ function renderExplore() {
     card.onclick = function () {
       if (entry.pack) {
         iconMakerApps.forEach(function (app, i) { if (entry.pack.icons[i]) app.customB64 = entry.pack.icons[i]; });
+      } else if (entry.real) {
+        iconMakerStyle = "real";
+        iconMakerRealStyle = entry.real;
+        localStorage.setItem("widgetking.realstyle", entry.real);
+        iconMakerApps.forEach(function (app) { delete app.customB64; });
       } else {
         iconMakerStyle = entry.id;
         iconMakerApps.forEach(function (app) { delete app.customB64; });
