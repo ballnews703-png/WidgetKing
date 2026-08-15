@@ -700,7 +700,7 @@
         <p class="hint">Pick a design for each part of the day (skip any — the widget falls back to the first one you set). The preview above shows what's live right now.</p>
       </div>
       <div class="field" id="fLock" style="display:none">
-        <label>Lock Screen widget — up to 3 rows 🔒</label>
+        <label>Lock Screen widget — up to 3 rows</label>
         <div class="row" id="lockStyleRow" style="margin-bottom:6px"></div>
         <div id="lockRowsBox"></div>
         <p class="hint">Apple draws Lock Screen widgets in frosted monochrome — that's normal. Time and Countdown rows stay live on their own. To add it: hold your Lock Screen → Customize → tap the widget strip → Scriptable → set Script to WidgetKing and Parameter to this design's name.</p>
@@ -709,7 +709,7 @@
         <label>Add any app with its real App Store icon</label>
         <div class="row" style="margin-bottom:6px">
           <input type="text" id="appSearch" placeholder="Search the App Store… (e.g. Spotify)" style="flex:1">
-          <button id="appSearchBtn">🔍 Search</button>
+          <button id="appSearchBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-search"/></svg> Search</button>
         </div>
         <div class="chips" id="appSearchResults"></div>
         <label style="margin-top:8px">Your apps (tap a chip to edit, ◀ ▶ to reorder)</label>
@@ -757,9 +757,9 @@
         </div>
         <div class="hint" id="shortcutHint" style="display:none;margin-top:8px"></div>
         <p class="hint" style="margin-top:6px">Taps work per-icon on <b>Medium/Large</b> (Small opens the first app) and flash through Scriptable for a moment — an iOS rule. For instant taps:</p>
-        <button id="toIconMakerBtn" style="width:100%">⚡ Make these zero-flash Home Screen icons instead</button>
+        <button id="toIconMakerBtn" style="width:100%"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-bolt"/></svg> Make these zero-flash Home Screen icons instead</button>
       </div>
-      <details class="dcard" open id="dcardStyle"><summary>🎨 Colors &amp; style</summary><div class="dbody">
+      <details class="dcard" open id="dcardStyle"><summary><svg class="ic ic-sm" aria-hidden="true" style="vertical-align:-3px;margin-right:4px"><use href="#i-palette"/></svg>Colors &amp; style</summary><div class="dbody">
       <div class="field">
         <label>Background</label>
         <div class="row kind-buttons" id="bgButtons"></div>
@@ -780,13 +780,13 @@
           <div class="chips" id="posChips"></div>
         </div>
         <p class="hint" id="bgHint" style="display:none;margin-top:6px"></p>
-        <button id="wallpaperBtn" style="margin-top:8px">🖼 Make a matching wallpaper</button>
+        <button id="wallpaperBtn" style="margin-top:8px"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-photo"/></svg> Make a matching wallpaper</button>
         <p class="hint">Generates a phone wallpaper in this widget's exact colors, so your whole screen feels designed together. Save it to Photos and set it as your wallpaper.</p>
       </div>
       <div class="field" id="themeField">
         <div class="row" style="justify-content:space-between;margin-bottom:5px">
           <label style="margin:0">Theme</label>
-          <button id="surpriseBtn" style="font-size:12px;padding:6px 12px">🎲 Surprise me</button>
+          <button id="surpriseBtn" style="font-size:12px;padding:6px 12px"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-refresh"/></svg> Surprise me</button>
         </div>
         <div class="swatches" id="themeSwatches"></div>
       </div>
@@ -807,12 +807,12 @@
       </select></div>
       <div class="field" id="fTextColor"><label>Text color</label><input type="color" id="textColor" value="#ffffff"></div>
       </div></details>
-      <details class="dcard" id="dcardExtras"><summary>⚡ Extras</summary><div class="dbody">
+      <details class="dcard" id="dcardExtras"><summary><svg class="ic ic-sm" aria-hidden="true" style="vertical-align:-3px;margin-right:4px"><use href="#i-bolt"/></svg>Extras</summary><div class="dbody">
       <div class="field" id="fTap">
         <label>Tap to open — which app should launch when this widget is tapped?</label>
         <div class="row">
           <input type="text" id="tapSearch" placeholder="Search the App Store… (e.g. Chess.com)" style="flex:1">
-          <button id="tapSearchBtn">🔍</button>
+          <button id="tapSearchBtn" aria-label="Search"><svg class="ic ic-sm" aria-hidden="true" style="margin:0"><use href="#i-search"/></svg></button>
         </div>
         <div class="chips" id="tapResults"></div>
         <p class="hint" id="tapStatus"></p>
@@ -820,13 +820,13 @@
           <div class="row" style="margin-top:6px">
             <select id="tapPreset" style="flex:1"><option value="">None</option></select>
             <input type="text" id="tapUrlInput" placeholder="custom URL / scheme" style="flex:1.4">
-            <button id="tapTestBtn" title="Try this link right now (works on iPhone)">🧪</button>
+            <button id="tapTestBtn" title="Try this link right now (works on iPhone)" aria-label="Test this link"><svg class="ic ic-sm" aria-hidden="true" style="margin:0"><use href="#i-bolt"/></svg></button>
           </div>
         </details>
       </div>
       <div class="row" id="remixRow" style="margin-top:10px;display:none">
-        <input type="text" id="remixInput" placeholder="✨ Remix with AI: make it warmer, add stars…" style="flex:1">
-        <button id="remixBtn">✨ Remix</button>
+        <input type="text" id="remixInput" placeholder="Remix with AI: make it warmer, add stars…" style="flex:1">
+        <button id="remixBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-sparkle"/></svg> Remix</button>
       </div>
       </div></details>
       <div class="row" id="saveRow">
@@ -845,9 +845,9 @@
     <div class="sheet-panel" id="panelWelcome">
       <h3 id="welcomeHead">What will we make today?</h3>
       <div class="pill-row">
-        <button class="pill-chip pill-accent" id="welcomeMagicBtn">✨ Design it for me</button>
-        <button class="pill-chip" id="welcomeTplBtn">🖼 Templates</button>
-        <button class="pill-chip" id="welcomeBgBtn">🎨 Backgrounds</button>
+        <button class="pill-chip pill-accent" id="welcomeMagicBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-sparkle"/></svg> Design it for me</button>
+        <button class="pill-chip" id="welcomeTplBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-frames"/></svg> Templates</button>
+        <button class="pill-chip" id="welcomeBgBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-palette"/></svg> Backgrounds</button>
       </div>
       <div class="row" style="margin-top:14px;gap:8px">
         <input type="text" id="welcomeIdea" class="pill-input" placeholder="Describe your idea — a cozy clock with weather" style="flex:1">
@@ -856,7 +856,7 @@
     </div>
     <div class="sheet-panel" id="panelWidget">
       <div id="tweakBlock" style="margin-bottom:12px">
-        <label style="font-size:12px;color:var(--muted)">✨ Quick tweaks — tap one, or ask in your own words</label>
+        <label style="font-size:12px;color:var(--muted)">Quick tweaks — tap one, or ask in your own words</label>
         <div class="chips" id="tweakChips" style="margin:6px 0"></div>
         <div style="display:flex;gap:8px">
           <input type="text" id="tweakInput" aria-label="Describe a change to this widget" placeholder="Change anything — try “warm sunset look”" style="flex:1">
@@ -867,7 +867,7 @@
     <div class="sheet-panel" id="panelTemplates">
       <div class="row" style="margin-bottom:8px">
         <input type="text" id="tplIdea" placeholder="Describe your ideal widget…" style="flex:1">
-        <button class="primary" id="tplGenerateBtn">✨ Generate</button>
+        <button class="primary" id="tplGenerateBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-sparkle"/></svg> Generate</button>
       </div>
       <div id="recentTemplates"></div>
       <div class="chips" id="panelPackChips"></div>
@@ -877,7 +877,7 @@
     <div class="sheet-panel" id="panelText">
       <div class="row" style="margin-bottom:8px">
         <input type="text" id="textIdea" placeholder="Type your words — they become a text piece" style="flex:1">
-        <button class="primary" id="textGenerateBtn">✨ Add</button>
+        <button class="primary" id="textGenerateBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-sparkle"/></svg> Add</button>
       </div>
       <div id="panelTextTiles"></div>
     </div>
@@ -888,7 +888,7 @@
     <div class="sheet-panel" id="panelBackground">
       <div class="row" style="margin-bottom:8px">
         <input type="text" id="bgIdea" placeholder="Describe your ideal background…" style="flex:1">
-        <button class="primary" id="bgGenerateBtn">✨ Generate</button>
+        <button class="primary" id="bgGenerateBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-sparkle"/></svg> Generate</button>
       </div>
       <div class="field"><label>Pattern</label><div class="chips" id="bgPatternChips"></div></div>
     </div>
@@ -902,35 +902,35 @@
 
 <section id="librarySection" class="pane pane-widgets">
   <div id="installChecklist" class="status-card" style="display:none">
-    <div class="grow">🚀 <b>New phone?</b> Put your widgets on your Home Screen — the wizard walks you through it once.</div>
+    <div class="grow"><svg class="ic ic-sm" aria-hidden="true" style="vertical-align:-3px;margin-right:3px"><use href="#i-phone"/></svg> <b>New phone?</b> Put your widgets on your Home Screen — the wizard walks you through it once.</div>
     <button class="primary" id="checklistWizardBtn">Set up</button>
     <button id="checklistDismissBtn" aria-label="Dismiss setup reminder">✕</button>
   </div>
-  <div id="backupNudge" style="display:none;border-radius:14px;padding:10px 12px;margin-bottom:8px;background:rgba(240,196,69,.14);font-size:13px;cursor:pointer">💾 <b>Protect your work</b> — your designs live only in this browser. Tap to save a backup file.</div>
+  <div id="backupNudge" style="display:none;border-radius:14px;padding:10px 12px;margin-bottom:8px;background:rgba(240,196,69,.14);font-size:13px;cursor:pointer"><svg class="ic ic-sm" aria-hidden="true" style="vertical-align:-3px;margin-right:3px"><use href="#i-save"/></svg> <b>Protect your work</b> — your designs live only in this browser. Tap to save a backup file.</div>
   <div class="seg" id="libSeg" role="tablist" aria-label="My Widgets sections" style="margin-bottom:10px">
     <button data-lt="widgets" role="tab">Widgets</button>
     <button data-lt="icons" role="tab">Icons</button>
   </div>
   <div id="libPacksPanel" style="display:none"></div>
-  <input type="text" id="librarySearch" placeholder="🔍 Search your widgets…" style="margin-bottom:8px">
+  <input type="text" id="librarySearch" placeholder="Search your widgets…" style="margin-bottom:8px">
   <div class="chips" id="libFolders" style="margin-bottom:4px"></div>
   <div class="row" id="libSortRow" style="margin-bottom:8px"></div>
   <div id="library"></div>
   <div class="row" style="margin-top:12px">
     <button class="primary" id="pushUpdateBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-refresh"/></svg> Update phone (one tap)</button>
     <button id="copyScriptBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-copy"/></svg> Copy Scriptable Script</button>
-    <button id="installScriptBtn">⚡ Install in Scriptable (first time)</button>
-    <button id="downloadScriptBtn">⬇️ Download Script</button>
+    <button id="installScriptBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-bolt"/></svg> Install in Scriptable (first time)</button>
+    <button id="downloadScriptBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-save"/></svg> Download Script</button>
     <button id="backupBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-save"/></svg> Back up all designs</button>
-    <button id="importJsonBtn">📂 Restore / Import</button>
-    <button id="syncAllBtn">📲 Send all to my other device</button>
+    <button id="importJsonBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-folder"/></svg> Restore / Import</button>
+    <button id="syncAllBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-phone"/></svg> Send all to my other device</button>
     <input type="file" id="importFile" accept=".json,application/json" style="display:none">
   </div>
 </section>
 
 <section id="settingsSection" class="pane pane-settings">
   <details class="wk-sec" id="designerSetup" open>
-    <summary>✨ AI designer</summary>
+    <summary><span style="display:flex;align-items:center;gap:9px"><span class="icchip" style="background:#8F52FA"><svg class="ic" aria-hidden="true"><use href="#i-sparkle"/></svg></span>AI designer</span></summary>
     <p class="hint" style="margin-top:8px">
       Paste the access key to unlock the full designer on this device. Stored
       only in this browser.
@@ -944,10 +944,10 @@
       </select>
     </div>
     <label style="font-size:13px;display:flex;align-items:center;gap:6px;margin-top:8px">
-      <input type="checkbox" id="aiEyes" checked> 👁 Design review — the AI looks at its finished widget and fixes flaws (recommended)
+      <input type="checkbox" id="aiEyes" checked> Design review — the AI looks at its finished widget and fixes flaws (recommended)
     </label>
     <label style="font-size:13px;display:flex;align-items:center;gap:6px;margin-top:8px">
-      <input type="checkbox" id="aiPolish"> ✨ Design-director pass — a second AI review for extra polish
+      <input type="checkbox" id="aiPolish"> Design-director pass — a second AI review for extra polish
     </label>
     <div class="row" style="margin-top:8px">
       <span style="font-size:12px;color:var(--muted)">Budget $</span>
@@ -956,27 +956,27 @@
       <button id="resetSpend">Reset</button>
     </div>
     <div class="row" style="margin-top:8px">
-      <button id="clearKeyBtn" style="flex:1">🧹 Clear key from this device</button>
+      <button id="clearKeyBtn" style="flex:1"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-broom"/></svg> Clear key from this device</button>
     </div>
   </details>
   <details class="wk-sec" id="guidesSec" open>
-    <summary>📚 Guides — learn it in levels</summary>
+    <summary><span style="display:flex;align-items:center;gap:9px"><span class="icchip" style="background:#2FB56B"><svg class="ic" aria-hidden="true"><use href="#i-book"/></svg></span>Guides — learn it in levels</span></summary>
     <div id="guidesList"></div>
   </details>
   <details class="wk-sec" id="appSettings" open>
-    <summary>📱 App</summary>
-    <button class="settings-row" id="appearanceRow" style="width:100%;text-align:left">🌓 Appearance <span class="val" id="appearanceVal">Auto</span></button>
-    <button class="settings-row" id="replayTourRow" style="width:100%;text-align:left">👋 Welcome tour <span class="val">Replay</span></button>
-    <a class="settings-row" href="privacy.html" style="text-decoration:none;color:inherit">🔒 Privacy policy <span class="val">↗</span></a>
-    <div class="settings-row">👑 WidgetKing <span class="val" id="settingsVersion"></span></div>
+    <summary><span style="display:flex;align-items:center;gap:9px"><span class="icchip" style="background:#8E8E93"><svg class="ic" aria-hidden="true"><use href="#i-gear"/></svg></span>App</span></summary>
+    <button class="settings-row" id="appearanceRow" style="width:100%;text-align:left"><span class="icchip" style="background:#5E5CE6"><svg class="ic" aria-hidden="true"><use href="#i-moonsun"/></svg></span> Appearance <span class="val" id="appearanceVal">Auto</span></button>
+    <button class="settings-row" id="replayTourRow" style="width:100%;text-align:left"><span class="icchip" style="background:#0A84FF"><svg class="ic" aria-hidden="true"><use href="#i-compass"/></svg></span> Welcome tour <span class="val">Replay</span></button>
+    <a class="settings-row" href="privacy.html" style="text-decoration:none;color:inherit"><span class="icchip" style="background:#64748B"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span> Privacy policy <span class="val">↗</span></a>
+    <div class="settings-row"><span class="icchip" style="background:#F0B429"><svg class="ic" aria-hidden="true"><use href="#i-crown"/></svg></span> WidgetKing <span class="val" id="settingsVersion"></span></div>
   </details>
 </section>
 
 <section id="installSection" class="pane pane-settings">
   <div class="sec-label">Install &amp; setup help</div>
-  <button class="primary" id="wizardBtn" style="width:100%;font-size:16px;padding:14px">🪄 Set up my iPhone — step by step</button>
+  <button class="primary" id="wizardBtn" style="width:100%;font-size:16px;padding:14px"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-wand"/></svg> Set up my iPhone — step by step</button>
   <p class="hint" style="margin-top:8px">💡 Make this designer feel like an app: in Safari tap <b>Share → Add to Home Screen</b> — you'll get a WidgetKing 👑 icon that opens full-screen.</p>
-  <h3 style="margin:16px 0 4px">👑 Pick your WidgetKing icon</h3>
+  <h3 style="margin:16px 0 4px"><svg class="ic ic-sm" aria-hidden="true" style="vertical-align:-2px;margin-right:3px"><use href="#i-crown"/></svg> Pick your WidgetKing icon</h3>
   <p class="hint">Tap a style — same crown, your color. It applies the next time the app is added to your Home Screen.</p>
   <div id="appIconGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:8px"></div>
   <p class="hint" id="appIconHint" style="display:none;margin-top:8px">✓ Saved. To see it on your Home Screen: remove the current WidgetKing icon (it won't delete anything), then <b>Share → Add to Home Screen</b> again — iPhones only read the icon at add-time.</p>
@@ -1040,7 +1040,7 @@
   </div>
   <p class="hint" id="iconSaveHint" style="display:none"><b>Long-press each icon → “Add to Photos”.</b> Then follow the guide:</p>
   <details id="iconHowTo" style="display:none">
-    <summary>📖 How to put these on your Home Screen (one-time per app)</summary>
+    <summary><svg class="ic ic-sm" aria-hidden="true" style="vertical-align:-3px;margin-right:4px"><use href="#i-book"/></svg>How to put these on your Home Screen (one-time per app)</summary>
     <ol style="margin-top:8px">
       <li>Open the <b>Shortcuts</b> app → tap <b>+</b>.</li>
       <li>Add the action <b>“Open App”</b> → tap the pale word <b>App</b> → pick the app (e.g. Instagram).</li>
@@ -1053,7 +1053,7 @@
 </section>
 
 <section id="shortcutGuideSection" class="pane pane-settings">
-  <details class="dcard"><summary>⚡ Your Shortcut Guide — reads your widgets</summary><div class="dbody">
+  <details class="dcard"><summary><svg class="ic ic-sm" aria-hidden="true" style="vertical-align:-3px;margin-right:4px"><use href="#i-bolt"/></svg>Your Shortcut Guide — reads your widgets</summary><div class="dbody">
   <p class="hint">What each app button does on tap, auto-generated from your saved widgets. Zero-flash tip: a single-app widget can skip Scriptable entirely — long-press it → <b>Edit Widget → When Interacting → Open URL</b> → paste the link (📋 below).</p>
   <div id="shortcutGuideList"></div>
   <a class="wiz-action" href="shortcuts://" style="margin-top:10px">🚀 Open the Shortcuts app</a>
@@ -1104,7 +1104,7 @@
     <h2>You're ready.</h2>
     <p>Design something, save it, and the setup wizard walks your iPhone through the rest — once.</p>
     <div class="wk-actions" style="justify-content:center">
-      <button class="primary" id="wtWizardBtn" style="flex:1">🪄 Set up my iPhone</button>
+      <button class="primary" id="wtWizardBtn" style="flex:1"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-wand"/></svg> Set up my iPhone</button>
       <button id="wtBrowseBtn" style="flex:1">Look around first</button>
     </div>
   </div>
@@ -1209,9 +1209,9 @@
     </div>
     <div class="row" id="pageAIRow" style="display:none;margin-top:10px">
       <input type="text" id="pageIdea" placeholder="e.g. a fantasy football command center, dark green" style="flex:1">
-      <button id="pageAIBtn">✨ Design my page</button>
+      <button id="pageAIBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-sparkle"/></svg> Design my page</button>
     </div>
-    <button class="primary" id="pageSaveBtn" style="width:100%;margin-top:12px">💾 Save page &amp; get the placement checklist</button>
+    <button class="primary" id="pageSaveBtn" style="width:100%;margin-top:12px"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-save"/></svg> Save page &amp; get the placement checklist</button>
     <div id="pageChecklist" style="margin-top:12px"></div>
   </div>
 </div>
@@ -1247,10 +1247,10 @@
     <div id="bResult" style="display:none">
       <div id="bPreviewWrap"></div>
       <div class="row" style="margin-top:14px;justify-content:center">
-        <button id="bAgain">🎲 Show me another</button>
+        <button id="bAgain"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-refresh"/></svg> Show me another</button>
         <button class="primary" id="bKeep">💜 Perfect — let me tweak it</button>
       </div>
-      <button id="bAI" style="width:100%;margin-top:10px;display:none">👑 Have WidgetKing fancy it up</button>
+      <button id="bAI" style="width:100%;margin-top:10px;display:none"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-crown"/></svg> Have WidgetKing fancy it up</button>
     </div>
   </div>
 </div>
@@ -1270,7 +1270,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 121;
+const WK_VERSION = 122;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -10051,7 +10051,7 @@ function renderLibrary() {
   const folders = libFolderNames();
   if (libFolder && folders.indexOf(libFolder) < 0) libFolder = "";
   if (folders.length) {
-    const all = [["", "✨ All"]].concat(folders.map(function (f) { return [f, "📁 " + f]; }));
+    const all = [["", "All"]].concat(folders.map(function (f) { return [f, f]; }));
     for (const pair of all) {
       const chip = document.createElement("button");
       chip.textContent = pair[1];
@@ -11679,7 +11679,7 @@ function buildSheetPanel(tool) {
     renderTemplates(document.getElementById("panelTemplateRow"), document.getElementById("panelPackChips"));
   } else if (tool === "pieces") {
     const panel = document.getElementById("panelPieces");
-    panel.innerHTML = '<div class="row" style="margin-bottom:8px"><input type="text" id="piecesSearch" placeholder="🔍 Search pieces…" style="flex:1"></div>' +
+    panel.innerHTML = '<div class="row" style="margin-bottom:8px"><input type="text" id="piecesSearch" placeholder="Search pieces…" style="flex:1"></div>' +
       '<div id="recentPieces"></div><div id="piecesTiles"></div>';
     buildPalette(document.getElementById("piecesTiles"),
       { smart: true, keys: ["sticker", "shape", "icon", "emoji", "art", "clock", "date", "countdown", "progress", "ring"] });
@@ -11692,7 +11692,7 @@ function buildSheetPanel(tool) {
     buildPalette(document.getElementById("panelAppTiles"), { keys: ["app"] });
   } else if (tool === "data") {
     const panel = document.getElementById("panelData");
-    panel.innerHTML = '<div class="row" style="margin-bottom:8px"><input type="text" id="dataSearch" placeholder="🔍 Search live info…" style="flex:1"></div><div id="dataTiles"></div>';
+    panel.innerHTML = '<div class="row" style="margin-bottom:8px"><input type="text" id="dataSearch" placeholder="Search live info…" style="flex:1"></div><div id="dataTiles"></div>';
     buildPalette(document.getElementById("dataTiles"), { keys: DATA_ELEMENT_KINDS });
     wirePanelSearch("dataSearch", "dataTiles");
   }
@@ -13938,7 +13938,7 @@ document.getElementById("wizardBtn").onclick = function () {
 // leveled path: each guide promises an outcome, teaches it in a few steps,
 // and ends on a button that DOES the thing rather than describing it.
 const GUIDES = [
-  { icon: "✨", title: "Your first widget", promise: "From idea to a saved design in about a minute.",
+  { ic: "i-sparkle", tint: "#8F52FA", title: "Your first widget", promise: "From idea to a saved design in about a minute.",
     steps: [
       "Open <b>My Widgets</b> and tap <b>Create a widget</b> — or start on the Create tab with <b>Build it for me</b>.",
       "Pick a door: describe your idea to the AI, start from a template, or begin with a blank canvas.",
@@ -13946,8 +13946,8 @@ const GUIDES = [
       "In the <b>Widget</b> tool, Quick Tweaks suggests three changes read from your design — tap one, or type your own.",
       "Tap <b>💾 Save design</b>. It's now in My Widgets, ready for your phone."
     ],
-    action: { label: "👋 Replay the welcome tour", run: function () { closeGuide(); showWelcomeTour(); } } },
-  { icon: "📲", title: "Put it on your Home Screen", promise: "One-time setup, then updates are one tap.",
+    action: { ic: "i-refresh", label: "Replay the welcome tour", run: function () { closeGuide(); showWelcomeTour(); } } },
+  { ic: "i-phone", tint: "#0A84FF", title: "Put it on your Home Screen", promise: "One-time setup, then updates are one tap.",
     steps: [
       "Install the free <b>Scriptable</b> app from the App Store — it's what draws your widgets on the Home Screen.",
       "Run the step-by-step wizard below; it walks the whole thing once.",
@@ -13955,37 +13955,37 @@ const GUIDES = [
       "Long-press the new widget → <b>Edit Widget</b> → pick which design it shows by its slot number.",
       "The first time live data runs, iOS asks permission inside Scriptable — that's normal and happens once."
     ],
-    action: { label: "🪄 Open the setup wizard", run: function () { closeGuide(); document.getElementById("wizardBtn").onclick(); } } },
-  { icon: "🎨", title: "Make it yours", promise: "Colors, fonts, textures — your taste on every pixel.",
+    action: { ic: "i-wand", label: "Open the setup wizard", run: function () { closeGuide(); document.getElementById("wizardBtn").onclick(); } } },
+  { ic: "i-palette", tint: "#E8567C", title: "Make it yours", promise: "Colors, fonts, textures — your taste on every pixel.",
     steps: [
       "The <b>Background</b> tool holds themes, custom colors, dreamy mesh blends, and soft textures — or type a mood and tap Generate.",
       "The <b>Text</b> tool changes fonts and text colors; every element can override them.",
       "Quick Tweaks (in the <b>Widget</b> tool) always has three ideas ready — tap through them, nothing is permanent.",
       "Undo lives next to Save. Experiment freely; every change steps back cleanly."
     ],
-    action: { label: "👑 Open My Widgets", run: function () { closeGuide(); switchTab("widgets"); } } },
-  { icon: "🖼", title: "Your photos, in widgets", promise: "One perfect shot, or a rotating pick from favorites.",
+    action: { ic: "i-crown", label: "Open My Widgets", run: function () { closeGuide(); switchTab("widgets"); } } },
+  { ic: "i-photo", tint: "#2FB56B", title: "Your photos, in widgets", promise: "One perfect shot, or a rotating pick from favorites.",
     steps: [
       "In the editor, open the <b>Photos</b> tool and add a photo piece — then pick from your camera roll.",
       "Choose a frame: clean, polaroid, bordered, or film.",
       "Add several photos to one piece and it rotates through them each time the widget refreshes.",
       "The background remover turns a subject into a sticker — great over gradients."
     ] },
-  { icon: "📅", title: "Widgets that know your day", promise: "Weather, calendar, reminders, battery — live.",
+  { ic: "i-bolt", tint: "#F59E0B", title: "Widgets that know your day", promise: "Weather, calendar, reminders, battery — live.",
     steps: [
       "Open the <b>Data</b> tool: weather, calendar, reminders, news, stocks, battery, astronomy, world clocks and more.",
       "Drop a piece on the canvas — the preview shows sample data so you can design the layout now.",
       "On your phone, the real numbers appear and refresh on Apple's widget schedule.",
       "iOS asks permission (calendar, location…) inside Scriptable the first time — grant it once and you're set."
     ] },
-  { icon: "🫥", title: "Clear & glass backgrounds", promise: "Widgets that melt into your wallpaper.",
+  { ic: "i-layers", tint: "#14B8A6", title: "Clear & glass backgrounds", promise: "Widgets that melt into your wallpaper.",
     steps: [
       "Pick <b>Clear</b> or <b>Glass</b> in the Background tool.",
       "One-time trick for Clear: swipe to an empty Home Screen page, take a screenshot, and pick that screenshot when the widget asks — iOS shades wallpapers, so a screenshot matches perfectly.",
       "Set your exact iPhone model in the device picker (Create tab) so the slice lines up.",
       "Glass needs no setup — it blurs whatever is behind it."
     ] },
-  { icon: "🔄", title: "Keep everything fresh", promise: "Edit here, tap once, done on your phone.",
+  { ic: "i-refresh", tint: "#0EA5E9", title: "Keep everything fresh", promise: "Edit here, tap once, done on your phone.",
     steps: [
       "Edit any design and Save — My Widgets shows an update is waiting.",
       "Tap <b>Update phone (one tap)</b> and approve on your phone. Every widget redraws.",
@@ -14002,7 +14002,7 @@ function closeGuide() {
 function openGuide(index) {
   const g = GUIDES[index];
   guideReturnFocus = document.activeElement;
-  document.getElementById("guideTitle").textContent = g.icon + " " + g.title;
+  document.getElementById("guideTitle").textContent = g.title;
   const body = document.getElementById("guideBody");
   body.innerHTML = "";
   const promise = document.createElement("p");
@@ -14020,7 +14020,12 @@ function openGuide(index) {
     const b = document.createElement("button");
     b.className = "primary";
     b.style.cssText = "width:100%;padding:14px;font-size:15px;margin-top:4px";
-    b.textContent = g.action.label;
+    if (g.action.ic) {
+      b.innerHTML = '<svg class="ic ic-sm" aria-hidden="true"><use href="#' + g.action.ic + '"/></svg> ';
+      b.appendChild(document.createTextNode(g.action.label));
+    } else {
+      b.textContent = g.action.label;
+    }
     b.onclick = g.action.run;
     body.appendChild(b);
   }
@@ -14034,7 +14039,7 @@ function openGuide(index) {
   GUIDES.forEach(function (g, i) {
     const row = document.createElement("button");
     row.className = "guide-row";
-    row.innerHTML = '<span class="gi" aria-hidden="true">' + g.icon + '</span>' +
+    row.innerHTML = '<span class="icchip" aria-hidden="true" style="background:' + g.tint + '"><svg class="ic"><use href="#' + g.ic + '"/></svg></span>' +
       '<span class="gt"><span class="gl">LEVEL ' + (i + 1) + '</span><br>' +
       '<span class="gn">' + g.title + '</span>' +
       '<span class="gp" style="display:block">' + g.promise + '</span></span>' +
