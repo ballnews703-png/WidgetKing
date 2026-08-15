@@ -939,8 +939,8 @@
     <div class="row" style="margin-top:8px">
       <span style="font-size:12px;color:var(--muted)">Model</span>
       <select id="aiModel" style="flex:1">
-        <option value="claude-opus-5">Best quality</option>
-        <option value="claude-haiku-4-5">Fastest</option>
+        <option value="claude-sonnet-5">High quality</option>
+        <option value="claude-haiku-4-5">Fast</option>
       </select>
     </div>
     <label style="font-size:13px;display:flex;align-items:center;gap:6px;margin-top:8px">
@@ -1270,7 +1270,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 120;
+const WK_VERSION = 121;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -5149,14 +5149,21 @@ function toast(message) {
 function getApiKey() { return (localStorage.getItem("widgetking.apikey") || "").trim(); }
 
 // ==================== AI budget tracking ====================
-const PRICES = { "claude-opus-5": [5, 25], "claude-haiku-4-5": [1, 5] };
+const PRICES = { "claude-opus-5": [5, 25], "claude-sonnet-5": [3, 15], "claude-haiku-4-5": [1, 5] };
+// The two models the app offers. Anything else stored (e.g. an old
+// "claude-opus-5" from before v121) reads as the default.
+const AI_MODELS = ["claude-sonnet-5", "claude-haiku-4-5"];
+function aiModel() {
+  const m = localStorage.getItem("widgetking.aimodel");
+  return AI_MODELS.indexOf(m) >= 0 ? m : "claude-sonnet-5";
+}
 function getSpend() { return Number(localStorage.getItem("widgetking.spend") || 0) || 0; }
 function getBudget() {
   const budget = Number(localStorage.getItem("widgetking.budget"));
   return isFinite(budget) && budget > 0 ? budget : 5;
 }
 function addSpend(model, usage) {
-  const price = PRICES[model] || PRICES["claude-opus-5"];
+  const price = PRICES[model] || PRICES["claude-sonnet-5"];
   const cost = (
     (usage.input_tokens || 0) * price[0] +
     (usage.output_tokens || 0) * price[1] +
@@ -5599,8 +5606,12 @@ function routedExemplars(requestText) {
   return chosen;
 }
 
-function aiSystemPrompt(requestText) {
-  const today = new Date().toISOString().slice(0, 10);
+// v121: the prompt is split so the big unchanging part can be prompt-cached
+// (10% price on repeat calls within 5 minutes — the AI-eyes review call and
+// back-to-back generations). ONLY the tail may vary per call: the shuffled
+// style references and the date. Anything random added to the stable half
+// silently kills the discount for every user.
+function aiSystemPromptStable() {
   return "You are WidgetKing's expert widget designer AND a trained graphic designer. Two skills, applied together: the WIDGET craft below (elements, layouts, fit), and this DESIGN DOCTRINE — universal principles that outrank any single trick:\n" +
     "TYPOGRAPHY: hierarchy needs at least a 2x size jump between hero and body; only two levels of emphasis besides the hero. Labels/microcopy: 8-10pt UPPERCASE reads as designed. Pair fonts by CONTRAST (one display serif or script + one quiet sans), never two similar fonts. The hero gets the character font; data stays in classic/avenir/rounded.\n" +
     "COLOR: think 60-30-10 — dominant base, secondary surface, ONE accent used 2-3 times. Muted bases, saturated accent. Calm moods = analogous hues (neighbors on the wheel); energy = one complementary pop. On dark backgrounds lighten and slightly desaturate accents; on light backgrounds deepen them. Never two competing saturated hues. Text must clearly contrast its background (squint test).\n" +
@@ -5646,13 +5657,19 @@ function aiSystemPrompt(requestText) {
     "Themes: " + Object.keys(THEMES).join(", ") + ". 'paper' is light (use dark text #333333); others are dark (use light text). For specific moods prefer TWO custom backgroundColors (e.g. dusk plum #2A1A34 to terracotta #B0626A) over presets.\n" +
     "Backgrounds: glass = frosted wallpaper (glassTint dark/light); clear = fully transparent on the wallpaper — use when the user says transparent/frosted/blend; bgOpacity below 1 makes a gradient see-through like tinted glass. gradientDir mesh (freestyle only) = dreamy multi-color blob glow — reach for it on soft, aesthetic, or minimal moods. Otherwise gradient. bgPattern adds a named theme-tinted texture over the gradient (grain/dots/grid/stripes/waves/paper/blobs) — name it exactly, one at most, only when it serves the mood.\n" +
     "Launchers: set tapUrl when the whole widget should open one app. Common schemes: instagram://, spotify://, youtube://, tiktok://, twitter://, snapchat://, whatsapp://, fb://, fb-messenger://, discord://, reddit://, googlegmail://, slack://, zoomus://, nflx://, music://, maps://, calshow://, tel://, sms://, mailto:.\n" +
-    "For long text set w ~0.8 on the text element so it wraps (w=0 = single line).\n" +
-    "STYLE REFERENCES — these set the QUALITY BAR; they are never the answer. Hard rules: (1) recombine ideas, never restate a reference; (2) your design must differ from every reference shown in at least palette, arrangement, AND hero element; (3) if the request resembles a reference, deliberately choose a different composition at the same quality. References omit empty fields for brevity — your output must still fill every schema field.\n" +
+    "For long text set w ~0.8 on the text element so it wraps (w=0 = single line).\n";
+}
+function aiSystemPromptVariable(requestText) {
+  const today = new Date().toISOString().slice(0, 10);
+  return "STYLE REFERENCES — these set the QUALITY BAR; they are never the answer. Hard rules: (1) recombine ideas, never restate a reference; (2) your design must differ from every reference shown in at least palette, arrangement, AND hero element; (3) if the request resembles a reference, deliberately choose a different composition at the same quality. References omit empty fields for brevity — your output must still fill every schema field.\n" +
     routedExemplars(requestText).map(function (ex) {
       return "Reference [" + ex.tags.slice(0, 3).join(", ") + "]: " + JSON.stringify(ex.spec);
     }).join("\n") + "\n" +
     "VARIETY: similar requests must NOT produce similar widgets. Rotate archetypes, pick a fresh palette (never a reference's), vary the hero (clock vs date vs ring vs type), and add one unexpected-but-tasteful touch per design — an unusual font pairing, an off-center anchor, a two-tone capsule, a wildcard accent.\n" +
     "Today is " + today + ". Resolve relative dates to yyyy-MM-dd. Names under 24 chars. Fill unused fields with empty strings, 0, or empty arrays. Compose like a designer, not a form-filler: every element should earn its place.";
+}
+function aiSystemPrompt(requestText) {
+  return aiSystemPromptStable() + aiSystemPromptVariable(requestText);
 }
 // v114: a serialized SVG foreignObject carries NONE of the page's
 // stylesheets, so class-styled nodes lose those rules when rasterized —
@@ -5712,7 +5729,7 @@ async function callClaudeOnce(messages, key, schema) {
   if (getSpend() >= getBudget()) {
     throw new Error("AI budget reached ($" + getBudget().toFixed(2) + ") — raise the budget in the AI section to keep using the AI");
   }
-  const model = localStorage.getItem("widgetking.aimodel") || "claude-opus-5";
+  const model = aiModel();
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -5724,7 +5741,13 @@ async function callClaudeOnce(messages, key, schema) {
     body: JSON.stringify({
       model: model,
       max_tokens: 16000,
-      system: aiSystemPrompt(messagesText(messages)),
+      // Two system blocks: the stable doctrine is marked cacheable (repeat
+      // calls within 5 min pay ~10% for it — the review pass always does),
+      // the shuffled style references ride after the cache breakpoint.
+      system: [
+        { type: "text", text: aiSystemPromptStable(), cache_control: { type: "ephemeral" } },
+        { type: "text", text: aiSystemPromptVariable(messagesText(messages)) }
+      ],
       output_config: { format: { type: "json_schema", schema: schema || AI_SCHEMA } },
       messages: messages
     })
@@ -10241,7 +10264,7 @@ apiKeyInput.oninput = function () {
   document.getElementById("remixRow").style.display = getApiKey() ? "flex" : "none";
 };
 const aiModelSelect = document.getElementById("aiModel");
-aiModelSelect.value = localStorage.getItem("widgetking.aimodel") || "claude-opus-5";
+aiModelSelect.value = aiModel();
 aiModelSelect.onchange = function () {
   localStorage.setItem("widgetking.aimodel", aiModelSelect.value);
 };
@@ -11187,7 +11210,7 @@ async function allDesignsLink(includeAI) {
     // never part of the public site.
     payload.ai = {
       key: getApiKey(),
-      model: localStorage.getItem("widgetking.aimodel") || "claude-opus-5",
+      model: aiModel(),
       budget: getBudget()
     };
   }
@@ -11270,7 +11293,7 @@ async function receiveSharedDesign() {
       let aiNote = "";
       if (hasKey) {
         localStorage.setItem("widgetking.apikey", parsed.ai.key.trim());
-        if (PRICES[parsed.ai.model]) localStorage.setItem("widgetking.aimodel", parsed.ai.model);
+        if (AI_MODELS.indexOf(parsed.ai.model) >= 0) localStorage.setItem("widgetking.aimodel", parsed.ai.model);
         const budget = Number(parsed.ai.budget);
         if (isFinite(budget) && budget > 0) localStorage.setItem("widgetking.budget", String(budget));
         document.getElementById("apiKeyInput").value = parsed.ai.key.trim();
