@@ -1100,7 +1100,11 @@
     </div>
   </div>
   <div class="wt-pane" data-p="4" style="display:none">
-    <div class="wt-big">👑</div>
+    <div class="wt-fan">
+      <div class="wt-art wt-fan-l" id="wtArt4L"></div>
+      <div class="wt-art wt-fan-c" id="wtArt4C"></div>
+      <div class="wt-art wt-fan-r" id="wtArt4R"></div>
+    </div>
     <h2>You're ready.</h2>
     <p>Design something, save it, and the setup wizard walks your iPhone through the rest — once.</p>
     <div class="wk-actions" style="justify-content:center">
@@ -1270,7 +1274,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 122;
+const WK_VERSION = 123;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -12203,10 +12207,20 @@ function tourDesign(name, fallback) {
   return t ? JSON.parse(JSON.stringify(t.design)) : fallback;
 }
 function showWelcomeTour() {
-  wtArt("wtArtL", tourDesign("Dreamy Hours", { name: "TourL", kind: "clock", themeID: "candy" }), "small", 0.72);
+  // v123: the tour is a portfolio, not a pattern — every slot shows a
+  // DIFFERENT hero, not just a different palette (three clocks in three
+  // colors still read as the same widget). Opening fan: light photo
+  // polaroid, the flagship clock jewel, a festive countdown. Data pane:
+  // the premium bento dashboard. Closing fan: fantasy sports card,
+  // sun & moon astronomy, a mint battery ring — seven distinct looks
+  // AND seven distinct jobs by the last screen.
+  wtArt("wtArtL", tourDesign("Polaroid", { name: "TourL", kind: "date", themeID: "paper" }), "small", 0.72);
   wtArt("wtArt0", tourDesign("Crown Jewel", { name: "Tour", kind: "clock", themeID: "lavender" }), "small", 0.95);
-  wtArt("wtArtR", tourDesign("Night Drive", { name: "TourR", kind: "clock", themeID: "midnight" }), "small", 0.72);
-  wtArt("wtArt1", tourDesign("Desk Brief", { name: "Tour2", kind: "clock", themeID: "midnight" }), "medium", 0.72);
+  wtArt("wtArtR", tourDesign("New Year Sparkle", { name: "TourR", kind: "countdown", themeID: "berry" }), "small", 0.72);
+  wtArt("wtArt1", tourDesign("Bento Board", { name: "Tour2", kind: "clock", themeID: "midnight" }), "medium", 0.72);
+  wtArt("wtArt4L", tourDesign("Fantasy Command", { name: "Tour4L", kind: "battery", themeID: "lava" }), "small", 0.62);
+  wtArt("wtArt4C", tourDesign("Sun & Moon", { name: "Tour4C", kind: "clock", themeID: "cosmos" }), "small", 0.8);
+  wtArt("wtArt4R", tourDesign("Battery Ring", { name: "Tour4R", kind: "battery", themeID: "mint" }), "small", 0.62);
   wtStep = 0;
   wtRenderStep();
   document.getElementById("welcomeTour").classList.add("open");
