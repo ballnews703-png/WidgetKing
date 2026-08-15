@@ -29,7 +29,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 119;
+const WK_VERSION = 120;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -292,6 +292,33 @@ function moonInfo(d) {
   const slugs = ["new", "waxing-crescent", "first-quarter", "waxing-gibbous",
     "full", "waning-gibbous", "last-quarter", "waning-crescent"];
   return { emoji: emojis[idx], name: names[idx], slug: slugs[idx] };
+}
+// v120: LIVE ART — live data picks which stock artwork to draw. The library
+// was generated as complete condition sets, so every state has a face.
+function weatherArtSlug(code, isDay) {
+  const c = Number(code);
+  if (c === 0 || c === 1) return isDay ? "clear-day" : "clear-night";
+  if (c === 2) return isDay ? "partly-cloudy-day" : "partly-cloudy-night";
+  if (c === 3) return "overcast";
+  if (c === 45 || c === 48) return "fog";
+  if (c >= 51 && c <= 57) return "drizzle";
+  if (c === 61 || c === 63 || c === 80 || c === 81) return "rain";
+  if (c === 65 || c === 82) return "heavy-rain";
+  if (c === 66 || c === 67) return "sleet";
+  if ((c >= 71 && c <= 77) || c === 85 || c === 86) return "snow";
+  if (c === 95) return "thunderstorm";
+  if (c === 96 || c === 99) return "hail";
+  return "cloudy";
+}
+function batteryArtSlug(level, charging) {
+  if (charging) return "battery-charging";
+  if (level >= 0.75) return "battery-full";
+  if (level >= 0.35) return "battery-half";
+  return "battery-low";
+}
+function daylightNow() {
+  const hr = new Date().getHours();
+  return hr >= 6 && hr < 20;
 }
 // Sunrise/sunset from Open-Meteo (same free API + cached location as weather).
 async function fetchAstro() {
@@ -603,6 +630,18 @@ async function liveDataFor(design) {
       const moonId = el.moonPack + "-" + moonInfo(new Date()).slug;
       if (!live.stickers[moonId]) live.stickers[moonId] = await loadStickerImage(moonId);
     }
+  }
+  // v120 live art: current-condition weather and battery-state artwork.
+  if (els.some(function (e) { return e.kind === "weather" && e.wmode === "icon"; }) && live.weather) {
+    if (!live.stickers) live.stickers = {};
+    const wSlug = weatherArtSlug(live.weather.code, daylightNow());
+    if (!live.stickers[wSlug]) live.stickers[wSlug] = await loadStickerImage(wSlug);
+  }
+  if (els.some(function (e) { return e.kind === "battery" && e.mode === "icon"; })) {
+    if (!live.stickers) live.stickers = {};
+    let bSlug = "battery-full";
+    try { bSlug = batteryArtSlug(Device.batteryLevel(), Device.isCharging()); } catch (e) {}
+    if (!live.stickers[bSlug]) live.stickers[bSlug] = await loadStickerImage(bSlug);
   }
   return live;
 }
@@ -1168,6 +1207,28 @@ function drawFreestyle(design, family, bgImg, live) {
       if (moonImg) {
         const mside = Math.max(16, (el.size || 14) * scale * 1.25);
         try { ctx.drawImageInRect(moonImg, new Rect(px - mside / 2, py - mside / 2, mside, mside)); } catch (e) {}
+        continue;
+      }
+    }
+    if (el.kind === "weather" && el.wmode === "icon") {
+      // v120: the CURRENT condition drawn with the stock weather art. If the
+      // art never arrived, fall through to the text renderer (plain temp).
+      const wxImg = live && live.stickers && live.weather
+        ? live.stickers[weatherArtSlug(live.weather.code, daylightNow())] : null;
+      if (wxImg) {
+        const wside = Math.max(16, (el.size || 26) * scale * 1.25);
+        try { ctx.drawImageInRect(wxImg, new Rect(px - wside / 2, py - wside / 2, wside, wside)); } catch (e) {}
+        continue;
+      }
+    }
+    if (el.kind === "battery" && el.mode === "icon") {
+      // v120: battery state as stock art — charging bolt, full, half, low.
+      let bslug = "battery-full";
+      try { bslug = batteryArtSlug(Device.batteryLevel(), Device.isCharging()); } catch (e) {}
+      const bImg = live && live.stickers ? live.stickers[bslug] : null;
+      if (bImg) {
+        const bside = Math.max(16, (el.size || 30) * scale * 1.25);
+        try { ctx.drawImageInRect(bImg, new Rect(px - bside / 2, py - bside / 2, bside, bside)); } catch (e) {}
         continue;
       }
     }
