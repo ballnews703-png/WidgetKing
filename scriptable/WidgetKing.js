@@ -29,7 +29,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 118;
+const WK_VERSION = 119;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -289,7 +289,9 @@ function moonInfo(d) {
   const emojis = ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"];
   const names = ["New moon", "Waxing crescent", "First quarter", "Waxing gibbous",
     "Full moon", "Waning gibbous", "Last quarter", "Waning crescent"];
-  return { emoji: emojis[idx], name: names[idx] };
+  const slugs = ["new", "waxing-crescent", "first-quarter", "waxing-gibbous",
+    "full", "waning-gibbous", "last-quarter", "waning-crescent"];
+  return { emoji: emojis[idx], name: names[idx], slug: slugs[idx] };
 }
 // Sunrise/sunset from Open-Meteo (same free API + cached location as weather).
 async function fetchAstro() {
@@ -337,6 +339,14 @@ function astroText(el, astro) {
   const set = shortClock(new Date(astro.sunset));
   if (mode === "sunrise") return "🌅 " + rise;
   if (mode === "sunset") return "🌇 " + set;
+  if (mode === "next") {
+    // v119: the widget flips itself — next sun event. During daylight show
+    // tonight's sunset; after dark show sunrise. (Today's sunrise time also
+    // stands in for tomorrow's — it drifts about a minute per day.)
+    const now = Date.now();
+    const day = now >= new Date(astro.sunrise).getTime() && now < new Date(astro.sunset).getTime();
+    return day ? "🌇 " + set : "🌅 " + rise;
+  }
   return "🌅 " + rise + "  🌇 " + set;
 }
 // Live quote from Yahoo Finance's public chart endpoint — no key needed.
@@ -583,10 +593,15 @@ async function liveDataFor(design) {
     live.news = await fetchNews(maxN);
   }
   const stickerEls = els.filter(function (e) { return e.kind === "sticker" && e.stockId; });
-  if (stickerEls.length) {
+  const moonArtEls = els.filter(function (e) { return e.kind === "astro" && e.mode === "moonicon" && e.moonPack; });
+  if (stickerEls.length || moonArtEls.length) {
     live.stickers = {};
     for (const el of stickerEls) {
       if (!live.stickers[el.stockId]) live.stickers[el.stockId] = await loadStickerImage(el.stockId);
+    }
+    for (const el of moonArtEls) {
+      const moonId = el.moonPack + "-" + moonInfo(new Date()).slug;
+      if (!live.stickers[moonId]) live.stickers[moonId] = await loadStickerImage(moonId);
     }
   }
   return live;
@@ -1144,6 +1159,17 @@ function drawFreestyle(design, family, bgImg, live) {
         try { ctx.drawImageInRect(stImg, new Rect(px - side / 2, py - side / 2, side, side)); } catch (e) {}
       }
       continue;
+    }
+    if (el.kind === "astro" && el.mode === "moonicon" && el.moonPack) {
+      // v119: tonight's REAL phase drawn with the stock moon art (prefetched
+      // by phase in liveDataFor). Falls back to the emoji glyph below if the
+      // art never arrived.
+      const moonImg = live && live.stickers ? live.stickers[el.moonPack + "-" + moonInfo(new Date()).slug] : null;
+      if (moonImg) {
+        const mside = Math.max(16, (el.size || 14) * scale * 1.25);
+        try { ctx.drawImageInRect(moonImg, new Rect(px - mside / 2, py - mside / 2, mside, mside)); } catch (e) {}
+        continue;
+      }
     }
     if (el.kind === "progress") {
       const pct = Math.min(Math.max(progressPct(el), 0), 1);
