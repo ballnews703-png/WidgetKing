@@ -1270,7 +1270,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 117;
+const WK_VERSION = 118;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -11455,7 +11455,7 @@ function buildSheetPanel(tool) {
     panel.innerHTML = '<div class="row" style="margin-bottom:8px"><input type="text" id="piecesSearch" placeholder="🔍 Search pieces…" style="flex:1"></div>' +
       '<div id="recentPieces"></div><div id="piecesTiles"></div>';
     buildPalette(document.getElementById("piecesTiles"),
-      { smart: true, keys: ["shape", "icon", "emoji", "art", "clock", "date", "countdown", "progress", "ring"] });
+      { smart: true, keys: ["sticker", "shape", "icon", "emoji", "art", "clock", "date", "countdown", "progress", "ring"] });
     wirePanelSearch("piecesSearch", "piecesTiles");
   } else if (tool === "text") {
     buildPalette(document.getElementById("panelTextTiles"), { keys: ["text"] });
