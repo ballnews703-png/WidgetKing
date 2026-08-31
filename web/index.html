@@ -68,7 +68,7 @@
   h2 { font-size: 17px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
   .step { display: none; }
   .hint { color: var(--muted); font-size: 13px; margin-bottom: 10px; line-height: 1.45; }
-  textarea, input[type=text], input[type=password], input[type=date], select {
+  textarea, input[type=text], input[type=password], input[type=date], input[type=email], select {
     width: 100%; background: var(--card2); color: var(--text);
     border: 1px solid var(--border); border-radius: 12px;
     padding: 12px 14px; font-size: 15px; font-family: inherit;
@@ -959,6 +959,29 @@
       <button id="clearKeyBtn" style="flex:1"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-broom"/></svg> Clear key from this device</button>
     </div>
   </details>
+  <details class="wk-sec" id="accountSec" open style="display:none">
+    <summary><span style="display:flex;align-items:center;gap:9px"><span class="icchip" style="background:#0A84FF"><svg class="ic" aria-hidden="true"><use href="#i-key"/></svg></span>Account &amp; sync</span></summary>
+    <div id="acctOut">
+      <p class="hint" style="margin-top:8px">One account, every device — your designs follow you. Sign in with your email: we send a 6-digit code, no password to remember.</p>
+      <div class="row" style="margin-top:8px">
+        <input type="email" id="acctEmail" placeholder="you@example.com" autocomplete="email" style="flex:1">
+        <button id="acctSendBtn">Email me a code</button>
+      </div>
+      <div class="row" id="acctCodeRow" style="display:none;margin-top:8px">
+        <input type="text" id="acctCode" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" style="flex:1">
+        <button class="primary" id="acctVerifyBtn">Sign in</button>
+      </div>
+      <p class="hint" id="acctHint" style="display:none;margin-top:6px"></p>
+    </div>
+    <div id="acctIn" style="display:none">
+      <div class="settings-row"><span class="icchip" style="background:#2FB56B"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></span> <span id="acctWho"></span> <span class="val">Signed in</span></div>
+      <div class="row">
+        <button id="acctSyncBtn" style="flex:1"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-refresh"/></svg> Sync now</button>
+        <button id="acctOutBtn" style="flex:1">Sign out</button>
+      </div>
+      <p class="hint" id="acctStatus"></p>
+    </div>
+  </details>
   <details class="wk-sec" id="guidesSec" open>
     <summary><span style="display:flex;align-items:center;gap:9px"><span class="icchip" style="background:#2FB56B"><svg class="ic" aria-hidden="true"><use href="#i-book"/></svg></span>Guides — learn it in levels</span></summary>
     <div id="guidesList"></div>
@@ -1274,7 +1297,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 123;
+const WK_VERSION = 124;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -4932,6 +4955,7 @@ function normalizeDesign(design) {
     design.customColors = null;
   }
   if (design.tapUrl == null) design.tapUrl = "";
+  if (design.updatedAt != null && !isFinite(Number(design.updatedAt))) delete design.updatedAt;
   const POSITIONS = ["top-left", "top-right", "middle-left", "middle-right", "bottom-left", "bottom-right", "top", "middle", "bottom"];
   if (POSITIONS.indexOf(design.position) < 0) delete design.position;
   if (!design.gradientDir) design.gradientDir = "diagonal";
@@ -5140,6 +5164,7 @@ function persist() {
     localStorage.setItem("widgetking.designs", JSON.stringify(designs));
     localStorage.setItem("widgetking.libstamp", String(Date.now()));
     updateCopyButtons();
+    scheduleSync();
   } catch (e) {
     toast("⚠️ Storage is full — photos take space. Delete a design or use smaller photos.");
   }
@@ -5151,6 +5176,149 @@ function toast(message) {
   setTimeout(function () { el.style.opacity = 0; }, 2600);
 }
 function getApiKey() { return (localStorage.getItem("widgetking.apikey") || "").trim(); }
+
+// ==================== Account & cloud sync (phase 1 — ships dark) ==========
+// Backed by a Supabase project (setup: ACCOUNTS_SETUP.md). The Account
+// section stays invisible until BOTH constants are filled at build time —
+// or overridden for testing via localStorage widgetking.sync.url / .key.
+// Free-tier counters stay on the device by design (see MONETIZATION.md);
+// the account carries the valuables: designs, and later Pro status.
+const WK_SYNC_URL = "";
+const WK_SYNC_KEY = "";
+function syncConfig() {
+  const url = (localStorage.getItem("widgetking.sync.url") || WK_SYNC_URL).replace(/\/+$/, "");
+  const key = localStorage.getItem("widgetking.sync.key") || WK_SYNC_KEY;
+  return url && key ? { url: url, key: key } : null;
+}
+function syncSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem("widgetking.session") || "null");
+    return s && s.access_token ? s : null;
+  } catch (e) { return null; }
+}
+function setSyncSession(s) {
+  if (s) localStorage.setItem("widgetking.session", JSON.stringify(s));
+  else localStorage.removeItem("widgetking.session");
+  renderAccountSection();
+}
+async function syncFetch(path, options) {
+  options = options || {};
+  const cfg = syncConfig();
+  if (!cfg) throw new Error("Sync isn't set up");
+  const headers = Object.assign({ "apikey": cfg.key, "Content-Type": "application/json" }, options.headers || {});
+  const session = syncSession();
+  if (session && !options.noAuth) headers.Authorization = "Bearer " + session.access_token;
+  const res = await fetch(cfg.url + path, { method: options.method || "GET", headers: headers, body: options.body });
+  if (res.status === 401 && session && !options.noAuth && !options.retried) {
+    if (await acctRefresh()) return syncFetch(path, Object.assign({}, options, { retried: true }));
+  }
+  return res;
+}
+async function acctSendCode(email) {
+  const res = await syncFetch("/auth/v1/otp", { method: "POST", noAuth: true,
+    body: JSON.stringify({ email: email, create_user: true }) });
+  if (!res.ok) {
+    let msg = "Couldn't send the code — try again in a minute";
+    try { const j = await res.json(); if (j.msg || j.error_description) msg = j.msg || j.error_description; } catch (e) {}
+    throw new Error(msg);
+  }
+}
+async function acctVerify(email, code) {
+  const res = await syncFetch("/auth/v1/verify", { method: "POST", noAuth: true,
+    body: JSON.stringify({ type: "email", email: email, token: String(code).trim() }) });
+  let j = {};
+  try { j = await res.json(); } catch (e) {}
+  if (!res.ok || !j.access_token) {
+    throw new Error(j.msg || j.error_description || "That code didn't work — check the digits or email a fresh one");
+  }
+  setSyncSession({ access_token: j.access_token, refresh_token: j.refresh_token,
+    email: (j.user && j.user.email) || email, user_id: j.user && j.user.id });
+}
+async function acctRefresh() {
+  const s = syncSession();
+  if (!s || !s.refresh_token) return false;
+  try {
+    const res = await syncFetch("/auth/v1/token?grant_type=refresh_token", { method: "POST", noAuth: true,
+      body: JSON.stringify({ refresh_token: s.refresh_token }) });
+    const j = await res.json();
+    if (!res.ok || !j.access_token) { setSyncSession(null); return false; }
+    setSyncSession(Object.assign({}, s, { access_token: j.access_token, refresh_token: j.refresh_token || s.refresh_token }));
+    return true;
+  } catch (e) { return false; }
+}
+// Push: every design, slimmed the same way share links are (photos never
+// leave the device). Pull: newer timestamp wins per design; local photo data
+// is grafted back into replaced rows. Both are quiet no-ops when signed out.
+let syncTimer = null, syncBusy = false;
+function scheduleSync() {
+  if (!syncSession() || !syncConfig()) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(function () { syncPush().catch(function () {}); }, 4000);
+}
+async function syncPush() {
+  if (!syncSession() || !syncConfig() || syncBusy) return 0;
+  syncBusy = true;
+  try {
+    const rows = designs.map(function (d) {
+      const slim = JSON.parse(JSON.stringify(d));
+      stripPhotoData(slim);
+      return { id: d.id, updated_at: Number(d.updatedAt) || 0, data: slim };
+    });
+    if (!rows.length) return 0;
+    const res = await syncFetch("/rest/v1/designs?on_conflict=user_id,id", {
+      method: "POST", headers: { "Prefer": "resolution=merge-duplicates" }, body: JSON.stringify(rows) });
+    if (!res.ok) throw new Error("push failed (" + res.status + ")");
+    setSyncStatus("Synced " + rows.length + " design" + (rows.length === 1 ? "" : "s") + " ✓");
+    return rows.length;
+  } finally { syncBusy = false; }
+}
+async function syncPull() {
+  if (!syncSession() || !syncConfig()) return 0;
+  const res = await syncFetch("/rest/v1/designs?select=id,updated_at,data");
+  if (!res.ok) throw new Error("pull failed (" + res.status + ")");
+  const rows = await res.json();
+  let changed = 0;
+  for (const row of rows || []) {
+    if (!row || !row.id || !row.data) continue;
+    const index = designs.findIndex(function (d) { return d.id === row.id; });
+    if (index >= 0 && (Number(row.updated_at) || 0) <= (Number(designs[index].updatedAt) || 0)) continue;
+    const incoming = normalizeDesign(row.data);
+    incoming.id = row.id;
+    incoming.updatedAt = Number(row.updated_at) || 0;
+    if (index >= 0) { preservePhotos(incoming, designs[index]); designs[index] = incoming; }
+    else designs.push(incoming);
+    changed++;
+  }
+  if (changed) { persist(); renderLibrary(); }
+  return changed;
+}
+function setSyncStatus(text) {
+  const n = document.getElementById("acctStatus");
+  if (n) n.textContent = text;
+}
+function renderAccountSection() {
+  const sec = document.getElementById("accountSec");
+  if (!sec) return;
+  sec.style.display = syncConfig() ? "" : "none";
+  const s = syncSession();
+  document.getElementById("acctOut").style.display = s ? "none" : "";
+  document.getElementById("acctIn").style.display = s ? "" : "none";
+  if (s) document.getElementById("acctWho").textContent = s.email || "Signed in";
+}
+
+// ==================== Usage metering (records only — enforces nothing) =====
+// Free-tier allowances are device-local (MONETIZATION.md). This just keeps
+// honest counts so enforcement later is a switch, not a rebuild.
+function meterAIBuild() {
+  try {
+    const month = new Date().toISOString().slice(0, 7);
+    let m = {};
+    try { m = JSON.parse(localStorage.getItem("widgetking.meter.ai") || "{}"); } catch (e) {}
+    if (m.month !== month) m = { month: month, count: 0 };
+    m.count++;
+    localStorage.setItem("widgetking.meter.ai", JSON.stringify(m));
+  } catch (e) {}
+}
 
 // ==================== AI budget tracking ====================
 const PRICES = { "claude-opus-5": [5, 25], "claude-sonnet-5": [3, 15], "claude-haiku-4-5": [1, 5] };
@@ -5769,6 +5937,7 @@ async function callClaudeOnce(messages, key, schema) {
   return JSON.parse(block.text);
 }
 async function callClaude(messages, key) {
+  meterAIBuild();
   let spec = await callClaudeOnce(messages, key);
   // AI eyes (default on): render the draft exactly as the widget will draw
   // it and show the AI its own work — the step between correct and polished.
@@ -10247,6 +10416,7 @@ document.getElementById("saveBtn").onclick = function () {
   const rawName = document.getElementById("nameInput").value || "My Widget";
   current.name = dedupedName(rawName, current.id);
   document.getElementById("nameInput").value = current.name;
+  current.updatedAt = Date.now();
   const index = designs.findIndex(function (d) { return d.id === current.id; });
   const copy = JSON.parse(JSON.stringify(current));
   if (index >= 0) designs[index] = copy; else designs.push(copy);
@@ -10287,6 +10457,56 @@ document.getElementById("resetSpend").onclick = function () {
   updateSpendUI();
   toast("Spend counter reset");
 };
+// Account & sync wiring (section is hidden until sync is configured)
+document.getElementById("acctSendBtn").onclick = async function () {
+  const email = (document.getElementById("acctEmail").value || "").trim();
+  const hint = document.getElementById("acctHint");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast("That doesn't look like an email address"); return; }
+  this.disabled = true;
+  try {
+    await acctSendCode(email);
+    document.getElementById("acctCodeRow").style.display = "flex";
+    hint.style.display = "";
+    hint.textContent = "Code sent — check " + email + " (and spam, the first time). It works for 10 minutes.";
+    document.getElementById("acctCode").focus();
+  } catch (e) { toast("⚠️ " + e.message); }
+  this.disabled = false;
+};
+document.getElementById("acctVerifyBtn").onclick = async function () {
+  const email = (document.getElementById("acctEmail").value || "").trim();
+  const code = (document.getElementById("acctCode").value || "").trim();
+  if (!/^\d{6}$/.test(code)) { toast("The code is the 6 digits from the email"); return; }
+  this.disabled = true;
+  try {
+    await acctVerify(email, code);
+    toast("Signed in ✓");
+    setSyncStatus("Syncing…");
+    try {
+      const pulled = await syncPull();
+      const pushed = await syncPush();
+      setSyncStatus("Up to date — " + designs.length + " design" + (designs.length === 1 ? "" : "s") + " on your account" + (pulled ? " (" + pulled + " new from cloud)" : ""));
+    } catch (e) { setSyncStatus("Signed in — first sync will retry on your next save"); }
+  } catch (e) { toast("⚠️ " + e.message); }
+  this.disabled = false;
+};
+document.getElementById("acctSyncBtn").onclick = async function () {
+  this.disabled = true;
+  setSyncStatus("Syncing…");
+  try {
+    const pulled = await syncPull();
+    await syncPush();
+    setSyncStatus("Up to date ✓" + (pulled ? " — " + pulled + " design" + (pulled === 1 ? "" : "s") + " arrived from your other device" : ""));
+  } catch (e) { setSyncStatus("Sync hit a snag — check your connection and try again"); }
+  this.disabled = false;
+};
+document.getElementById("acctOutBtn").onclick = function () {
+  setSyncSession(null);
+  toast("Signed out — everything stays on this device");
+};
+renderAccountSection();
+// Quiet catch-up shortly after launch: newer designs from another device
+// appear without anyone pressing anything.
+setTimeout(function () { syncPull().catch(function () {}); }, 1500);
 document.getElementById("clearKeyBtn").onclick = function () {
   if (!getApiKey()) { toast("No key is stored on this device"); return; }
   if (!confirm("Remove the AI access key from this device?\n\nYour designs stay. AI building stops working here until a key is pasted again.")) return;
@@ -13201,6 +13421,7 @@ document.getElementById("pageAIBtn").onclick = async function () {
   button.disabled = true;
   button.textContent = "Designing the page… 🎨";
   try {
+    meterAIBuild();
     const spec = await callClaudeOnce([{
       role: "user",
       content: "Design a COHESIVE Home Screen page: " + idea + ". " + layoutAsk +
