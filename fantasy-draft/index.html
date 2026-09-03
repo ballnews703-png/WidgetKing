@@ -1,0 +1,417 @@
+<title>Draft Night Lottery</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Graduate&family=Barlow+Semi+Condensed:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&display=swap">
+<style>
+  :root {
+    --night: #0A1622;
+    --panel: #122536;
+    --panel-2: #0E1D2C;
+    --line: #24405A;
+    --chalk: #F2EFE6;
+    --chalk-dim: #A8B4BC;
+    --gold: #F0AE2E;
+    --gold-deep: #C88A14;
+    --turf: #2E8B57;
+    --redzone: #D64533;
+    --display: 'Graduate', 'Arial Black', sans-serif;
+    --body: 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { color-scheme: dark; }
+  body {
+    margin: 0;
+    background: var(--night);
+    color: var(--chalk);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.45;
+    min-height: 100vh;
+    /* yard lines */
+    background-image:
+      repeating-linear-gradient(90deg,
+        transparent 0, transparent 119px,
+        rgba(242,239,230,.045) 119px, rgba(242,239,230,.045) 121px),
+      radial-gradient(ellipse 120% 60% at 50% -10%, rgba(46,139,87,.18), transparent 60%);
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 28px 20px 64px; }
+
+  header { text-align: center; margin-bottom: 26px; }
+  .eyebrow {
+    font-family: var(--body); font-weight: 600; letter-spacing: .22em;
+    text-transform: uppercase; font-size: 12px; color: var(--gold);
+    display: inline-flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::before, .eyebrow::after {
+    content: ""; width: 34px; height: 2px; background: var(--gold-deep); display: inline-block;
+  }
+  h1 {
+    font-family: var(--display); font-size: clamp(30px, 6vw, 52px);
+    margin: 8px 0 4px; letter-spacing: .03em; text-wrap: balance;
+    color: var(--chalk); text-shadow: 0 3px 0 rgba(0,0,0,.45);
+  }
+  h1 .gold { color: var(--gold); }
+  .tagline { color: var(--chalk-dim); margin: 0; font-size: 16px; }
+
+  .board { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 820px) { .board { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .panel-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; background: var(--panel-2);
+    border-bottom: 1px solid var(--line);
+  }
+  .panel-head h2 {
+    margin: 0; font-family: var(--body); font-weight: 700; font-size: 13px;
+    letter-spacing: .18em; text-transform: uppercase; color: var(--chalk-dim);
+  }
+  .count-chip {
+    font-weight: 700; font-size: 13px; color: var(--night);
+    background: var(--gold); border-radius: 999px; padding: 2px 10px;
+    font-variant-numeric: tabular-nums;
+  }
+  .panel-body { padding: 16px; }
+
+  textarea {
+    width: 100%; min-height: 264px; resize: vertical;
+    background: var(--night); color: var(--chalk);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 14px; font-family: var(--body); font-size: 16px; line-height: 1.7;
+  }
+  textarea:focus-visible, button:focus-visible {
+    outline: 2px solid var(--gold); outline-offset: 2px;
+  }
+  .hint { color: var(--chalk-dim); font-size: 14px; margin: 10px 0 0; }
+  .hint em { color: var(--gold); font-style: normal; font-weight: 600; }
+
+  .controls { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+  button {
+    font-family: var(--body); cursor: pointer; border-radius: 8px;
+    border: 1px solid transparent; transition: transform .08s ease, filter .12s ease;
+  }
+  button:active { transform: translateY(1px); }
+  .btn-main {
+    font-family: var(--display); font-size: 20px; letter-spacing: .05em;
+    padding: 14px 18px; color: #1A1002;
+    background: linear-gradient(180deg, #FFC94D, var(--gold) 55%, var(--gold-deep));
+    border-color: var(--gold-deep);
+    box-shadow: 0 4px 0 #8A5E0B, 0 8px 18px rgba(240,174,46,.25);
+  }
+  .btn-main:hover { filter: brightness(1.06); }
+  .btn-quiet {
+    font-size: 15px; font-weight: 600; padding: 10px 14px;
+    background: transparent; color: var(--chalk-dim); border-color: var(--line);
+  }
+  .btn-quiet:hover { color: var(--chalk); border-color: var(--chalk-dim); }
+
+  /* Stage */
+  .stage { position: relative; }
+  .ticker {
+    min-height: 54px; display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; background: var(--panel-2);
+    border-bottom: 1px solid var(--line);
+  }
+  .live-dot {
+    width: 10px; height: 10px; border-radius: 50%; background: var(--redzone);
+    flex: none; animation: blink 1.1s steps(2, start) infinite;
+  }
+  @keyframes blink { 50% { opacity: .25; } }
+  .ticker p { margin: 0; font-size: 16px; font-style: italic; color: var(--chalk); }
+  .ticker .label {
+    flex: none; font-style: normal; font-weight: 700; font-size: 12px;
+    letter-spacing: .18em; color: var(--redzone); text-transform: uppercase;
+  }
+
+  .picks { list-style: none; margin: 0; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .pick {
+    display: grid; grid-template-columns: 64px 1fr; gap: 14px; align-items: center;
+    background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px 14px 10px 10px;
+  }
+  .pick .num {
+    font-family: var(--display); font-size: 26px; text-align: center;
+    color: var(--chalk-dim); font-variant-numeric: tabular-nums;
+    background: var(--night); border: 1px solid var(--line);
+    border-radius: 6px; padding: 8px 0;
+  }
+  .pick .who { min-width: 0; }
+  .pick .team {
+    font-weight: 700; font-size: 19px; overflow-wrap: anywhere;
+  }
+  .pick .roast { color: var(--chalk-dim); font-size: 14.5px; font-style: italic; margin-top: 1px; }
+  .pick.revealed { animation: slam .38s cubic-bezier(.2, 1.6, .4, 1); }
+  @keyframes slam { from { transform: scale(.92); opacity: 0; } }
+  .pick.first { border-color: var(--gold); background: linear-gradient(180deg, rgba(240,174,46,.14), var(--panel-2)); }
+  .pick.first .num { color: var(--gold); border-color: var(--gold-deep); }
+  .pick.last { border-color: rgba(214,69,51,.6); }
+  .pick.last .num { color: var(--redzone); }
+  .pick.mystery .team { color: var(--chalk-dim); letter-spacing: .2em; }
+
+  .stage-empty { padding: 44px 24px; text-align: center; color: var(--chalk-dim); }
+  .stage-empty .big { font-family: var(--display); font-size: 22px; color: var(--chalk); margin: 0 0 6px; }
+  .stage-empty p { margin: 6px 0 0; max-width: 46ch; margin-inline: auto; }
+
+  .after { display: none; padding: 0 16px 16px; gap: 10px; }
+  .after.show { display: flex; }
+  .after button { flex: 1; }
+
+  footer {
+    margin-top: 26px; text-align: center; color: var(--chalk-dim); font-size: 13px;
+  }
+  footer .seal { color: var(--turf); font-weight: 600; }
+
+  canvas#confetti {
+    position: fixed; inset: 0; width: 100vw; height: 100vh;
+    pointer-events: none; z-index: 50;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .live-dot, .pick.revealed { animation: none; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Official League Business</span>
+    <h1>DRAFT NIGHT <span class="gold">LOTTERY</span></h1>
+    <p class="tagline">One button. Zero arguments. The football gods decide.</p>
+  </header>
+
+  <div class="board">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>The Contenders</h2>
+        <span class="count-chip" id="count">10 teams</span>
+      </div>
+      <div class="panel-body">
+        <textarea id="names" spellcheck="false" aria-label="Team names, one per line">Gurley Things
+Baby Got Dak
+Run CMC
+Hurts So Good
+The Brady Bunch (Retired, Still Here)
+Loud Noises
+Kittle Corn
+Bijan Mustard
+Just Here For The Punts
+Draft Punk</textarea>
+        <p class="hint">One team per line. Those are <em>sample teams</em> — replace them with your league's.</p>
+        <div class="controls">
+          <button class="btn-main" id="go">🏈 RUN THE LOTTERY</button>
+          <button class="btn-quiet" id="instant">No drama — just give me the order</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel stage">
+      <div class="ticker">
+        <span class="live-dot" aria-hidden="true"></span>
+        <span class="label">Live</span>
+        <p id="ticker-text">The Commissioner has entered the building. Envelopes are sealed.</p>
+      </div>
+      <div class="stage-empty" id="empty">
+        <p class="big">THE BOARD IS SET</p>
+        <p>Picks are revealed from dead last up to the No.&nbsp;1 overall, lottery-night style.
+           Every result is a fresh cryptographic shuffle — your commissioner cannot rig this one.</p>
+      </div>
+      <ol class="picks" id="picks"></ol>
+      <div class="after" id="after">
+        <button class="btn-quiet" id="copy">📋 Copy order</button>
+        <button class="btn-quiet" id="again">🔁 Re-run it (coward)</button>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    <span class="seal">✔ Certified random</span> — Fisher–Yates shuffle powered by
+    <code>crypto.getRandomValues</code>. Not even Claude knows the order before you do.
+  </footer>
+</div>
+
+<canvas id="confetti" hidden></canvas>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const namesEl = $('names'), picksEl = $('picks'), tickerEl = $('ticker-text');
+  const emptyEl = $('empty'), afterEl = $('after'), confettiEl = $('confetti');
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Roasts keyed loosely to draft position. {n} = pick number.
+  const topRoasts = [
+    "First overall. Frame this moment — it's the last thing they'll win all year.",
+    "The No. 1 pick! Historically followed by the No. 1 most regrettable draft.",
+    "First pick, and somehow they'll still panic at the podium.",
+  ];
+  const earlyRoasts = [
+    "A top pick. The autodraft would've done it better, but sure.",
+    "Great draft slot. Terrible everything else.",
+    "Early pick secured. Group chat muting begins now.",
+    "Pick {n}. Their confidence is at an all-time, unearned high.",
+  ];
+  const midRoasts = [
+    "Pick {n}: the beige of draft slots.",
+    "Perfectly mid. Just like last season.",
+    "Pick {n}. Not good, not bad, extremely forgettable — fitting, honestly.",
+    "The middle of the draft, where championships go to nap.",
+    "Pick {n}: statistically fine, spiritually devastating.",
+  ];
+  const lateRoasts = [
+    "Pick {n}. Enjoy the leftovers, champ.",
+    "Late pick. Time to pretend zero-RB was the plan all along.",
+    "Pick {n}: 'I actually like drafting from here' — a liar, moments from now.",
+    "The scraps await. Bring tupperware.",
+  ];
+  const lastRoasts = [
+    "DEAD LAST. The football gods have spoken, and they are laughing.",
+    "Last pick. On the bright side, the turn picks are... no, there is no bright side.",
+    "Last overall. The universe saw your trade offers and chose violence.",
+  ];
+  const tickerLines = [
+    "The Commissioner shakes the envelope for dramatic effect...",
+    "A hush falls over the group chat...",
+    "Somebody just yelled 'rigged!' — the lottery machine ignores them...",
+    "Tension. Sweat. A ping-pong ball rattles ominously...",
+    "The intern is walking the next card to the podium...",
+    "One league member has already threatened to quit. Classic...",
+  ];
+
+  function rand(n) { // uniform int in [0, n) via rejection sampling
+    const buf = new Uint32Array(1), lim = Math.floor(0x100000000 / n) * n;
+    do { crypto.getRandomValues(buf); } while (buf[0] >= lim);
+    return buf[0] % n;
+  }
+  function shuffle(a) {
+    const out = a.slice();
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = rand(i + 1);
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  }
+  const pickFrom = arr => arr[rand(arr.length)];
+  function roastFor(pick, total) {
+    let pool;
+    if (pick === 1) pool = topRoasts;
+    else if (pick === total) pool = lastRoasts;
+    else if (pick <= Math.ceil(total / 3)) pool = earlyRoasts;
+    else if (pick > total - Math.ceil(total / 3)) pool = lateRoasts;
+    else pool = midRoasts;
+    return pickFrom(pool).replaceAll('{n}', pick);
+  }
+
+  function getTeams() {
+    return namesEl.value.split('\n').map(s => s.trim()).filter(Boolean);
+  }
+  namesEl.addEventListener('input', () => {
+    const n = getTeams().length;
+    $('count').textContent = n + (n === 1 ? ' team' : ' teams');
+  });
+
+  let running = false;
+  function renderRow(pick, total, team, roast, mystery) {
+    const li = document.createElement('li');
+    li.className = 'pick' + (mystery ? ' mystery' : ' revealed') +
+      (!mystery && pick === 1 ? ' first' : '') +
+      (!mystery && pick === total ? ' last' : '');
+    li.innerHTML = '<span class="num">' + pick + '</span>' +
+      '<span class="who"><span class="team"></span>' +
+      (mystery ? '' : '<span class="roast"></span>') + '</span>';
+    li.querySelector('.team').textContent = mystery ? '· · · · · ·' : team;
+    if (!mystery) li.querySelector('.roast').textContent = roast;
+    return li;
+  }
+
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  async function run(dramatic) {
+    if (running) return;
+    const teams = getTeams();
+    if (teams.length < 2) {
+      tickerEl.textContent = 'The Commissioner needs at least 2 teams. This is a league, not a diary.';
+      return;
+    }
+    running = true;
+    emptyEl.style.display = 'none';
+    afterEl.classList.remove('show');
+    picksEl.replaceChildren();
+    const order = shuffle(teams); // order[0] = pick 1
+    const total = order.length;
+    const rows = new Map();
+
+    // Board fills with mystery slots first
+    for (let p = 1; p <= total; p++) {
+      const row = renderRow(p, total, '', '', true);
+      rows.set(p, row);
+      picksEl.appendChild(row);
+    }
+
+    const stepDelay = dramatic && !reduceMotion ? Math.min(1400, Math.max(600, 12000 / total)) : 0;
+
+    // Reveal from last pick up to No. 1
+    for (let p = total; p >= 1; p--) {
+      if (stepDelay) {
+        tickerEl.textContent = p === 1
+          ? 'And the FIRST OVERALL PICK belongs to...'
+          : pickFrom(tickerLines);
+        await sleep(stepDelay);
+      }
+      const fresh = renderRow(p, total, order[p - 1], roastFor(p, total), false);
+      rows.get(p).replaceWith(fresh);
+      rows.set(p, fresh);
+    }
+
+    tickerEl.textContent = 'The order is final. Complaints can be filed directly into the trash.';
+    afterEl.classList.add('show');
+    running = false;
+    if (!reduceMotion) confetti();
+    window._lastOrder = order;
+  }
+
+  $('go').addEventListener('click', () => run(true));
+  $('instant').addEventListener('click', () => run(false));
+  $('again').addEventListener('click', () => run(true));
+  $('copy').addEventListener('click', async () => {
+    const order = window._lastOrder || [];
+    const text = '🏈 DRAFT ORDER (certified random)\n' +
+      order.map((t, i) => (i + 1) + '. ' + t).join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      $('copy').textContent = '✅ Copied — go paste it in the group chat';
+      setTimeout(() => $('copy').textContent = '📋 Copy order', 2500);
+    } catch {
+      tickerEl.textContent = 'Clipboard said no. Screenshot it like it’s 2011.';
+    }
+  });
+
+  // Confetti for the No. 1 pick
+  function confetti() {
+    const ctx = confettiEl.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    confettiEl.width = innerWidth * dpr; confettiEl.height = innerHeight * dpr;
+    ctx.scale(dpr, dpr);
+    confettiEl.hidden = false;
+    const colors = ['#F0AE2E', '#F2EFE6', '#2E8B57', '#D64533', '#C88A14'];
+    const bits = Array.from({ length: 140 }, () => ({
+      x: Math.random() * innerWidth, y: -20 - Math.random() * innerHeight * .5,
+      w: 6 + Math.random() * 6, h: 8 + Math.random() * 8,
+      vy: 2 + Math.random() * 3.5, vx: -1.5 + Math.random() * 3,
+      rot: Math.random() * Math.PI, vr: -.15 + Math.random() * .3,
+      c: colors[Math.floor(Math.random() * colors.length)],
+    }));
+    const t0 = performance.now();
+    (function tick(t) {
+      ctx.clearRect(0, 0, innerWidth, innerHeight);
+      for (const b of bits) {
+        b.y += b.vy; b.x += b.vx; b.rot += b.vr;
+        ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.rot);
+        ctx.fillStyle = b.c; ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+        ctx.restore();
+      }
+      if (t - t0 < 3800) requestAnimationFrame(tick);
+      else { ctx.clearRect(0, 0, innerWidth, innerHeight); confettiEl.hidden = true; }
+    })(t0);
+  }
+</script>
