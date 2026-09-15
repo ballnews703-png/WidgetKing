@@ -66,6 +66,8 @@ const synthetic = [
   { id: 'syn-launcher', name: 'Syn Launcher', kind: 'launcher', themeID: 'midnight', iconTheme: 'candy', apps: [{ emoji: '🎵', label: 'Music', url: 'music://' }, { emoji: '🗺', label: 'Maps', url: 'maps://' }, { emoji: '📷', label: 'Cam', url: 'camera://', iconUrl: 'https://example.com/i.png' }, { emoji: '🌐', label: 'Web', shortcut: 'Open Web' }] },
   { id: 'syn-launcher-real', name: 'Syn Launcher Real', kind: 'launcher', themeID: 'midnight', iconTheme: 'original', launcherStyle: 'grid', apps: [{ emoji: '🎵', label: 'Music', url: 'music://', iconUrl: 'https://example.com/i.png' }] },
   { id: 'syn-lock', name: 'Syn Lock', kind: 'lock', lockRows: [{ kind: 'time' }, { kind: 'countdown', dateISO: '2027-01-01', label: 'NY' }, { kind: 'text', text: 'hello' }] },
+  { id: 'syn-lock-circle', name: 'Syn Lock Circle', kind: 'lock', lockStyle: 'circle', lockRows: [{ kind: 'time' }, { kind: 'date' }, { kind: 'text', text: 'third' }] },
+  { id: 'syn-launcher-onyx', name: 'Syn Launcher Onyx', kind: 'launcher', themeID: 'midnight', iconTheme: 'onyx', apps: [{ emoji: '🎵', label: 'Music', url: 'music://' }, { emoji: '🗺', label: 'Maps', url: 'maps://' }] },
   { id: 'syn-playlist', name: 'Syn Playlist', kind: 'playlist', playlist: { morning: 'syn-clock', night: 'syn-date' } },
   { id: 'syn-playlist-empty', name: 'Syn Playlist Empty', kind: 'playlist', playlist: {} }
 ];
@@ -108,6 +110,14 @@ if (program.includes('__DESIGNS__') || program.includes('__PAGE_URL__')) throw n
 const familiesFor = d => d.kind === 'lock' ? ['accessoryRectangular', 'accessoryCircular', 'accessoryInline']
   : d.fitSize === 'large' ? ['large', 'medium', 'small'] : ['small', 'medium', 'large'];
 const findings = [];
+// v127 targeted expectations, checked inside runOne via env.texts
+const EXPECT = {
+  'Syn Backgrounds Clear': env => env.texts.some(t => /wallpaper/i.test(t)) ? null : 'no wallpaper-missing hint drawn',
+  'Syn Lock Circle': env => {
+    const n = JSON.stringify(env.widget).split('"text"').length - 1 + JSON.stringify(env.widget).split('"date"').length - 1;
+    return n <= 2 ? null : 'circle lockStyle should cap rows at 2, got ' + n;
+  }
+};
 let runs = 0, warnTotal = 0;
 async function runOne(design, family, net, label) {
   const { env, globals } = makeScriptableEnv({ family, parameter: design.name, net, events, reminders });
@@ -121,6 +131,7 @@ async function runOne(design, family, net, label) {
     if (blank) findings.push({ sev: 'HIGH', design: design.name, family, label, msg: 'Script.setWidget never called — blank widget' });
     else if (isNotFound) findings.push({ sev: 'HIGH', design: design.name, family, label, msg: 'renderer could not find the design by name' });
     else if (drewNothing) findings.push({ sev: 'HIGH', design: design.name, family, label, msg: 'freestyle drew zero ops' });
+    if (EXPECT[design.name] && label === 'net-up') { const why = EXPECT[design.name](env); if (why) findings.push({ sev: 'HIGH', design: design.name, family, label, msg: why }); }
     const nan = env.warnings.filter(w => w.startsWith('non-finite'));
     if (nan.length) findings.push({ sev: 'MED', design: design.name, family, label, msg: 'NaN geometry: ' + [...new Set(nan)].slice(0, 4).join(', ') });
     const other = env.warnings.filter(w => !w.startsWith('non-finite'));

@@ -29,7 +29,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 126;
+const WK_VERSION = 127;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -774,6 +774,12 @@ function loadWallpaper() {
   } catch (e) {}
   return null;
 }
+// Clear/Glass with no captured wallpaper can't be see-through yet — say so
+// on the widget itself instead of showing a puzzling opaque gradient.
+function wallpaperMissing(design) {
+  return (design.background === "clear" || design.background === "glass") && !loadWallpaper();
+}
+const WALLPAPER_HINT = "Set your wallpaper: open the WidgetKing script";
 // Exact widget frames per iPhone, measured by the Scriptable community
 // (mzeryck's Widget Blur data), keyed by the screenshot's pixel height.
 // Each frame: [small, medium, large, left, right, top, middle, bottom].
@@ -1442,6 +1448,12 @@ function drawFreestyle(design, family, bgImg, live) {
       }
     }
   }
+  if (wallpaperMissing(design)) {
+    ctx.setFont(Font.systemFont(Math.round(7 * scale)));
+    ctx.setTextColor(new Color("#FFFFFF", 0.75));
+    ctx.setTextAlignedCenter();
+    ctx.drawTextInRect(WALLPAPER_HINT, new Rect(6 * scale, H - 20 * scale, W - 12 * scale, 18 * scale));
+  }
   return ctx.getImage();
 }
 // App elements in freestyle designs are laid over the drawn background as
@@ -1603,7 +1615,7 @@ const ICON_THEMES = {
             glyphCycle: ["#FF6B6B", "#FFD93D", "#6BCB77", "#4D96FF"] },
   candy:  { colors: ["#FF9A9E", "#A18CD1", "#7FD8BE", "#F6C90E", "#8FD3F4"], glyph: "#FFFFFF", radius: 0.3 },
   basic:  { colors: ["#3A3A44"], glyph: "#FFFFFF", emojiTile: true },
-  onyx:   { colors: ["#1C1C22"], glyph: "#F4F4F6", glyphStyle: "line", radius: 0.28 },
+  onyx:   { colors: ["#1C1C22"], glyph: "#F4F4F6", glyphStyle: "line", neu: true, radius: 0.28 },
   doodle: { colors: ["#241038"], glyph: "#FF2E92", glyphStyle: "line",
             gradStroke: ["#FF2E92", "#27C4F5"], dots: true, radius: 0.22 },
   treats: { colors: ["#C2D6C4", "#7C9791", "#F8CBB0", "#F1E8DC"],
@@ -1853,6 +1865,31 @@ function themedIconTile(app, themeName, index, pt) {
   if (theme.frost) { ctx.setFillColor(new Color("#FFFFFF", 0.25)); }
   else { ctx.setFillColor(new Color(bg)); }
   ctx.fillPath();
+  if (theme.neu) {
+    // Soft top-light bevel (the puffy neumorphic tile the preview paints):
+    // a light band fading down from the top, a shadow rising from the
+    // bottom. DrawContext can't clip, so each band is inset to stay inside
+    // the rounded corners.
+    const bands = 14;
+    const insetAt = function (y) {
+      const d = y < r ? r - y : (y > S - r ? y - (S - r) : 0);
+      return d > 0 ? r - Math.sqrt(Math.max(0, r * r - d * d)) : 0;
+    };
+    for (let b = 0; b < bands; b++) {
+      const t = b / bands;
+      const y = Math.round(S * 0.3 * t), h = Math.ceil(S * 0.3 / bands) + 1;
+      const ins = Math.ceil(Math.max(insetAt(y), insetAt(y + h)));
+      ctx.setFillColor(new Color("#FFFFFF", 0.10 * (1 - t) * (1 - t)));
+      ctx.fillRect(new Rect(ins, y, S - 2 * ins, h));
+    }
+    for (let b = 0; b < bands; b++) {
+      const t = b / bands;
+      const y = Math.round(S * 0.5 + S * 0.5 * t), h = Math.ceil(S * 0.5 / bands) + 1;
+      const ins = Math.ceil(Math.max(insetAt(y), insetAt(Math.min(S, y + h))));
+      ctx.setFillColor(new Color("#000000", 0.28 * t * t));
+      ctx.fillRect(new Rect(ins, y, S - 2 * ins, Math.min(h, S - y)));
+    }
+  }
   if (theme.duo) {
     // Soft accent orb toward the lower-right — stays inside the tile so it
     // never pokes past the rounded corners (DrawContext can't clip).
@@ -2079,7 +2116,9 @@ async function buildLockWidget(design, family) {
   w.setPadding(2, 2, 2, 2);
   if (design.tapUrl) w.url = design.tapUrl;
   const style = design.fontStyle || "rounded";
-  const circle = family === "accessoryCircular";
+  // The slot's family decides the physical shape; the design's chosen style
+  // decides the row cap — so the phone shows the rows the preview showed.
+  const circle = family === "accessoryCircular" || design.lockStyle === "circle";
   let rows = Array.isArray(design.lockRows) ? design.lockRows.slice(0, circle ? 2 : 3) : [];
   if (!rows.length) {
     // Any regular design still works on the Lock Screen — map it to rows.
@@ -2242,6 +2281,11 @@ async function buildWidget(design, position) {
     }
   }
   w.addSpacer();
+  if (wallpaperMissing(design)) {
+    const hint = w.addText(WALLPAPER_HINT);
+    hint.font = Font.systemFont(8); hint.textColor = new Color("#FFFFFF", 0.7);
+    hint.centerAlignText(); hint.lineLimit = 2; hint.minimumScaleFactor = 0.6;
+  }
   w.refreshAfterDate = new Date(Date.now() + 5 * 60 * 1000);
   return w;
 }

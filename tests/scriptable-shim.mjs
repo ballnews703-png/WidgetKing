@@ -5,7 +5,7 @@
 // renders nothing on the phone; the shim records it as a warning.
 export function makeScriptableEnv(opts) {
   const o = Object.assign({ family: 'small', parameter: '', runsInWidget: true, net: {} }, opts || {});
-  const env = { warnings: [], widget: null, drawOps: 0, textDraws: 0, netCalls: [], logs: [] };
+  const env = { warnings: [], widget: null, drawOps: 0, textDraws: 0, netCalls: [], logs: [], texts: [] };
   const warn = m => env.warnings.push(m);
   const expect = (v, type, what) => {
     if (typeof v !== type) throw new TypeError('Expected value of type ' + type + ' but got value of type ' + typeof v + ' (' + what + ')');
@@ -96,8 +96,8 @@ export function makeScriptableEnv(opts) {
     strokePath() { if (!this._path) warn('strokePath without addPath'); env.drawOps++; }
     drawImageAtPoint(img, p) { expectInstance(img, Image, 'drawImageAtPoint image'); expectInstance(p, Point, 'drawImageAtPoint point'); env.drawOps++; }
     drawImageInRect(img, r) { expectInstance(img, Image, 'drawImageInRect image'); expectInstance(r, Rect, 'drawImageInRect rect'); env.drawOps++; }
-    drawText(t, p) { expect(t, 'string', 'drawText text'); expectInstance(p, Point, 'drawText point'); env.drawOps++; env.textDraws++; }
-    drawTextInRect(t, r) { expect(t, 'string', 'drawTextInRect text'); expectInstance(r, Rect, 'drawTextInRect rect'); if (!this._font) warn('drawTextInRect before setFont'); env.drawOps++; env.textDraws++; }
+    drawText(t, p) { expect(t, 'string', 'drawText text'); expectInstance(p, Point, 'drawText point'); env.drawOps++; env.textDraws++; env.texts.push(t); }
+    drawTextInRect(t, r) { expect(t, 'string', 'drawTextInRect text'); expectInstance(r, Rect, 'drawTextInRect rect'); if (!this._font) warn('drawTextInRect before setFont'); env.drawOps++; env.textDraws++; env.texts.push(t); }
     setFont(f) { expectInstance(f, Font, 'setFont'); this._font = f; }
     setTextColor(c) { expectInstance(c, Color, 'setTextColor'); }
     setTextAlignedLeft() {} setTextAlignedCenter() {} setTextAlignedRight() {}
@@ -105,7 +105,7 @@ export function makeScriptableEnv(opts) {
   }
   // widget tree nodes — permissive on props, strict on the typed setters
   class WidgetText {
-    constructor(t) { expect(t, 'string', 'addText'); this.text = t; }
+    constructor(t) { expect(t, 'string', 'addText'); this.text = t; env.texts.push(t); }
     leftAlignText() {} centerAlignText() {} rightAlignText() {}
   }
   class WidgetDate {
