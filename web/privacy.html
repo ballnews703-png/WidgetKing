@@ -26,25 +26,51 @@
 <body>
 <main>
   <p><a href="./">← Back to WidgetKing</a></p>
-  <h1>👑 WidgetKing Privacy Policy</h1>
-  <p class="muted">Effective August 12, 2026</p>
+  <h1>WidgetKing Privacy Policy</h1>
+  <p class="muted">Effective September 15, 2026</p>
 
-  <p>WidgetKing is built so that your stuff stays yours. There are no accounts,
-  no analytics, no tracking, and no server of ours that receives your data.
-  This page explains exactly what leaves your device, when, and where it goes.</p>
+  <p>WidgetKing is built so that your stuff stays yours. There are no analytics,
+  no tracking, and no account unless you choose to create one. This page
+  explains exactly what leaves your device, when, and where it goes.</p>
 
   <div class="card">
     <strong>The short version:</strong> your designs live on your device.
     Nothing is sent anywhere unless you use a feature that plainly needs it —
-    AI design (to Anthropic) or live weather (to Open-Meteo) — and even then,
-    only the minimum required, sent directly from your device.
+    AI design (to Anthropic), live data such as weather (to the service that
+    provides it), or the optional account that syncs your designs between your
+    own devices — and even then, only the minimum required, sent directly from
+    your device.
   </div>
 
   <h2>Your designs</h2>
   <p>Widget designs, app-icon packs, photos you add, and settings are stored
   locally — in your browser's storage for the web designer, and on your phone
-  inside the Scriptable app for installed widgets. We never receive or store a
-  copy. Backups you export are files you keep; they are never uploaded.</p>
+  inside the Scriptable app for installed widgets. Unless you sign in to sync
+  (below), we never receive or store a copy. Backups you export are files you
+  keep; they are never uploaded.</p>
+
+  <h2>Account &amp; sync (optional)</h2>
+  <p>You can create an account so your designs follow you between your own
+  devices. If you do:</p>
+  <ul>
+    <li><strong>What we collect:</strong> your email address, used only to send
+    you a 6-digit sign-in code. There are no passwords.</li>
+    <li><strong>What is stored:</strong> your widget designs (their layout,
+    text, and settings). Photos you place in widgets are <em>not</em> uploaded —
+    they stay on the device that holds them. Your AI access key is never
+    uploaded.</li>
+    <li><strong>Where:</strong> in a database hosted by
+    <a href="https://supabase.com/privacy" rel="noopener">Supabase</a>, our
+    infrastructure provider, in the United States. Each account can only ever
+    read and write its own rows — the database enforces this, not just the
+    app.</li>
+    <li><strong>Deleting:</strong> signing out keeps everything on your device
+    and stops syncing. To delete your account and every design stored with it,
+    use the delete option in Settings → Account, or contact us (below); the
+    data is removed within 30 days.</li>
+  </ul>
+  <p>If you never sign in, nothing about this section applies — no email is
+  collected and no design leaves your device.</p>
 
   <h2>AI design (optional)</h2>
   <p>The AI designer only works if you set it up with an access key. When you
@@ -56,45 +82,59 @@
     to generate the design. See
     <a href="https://www.anthropic.com/legal/privacy" rel="noopener">Anthropic's
     privacy policy</a>.</li>
-    <li>Your access key is stored only on your device. It is never sent to us
-    (we have no server), and it is not included in exported backup files.</li>
+    <li>Your access key is stored only on your device. It is never sent to us,
+    never synced to your account, and not included in exported backup files.</li>
   </ul>
   <p>If you never set up the AI, nothing is ever sent to Anthropic.</p>
 
-  <h2>Weather widgets (optional)</h2>
-  <p>Widgets that show live weather ask your phone for your approximate
-  location (accurate to about a kilometer) and send only those coordinates to
-  <strong>Open-Meteo</strong>, a weather service, to fetch the forecast. See
-  <a href="https://open-meteo.com/en/terms" rel="noopener">Open-Meteo's
-  terms &amp; privacy</a>. The location is kept on your device and results are
-  cached there. Widgets without weather never request your location.</p>
+  <h2>Live data in widgets (optional)</h2>
+  <p>Some widget pieces fetch live information. Each request goes directly from
+  your phone to the service named, with only what that service needs:</p>
+  <ul>
+    <li><strong>Weather and sun &amp; moon</strong> — your approximate location
+    (accurate to about a kilometer) is sent to
+    <a href="https://open-meteo.com/en/terms" rel="noopener">Open-Meteo</a>.
+    The location is kept on your device and results are cached there. Widgets
+    without these pieces never request your location.</li>
+    <li><strong>Stocks</strong> — the ticker symbols you chose are sent to
+    Yahoo Finance.</li>
+    <li><strong>News</strong> — a public headline feed is downloaded from
+    Google News; nothing about you is sent.</li>
+    <li><strong>Fantasy sports</strong> — the Sleeper username or league you
+    entered is sent to Sleeper's public API.</li>
+    <li><strong>App icons</strong> — app names you search for are sent to
+    Apple's App Store search to find their icons.</li>
+    <li><strong>Stickers and updates</strong> — artwork from WidgetKing's
+    sticker library and the widget script's update check are plain downloads
+    from this website. They carry no personal data; like any web request, the
+    hosting provider (GitHub Pages) sees the request itself.</li>
+  </ul>
+  <p>Calendar, reminders, and battery pieces read that information on your
+  phone only; nothing is sent anywhere.</p>
 
-  <h2>Sync and share links</h2>
-  <p>When you create a sync link or share a design, the designs themselves are
-  encoded inside the link — they travel in the link, not through a server. A
-  sync link can optionally include your AI access key so your other device is
-  ready to go. Treat sync links like passwords: only send them to yourself or
-  someone you trust, because anyone who has the link has its contents.
-  Opening a link always shows a summary and asks for confirmation before
-  anything is added to a device.</p>
-
-  <h2>Widget updates</h2>
-  <p>The installed widget script can check this website for a newer version of
-  itself. That check is a plain download — it sends no personal data, and your
-  designs never leave the device during an update.</p>
+  <h2>Share links and device-to-device links</h2>
+  <p>When you share a design or send all your designs to another device as a
+  link, the designs themselves are encoded inside the link — they travel in the
+  link, not through a server. A device-to-device link can optionally include
+  your AI access key so the other device is ready to go. Treat such links like
+  passwords: only send them to yourself or someone you trust, because anyone
+  who has the link has its contents. Opening a link always shows a summary and
+  asks for confirmation before anything is added to a device.</p>
 
   <h2>Children</h2>
-  <p>WidgetKing does not knowingly collect personal information from anyone,
-  including children — it has no mechanism to collect personal information at
-  all.</p>
+  <p>WidgetKing is not directed at children under 13 and does not knowingly
+  collect personal information from them. The only personal information the
+  app can collect is an email address, and only when someone chooses to create
+  an account. If you believe a child has created an account, contact us and we
+  will delete it.</p>
 
   <h2>Changes</h2>
-  <p>If WidgetKing ever adds features that change what leaves your device (for
-  example, optional accounts for syncing), this policy will be updated first,
-  and the date at the top will change.</p>
+  <p>When WidgetKing adds or changes anything that affects what leaves your
+  device, this policy is updated in the same release and the date at the top
+  changes.</p>
 
   <h2>Contact</h2>
-  <p>Questions about privacy? Open an issue on the
+  <p>Questions about privacy, or a deletion request? Open an issue on the
   <a href="https://github.com/ballnews703-png/WidgetKing" rel="noopener">WidgetKing
   GitHub repository</a>.</p>
 </main>

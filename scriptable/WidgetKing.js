@@ -29,7 +29,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 124;
+const WK_VERSION = 125;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -143,6 +143,36 @@ function fontFor(style, size, bold) {
 function themeColors(d) {
   if (d.themeID === "custom" && d.customColors && d.customColors.length === 2) return d.customColors;
   return THEMES[d.themeID] || THEMES.midnight;
+}
+// Defense in depth: the designer sanitizes every design, but a hand-edited
+// backup or a future field can still reach the phone — and Scriptable's
+// bridge throws on a numeric text or a non-hex color. Strings stay strings,
+// colors stay hex, numbers stay finite, so a bad field degrades instead of
+// blanking the widget.
+function guardDesign(design) {
+  const HEX = /^#[0-9a-fA-F]{6}$/;
+  if (!HEX.test(String(design.textColorHex || ""))) design.textColorHex = "#FFFFFF";
+  if (design.customColors && !(Array.isArray(design.customColors) && design.customColors.length === 2 &&
+      design.customColors.every(function (c) { return HEX.test(String(c || "")); }))) design.customColors = null;
+  for (const el of design.canvasElements || []) {
+    for (const k of ["text", "label", "symbol", "city", "url", "stockId", "moonPack"]) {
+      if (el[k] != null && typeof el[k] !== "string") el[k] = String(el[k]);
+    }
+    for (const k of ["x", "y", "size", "w", "h", "opacity", "angle", "radius", "border", "count"]) {
+      if (el[k] != null && (typeof el[k] !== "number" || !isFinite(el[k]))) delete el[k];
+    }
+    if (el.x == null) el.x = 0.5;
+    if (el.y == null) el.y = 0.5;
+    if (el.size == null) el.size = 14;
+    for (const k of ["colorHex", "accentHex", "borderHex", "color2Hex", "frameHex", "tintHex"]) {
+      if (el[k] != null && !HEX.test(String(el[k]))) delete el[k];
+    }
+  }
+  for (const app of design.apps || []) {
+    if (app.label != null && typeof app.label !== "string") app.label = String(app.label);
+    if (app.url != null && typeof app.url !== "string") app.url = String(app.url);
+  }
+  return design;
 }
 function dayOfYear(d) {
   const start = new Date(d.getFullYear(), 0, 0);
@@ -1039,26 +1069,66 @@ function drawBgPattern(ctx, design, W, H) {
     }
   }
 }
-function drawFreestyle(design, family, bgImg, live) {
-  // v113: a design can carry the layout the user authored for THIS size —
-  // apply it so the widget matches the editor instead of stretching the
-  // authored-size coordinates.
-  if (design.sizes && design.sizes[family] && design.fitSize !== family) {
-    design = JSON.parse(JSON.stringify(design));
-    const snapList = design.sizes[family];
-    const snapById = {};
-    for (let si = 0; si < snapList.length; si++) snapById[snapList[si].id] = snapList[si];
-    const elsAll = design.canvasElements || [];
-    for (let ei = 0; ei < elsAll.length; ei++) {
-      const sv = snapById[elsAll[ei].id];
-      if (!sv) continue;
-      elsAll[ei].x = sv.x;
-      elsAll[ei].y = sv.y;
-      if (typeof sv.size === "number") elsAll[ei].size = sv.size;
-      if (typeof sv.w === "number") elsAll[ei].w = sv.w;
-      if (typeof sv.h === "number") elsAll[ei].h = sv.h;
+// v113: a design can carry the layout the user authored for THIS size —
+// apply it so the widget matches the editor instead of stretching the
+// authored-size coordinates. Returns a copy; the stored design is untouched.
+// (v125: applied ONCE in buildWidget so the baked image AND the native
+// overlays — app icons, clocks — share the same per-size coordinates.)
+function applySizeLayout(design, family) {
+  if (!(design.sizes && design.sizes[family] && design.fitSize !== family)) return design;
+  design = JSON.parse(JSON.stringify(design));
+  const snapList = design.sizes[family];
+  const snapById = {};
+  for (let si = 0; si < snapList.length; si++) snapById[snapList[si].id] = snapList[si];
+  const elsAll = design.canvasElements || [];
+  for (let ei = 0; ei < elsAll.length; ei++) {
+    const sv = snapById[elsAll[ei].id];
+    if (!sv) continue;
+    elsAll[ei].x = sv.x;
+    elsAll[ei].y = sv.y;
+    if (typeof sv.size === "number") elsAll[ei].size = sv.size;
+    if (typeof sv.w === "number") elsAll[ei].w = sv.w;
+    if (typeof sv.h === "number") elsAll[ei].h = sv.h;
+  }
+  delete design.sizes;
+  return design;
+}
+// Theme gradient + optional mesh glow + optional pattern, painted into a
+// context — the same background every kind gets in the designer preview.
+function paintBackground(ctx, design, W, H) {
+  const colors = themeColors(design);
+  const c1 = hexToRgb(colors[0]); const c2 = hexToRgb(colors[1]);
+  const steps = 60;
+  const horizontal = design.gradientDir === "horizontal";
+  for (let i = 0; i < steps; i++) {
+    const t = i / (steps - 1);
+    const mix = [0, 1, 2].map(function (j) { return c1[j] + (c2[j] - c1[j]) * t; });
+    ctx.setFillColor(new Color(rgbToHex(mix)));
+    if (horizontal) {
+      ctx.fillRect(new Rect(Math.floor((W * i) / steps), 0, Math.ceil(W / steps) + 1, H));
+    } else {
+      ctx.fillRect(new Rect(0, Math.floor((H * i) / steps), W, Math.ceil(H / steps) + 1));
     }
   }
+  if (design.gradientDir === "mesh") {
+    // Dreamy blob mesh: DrawContext has no gradients, so each blob is a
+    // stack of concentric circles at low alpha — reads as a soft glow.
+    const blobs = [[0.2, 0.22, 0.6, c2], [0.85, 0.18, 0.5, c1], [0.68, 0.85, 0.65, c2]];
+    for (const blob of blobs) {
+      const R = Math.max(W, H) * blob[2];
+      const glow = blob[3].map(function (v) { return Math.round(v * 0.55 + 255 * 0.45); });
+      const rings = 22;
+      for (let r = rings; r >= 1; r--) {
+        const frac = r / rings;
+        ctx.setFillColor(new Color(rgbToHex(glow), 0.05));
+        ctx.fillEllipse(new Rect(blob[0] * W - R * frac, blob[1] * H - R * frac, R * frac * 2, R * frac * 2));
+      }
+    }
+  }
+  drawBgPattern(ctx, design, W, H);
+}
+function drawFreestyle(design, family, bgImg, live) {
+  design = applySizeLayout(design, family);
   // Draw at the device's true widget size (in pixels) so nothing stretches.
   const pts = widgetPointSizes(family);
   let s = 3;
@@ -1068,43 +1138,19 @@ function drawFreestyle(design, family, bgImg, live) {
   ctx.size = new Size(W, H); ctx.opaque = false; ctx.respectScreenScale = false;
   if (bgImg) {
     ctx.drawImageInRect(bgImg, new Rect(0, 0, W, H));
+    // A see-through gradient over the wallpaper still carries its texture,
+    // exactly as the preview draws it.
+    if (design.background === "gradient") drawBgPattern(ctx, design, W, H);
   } else {
-    const colors = themeColors(design);
-    const c1 = hexToRgb(colors[0]); const c2 = hexToRgb(colors[1]);
-    const steps = 60;
-    const horizontal = design.gradientDir === "horizontal";
-    for (let i = 0; i < steps; i++) {
-      const t = i / (steps - 1);
-      const mix = [0, 1, 2].map(function (j) { return c1[j] + (c2[j] - c1[j]) * t; });
-      ctx.setFillColor(new Color(rgbToHex(mix)));
-      if (horizontal) {
-        ctx.fillRect(new Rect(Math.floor((W * i) / steps), 0, Math.ceil(W / steps) + 1, H));
-      } else {
-        ctx.fillRect(new Rect(0, Math.floor((H * i) / steps), W, Math.ceil(H / steps) + 1));
-      }
-    }
-    if (design.gradientDir === "mesh") {
-      // Dreamy blob mesh: DrawContext has no gradients, so each blob is a
-      // stack of concentric circles at low alpha — reads as a soft glow.
-      const blobs = [[0.2, 0.22, 0.6, c2], [0.85, 0.18, 0.5, c1], [0.68, 0.85, 0.65, c2]];
-      for (const blob of blobs) {
-        const R = Math.max(W, H) * blob[2];
-        const glow = blob[3].map(function (v) { return Math.round(v * 0.55 + 255 * 0.45); });
-        const rings = 22;
-        for (let r = rings; r >= 1; r--) {
-          const frac = r / rings;
-          ctx.setFillColor(new Color(rgbToHex(glow), 0.05));
-          ctx.fillEllipse(new Rect(blob[0] * W - R * frac, blob[1] * H - R * frac, R * frac * 2, R * frac * 2));
-        }
-      }
-    }
-    drawBgPattern(ctx, design, W, H);
+    paintBackground(ctx, design, W, H);
   }
   const scale = Math.min(W, H) / 158;
   const els = design.canvasElements || [];
   for (const el of els) {
-    // Clocks and countdowns render as live native overlays, never baked.
-    if (el.kind === "clock" || el.kind === "countdown") continue;
+    // Clocks render as live native overlays (they tick between refreshes);
+    // countdowns are baked as the day count — the same number the
+    // designer shows, never iOS's "in 3 months" phrasing.
+    if (el.kind === "clock") continue;
     const px = el.x * W; const py = el.y * H; const fs = (el.size || 20) * scale;
     const op = (typeof el.opacity === "number" && el.opacity >= 0 && el.opacity <= 1) ? el.opacity : 1;
     if (el.kind === "shape") {
@@ -1413,12 +1459,15 @@ function overlayCellSize(el) {
   return [pt, pt];
 }
 async function addFreestyleApps(w, design, family, live) {
-  const OVERLAY = { app: 1, sleeperlogo: 1, clock: 1, countdown: 1 };
+  const OVERLAY = { app: 1, sleeperlogo: 1, clock: 1 };
   let apps = (design.canvasElements || []).filter(function (el) { return OVERLAY[el.kind]; });
-  // Native texts can't stack on each other — drop shadow-twin clocks and
-  // countdowns, keeping only the topmost at a given position.
+  // Themed tiles cycle their palette by position among APP icons only —
+  // the same index the designer preview uses.
+  const appOnly = apps.filter(function (el) { return el.kind === "app"; });
+  // Native texts can't stack on each other — drop shadow-twin clocks,
+  // keeping only the topmost at a given position.
   apps = apps.filter(function (el, i) {
-    if (el.kind !== "clock" && el.kind !== "countdown") return true;
+    if (el.kind !== "clock") return true;
     for (let j = i + 1; j < apps.length; j++) {
       const o = apps[j];
       if (o.kind === el.kind && Math.abs(o.x - el.x) < 0.03 && Math.abs(o.y - el.y) < 0.03) return false;
@@ -1460,15 +1509,13 @@ async function addFreestyleApps(w, design, family, live) {
       const pt = cellDims[0];
       const left = Math.max(0, el.x * W - pt / 2);
       if (left > cursorX) rowStack.addSpacer(left - cursorX);
-      if (el.kind === "clock" || el.kind === "countdown") {
+      if (el.kind === "clock") {
         const liveCell = rowStack.addStack();
         liveCell.size = new Size(cellDims[0], cellDims[1]);
         liveCell.centerAlignContent();
         const fs = Math.min(Math.max(Number(el.size) || 34, 8), 90);
-        const t = el.kind === "clock"
-          ? liveCell.addDate(new Date())
-          : liveCell.addDate(new Date((el.dateISO || "2030-01-01") + "T00:00:00"));
-        if (el.kind === "clock") { t.applyTimeStyle(); } else { t.applyRelativeStyle(); }
+        const t = liveCell.addDate(new Date());
+        t.applyTimeStyle();
         t.font = fontFor(el.font || design.fontStyle, fs, el.bold !== false);
         t.textColor = new Color(el.colorHex || "#FFFFFF", typeof el.opacity === "number" ? el.opacity : 1);
         t.centerAlignText();
@@ -1502,7 +1549,7 @@ async function addFreestyleApps(w, design, family, live) {
       const elTheme = el.iconTheme && ICON_THEMES[el.iconTheme] ? el.iconTheme : "real";
       let realIcon = null;
       if (elTheme !== "real") {
-        const tile = iconStack.addImage(themedIconTile(el, elTheme, apps.indexOf(el), pt));
+        const tile = iconStack.addImage(themedIconTile(el, elTheme, appOnly.indexOf(el), pt));
         tile.imageSize = new Size(pt, pt);
       } else {
         // Custom pack icons travel baked into the script itself.
@@ -2091,15 +2138,35 @@ async function buildLockWidget(design, family) {
   return w;
 }
 async function buildWidget(design, position) {
+  guardDesign(design);
   const family = config.widgetFamily || "small";
   if (String(family).indexOf("accessory") === 0) {
     return buildLockWidget(design, family);
   }
+  if (design.kind === "lock") {
+    // A Lock Screen design dropped onto the Home Screen: say so instead of
+    // rendering an unrelated note.
+    design = { name: design.name, kind: "note", themeID: design.themeID || "midnight", fontStyle: "rounded",
+      textColorHex: "#FFFFFF", background: "gradient", canvasElements: [], apps: [],
+      primaryText: "“" + design.name + "” is a Lock Screen design.\nAdd it there: hold the Lock Screen → Customize → tap the widget strip → Scriptable." };
+  }
+  if (design.kind === "freestyle") design = applySizeLayout(design, family);
   const w = new ListWidget();
   w.setPadding(12, 12, 12, 12);
   const bgImg = backgroundImageFor(design, family, position);
   if (bgImg && design.kind !== "freestyle") {
     w.backgroundImage = bgImg;
+  } else if (!bgImg && design.kind !== "freestyle" && (design.bgPattern || design.gradientDir === "mesh")) {
+    // Textures and mesh glows are painted, not native gradients — every
+    // kind gets the background the designer showed, not just freestyle.
+    const pts = widgetPointSizes(family);
+    let s = 3;
+    try { s = Device.screenScale() || 3; } catch (e) {}
+    const W = Math.round(pts[0] * s), H = Math.round(pts[1] * s);
+    const bctx = new DrawContext();
+    bctx.size = new Size(W, H); bctx.opaque = false; bctx.respectScreenScale = false;
+    paintBackground(bctx, design, W, H);
+    w.backgroundImage = bctx.getImage();
   } else if (!bgImg && design.kind !== "freestyle") {
     // Freestyle paints its own background INTO its image — setting a widget
     // gradient too would layer ON TOP of that image (Scriptable draws

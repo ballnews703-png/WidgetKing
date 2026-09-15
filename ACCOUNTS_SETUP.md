@@ -37,6 +37,16 @@ alter table public.designs enable row level security;
 
 create policy "users own their designs" on public.designs
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Self-service account deletion (Settings → Account → Delete my account).
+-- Runs with definer rights so a signed-in user can remove ONLY themself;
+-- their designs cascade away with the auth user.
+create or replace function public.delete_own_account()
+returns void language sql security definer set search_path = public as $$
+  delete from auth.users where id = auth.uid();
+$$;
+revoke all on function public.delete_own_account() from public;
+grant execute on function public.delete_own_account() to authenticated;
 ```
 
 Row-level security means every signed-in user can only ever see and write
@@ -46,9 +56,8 @@ their own rows — enforced by the database itself, not by app code.
 
 - **Sign In / Up → Email**: ON (it is by default). Turn **Confirm email**
   OFF if present — the 6-digit code IS the confirmation.
-- **Email OTP length**: 6 (default). OTP expiry: default 1 hour is fine
-  (the app copy says 10 minutes to nudge urgency; tighten to 600s here if
-  you want the copy to be literal).
+- **Email OTP length**: 6 (default). **OTP expiry: set to 600 seconds** (the
+  default is an hour; ten minutes is plenty and limits a leaked code's life).
 - Rate limits: defaults are fine to start (Supabase's built-in email sender
   allows ~2 emails/hour per address on free tier — enough for testing; before
   launch we plug in a real sender via SMTP, e.g. Resend's free tier, so codes
@@ -78,8 +87,17 @@ and `localStorage.setItem("widgetking.sync.key", "<anon key>")`, reload.
 - **Metering** (recording only, nothing enforced): AI builds counted per
   month in `widgetking.meter.ai`, device-local per MONETIZATION.md.
 
-## What comes later (build order per MONETIZATION.md)
+## Before flipping the switch
 
+- `web/privacy.html` already describes account sync (updated with v125);
+  re-read it once the real project exists and confirm the hosting region.
+- Account deletion is built (Settings → Account → Delete my account, v125)
+  and relies on the `delete_own_account()` function from step 2 — run the
+  whole SQL block, not just the table.
+
+## Build order per MONETIZATION.md
+
+1. ✅ Accounts backend + design sync client — shipped v124 (dark).
 2. Enforcement UI: free-tier caps (3 AI builds/mo, 4 active widgets) with
    the upsell card — ships together with payments, never before.
 3. Stripe checkout + `pro` entitlement column; Explore publishing rides on

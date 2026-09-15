@@ -1,9 +1,17 @@
 # WidgetKing — Publishing / Native App Plan
 
-Status: **planning notes, not yet built.** The native SwiftUI/WidgetKit app is
-scaffolded in this repo (`WidgetKing.xcodeproj`, `WidgetKingWidgets/`). Building
-and shipping it requires an Apple Developer membership ($99/yr) and CI builds on
-macOS runners — a spend decision that is parked until explicitly approved.
+Status: **native app scaffolded, never signed or shipped.** The SwiftUI/WidgetKit
+project in this repo (`WidgetKing.xcodeproj`, `WidgetKing/`, `WidgetKingWidgets/`,
+`Shared/`) is a **from-scratch native rewrite, not a wrapper around the web
+app** — it loads no web content. Today it renders 6 of the web's 10 design kinds
+and 5 of its 25 element kinds, has 12 of 22 themes, hardcodes the expensive
+`claude-opus-5` model (the web moved to Sonnet/Haiku in v121), and cannot decode
+a web design (lowercase `kind`, string dates). Closing that gap — or replacing
+the native UI with a web view around `web/index.html` — is the first decision of
+this phase. Building and shipping either way requires an Apple Developer
+membership ($99/yr) and CI builds on macOS runners — a spend decision that is
+parked until explicitly approved. The project also has no shared Xcode scheme
+committed yet, which any CI build needs.
 
 ## Why native (what the web app can't do)
 
@@ -33,10 +41,15 @@ macOS runners — a spend decision that is parked until explicitly approved.
 
 ## Native-day-one feature notes
 
-- Alternate icons: ship the 8 v69 colorways (royal, noir, glass, cream, ocean,
-  sunset, neon, pastel) as bundled alternate icons; picker UI already designed.
-- Migration: import designs from the web app (share-link payload already
-  round-trips full libraries).
+- Alternate icons: DONE in the native project — the 8 v69 colorways (royal,
+  noir, glass, cream, ocean, sunset, neon, pastel) are bundled and the picker
+  in native Settings switches them.
+- Migration: NOT BUILT. The web share-link payload round-trips full libraries
+  between web devices, but the native app has no link importer and its decoder
+  rejects web designs. Needs a web-format decoding shim before it can be
+  claimed.
+- Sign-in + design sync: shipped on web in v124 (dark until keys); not built
+  natively.
 - Keep the web designer alive as the desktop/companion editor — same design
   format everywhere.
 

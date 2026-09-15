@@ -60,6 +60,10 @@ const r = await pg.evaluate(async ([ver]) => {
   out.promptSplit = aiSystemPrompt('x').indexOf(aiSystemPromptStable()) === 0 && !aiSystemPromptStable().includes('STYLE REFERENCES');
   out.models = JSON.stringify([...document.getElementById('aiModel').options].map(o => o.value)) ===
     JSON.stringify(['claude-sonnet-5', 'claude-haiku-4-5']) && aiModel() === 'claude-sonnet-5';
+  // v125: AI stickers must survive conversion (they became "Text" before)
+  const stSpec = { name: 'S', size: 'small', kind: 'freestyle', canvasElements: [{ kind: 'sticker', stockId: 'galaxy', x: 0.5, y: 0.5, w: 0.4, size: 14, text: '' }] };
+  const stOut = specToDesign(stSpec).canvasElements[0];
+  out.aiSticker = stOut.kind === 'sticker' && stOut.stockId === 'galaxy' && stOut.w === 0.4;
 
   // editor opens and inserts
   current = normalizeDesign({ name: 'CoreTest', kind: 'freestyle', themeID: 'ocean', canvasElements: [

@@ -980,6 +980,8 @@
         <button id="acctOutBtn" style="flex:1">Sign out</button>
       </div>
       <p class="hint" id="acctStatus"></p>
+      <button id="acctDeleteBtn" style="width:100%;margin-top:8px;color:#E8756D"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-trash"/></svg> Delete my account</button>
+      <p class="hint">Deleting removes your account and every design stored with it. Designs on this device stay here.</p>
     </div>
   </details>
   <details class="wk-sec" id="guidesSec" open>
@@ -1012,7 +1014,7 @@
     <li>Long-press your Home Screen → <b>Edit → Add Widget</b> → search <b>Scriptable</b> → add a widget (use <b>Medium/Large</b> for launchers so every icon is tappable).</li>
     <li>Long-press the widget → <b>Edit Widget</b> → Script: <b>WidgetKing</b>, and set <b>Parameter</b> to a design's name. Different widgets can show different designs.</li>
     <li><b>Glass / Clear backgrounds:</b> follow the ✨ step in the wizard above (one-time wallpaper photo; Clear also wants Parameter <b>Name | position</b>).</li>
-    <li>Changed your designs? Copy the script again and paste over the old one.</li>
+    <li>Changed your designs? Tap <b>Update phone (one tap)</b> in My Widgets — pasting is only for the first install.</li>
   </ol>
   </details>
   <p class="hint">iOS refreshes Scriptable widgets on its own schedule (every few minutes), so clock and battery values are close but not live to-the-second. Everything runs on your devices — nothing is uploaded anywhere.</p>
@@ -1107,7 +1109,7 @@
     <div class="wt-big">🔒</div>
     <h2>Yours stays yours.</h2>
     <div class="wt-rows">
-      <div><b>Designs live on your device</b><br>No account, no server, nothing uploaded.</div>
+      <div><b>Designs live on your device</b><br>No account required — nothing leaves your phone unless you turn on sync.</div>
       <div><b>No ads, no tracking</b><br>WidgetKing doesn't watch what you do.</div>
       <div><b>AI is optional</b><br>Only your widget idea is sent — and only when you use it.</div>
     </div>
@@ -1119,7 +1121,7 @@
     <div class="wt-rows">
       <div><b>1 · Design here</b><br>Templates, drag &amp; drop, or the AI.</div>
       <div><b>2 · Scriptable shows it</b><br>A free app renders your designs as real widgets.</div>
-      <div><b>3 · One tap updates</b><br>Change a design, tap 🔁, your phone catches up.</div>
+      <div><b>3 · One tap updates</b><br>Change a design, tap <b>Update phone</b>, your phone catches up.</div>
     </div>
   </div>
   <div class="wt-pane" data-p="4" style="display:none">
@@ -1213,7 +1215,7 @@
         <p>Swipe to an empty Home Screen page and take a screenshot. Open the WidgetKing script <i>inside</i> Scriptable → <b>Set wallpaper photo…</b> → pick that screenshot. For Clear widgets, set the Parameter to <b>Name | position</b> (like <b>My Clock | top-left</b>).</p>
       </div>
     </div>
-    <p class="hint" style="text-align:center;padding:0 0 20px">Changed a design later? Just do steps 2–3 again (paste over the old script). Everything else stays put. 👑</p>
+    <p class="hint" style="text-align:center;padding:0 0 20px">Changed a design later? Tap <b>Update phone (one tap)</b> in My Widgets — no pasting again. Everything else stays put.</p>
   </div>
 </div>
 
@@ -1297,7 +1299,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 124;
+const WK_VERSION = 125;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -1411,6 +1413,36 @@ function fontFor(style, size, bold) {
 function themeColors(d) {
   if (d.themeID === "custom" && d.customColors && d.customColors.length === 2) return d.customColors;
   return THEMES[d.themeID] || THEMES.midnight;
+}
+// Defense in depth: the designer sanitizes every design, but a hand-edited
+// backup or a future field can still reach the phone — and Scriptable's
+// bridge throws on a numeric text or a non-hex color. Strings stay strings,
+// colors stay hex, numbers stay finite, so a bad field degrades instead of
+// blanking the widget.
+function guardDesign(design) {
+  const HEX = /^#[0-9a-fA-F]{6}$/;
+  if (!HEX.test(String(design.textColorHex || ""))) design.textColorHex = "#FFFFFF";
+  if (design.customColors && !(Array.isArray(design.customColors) && design.customColors.length === 2 &&
+      design.customColors.every(function (c) { return HEX.test(String(c || "")); }))) design.customColors = null;
+  for (const el of design.canvasElements || []) {
+    for (const k of ["text", "label", "symbol", "city", "url", "stockId", "moonPack"]) {
+      if (el[k] != null && typeof el[k] !== "string") el[k] = String(el[k]);
+    }
+    for (const k of ["x", "y", "size", "w", "h", "opacity", "angle", "radius", "border", "count"]) {
+      if (el[k] != null && (typeof el[k] !== "number" || !isFinite(el[k]))) delete el[k];
+    }
+    if (el.x == null) el.x = 0.5;
+    if (el.y == null) el.y = 0.5;
+    if (el.size == null) el.size = 14;
+    for (const k of ["colorHex", "accentHex", "borderHex", "color2Hex", "frameHex", "tintHex"]) {
+      if (el[k] != null && !HEX.test(String(el[k]))) delete el[k];
+    }
+  }
+  for (const app of design.apps || []) {
+    if (app.label != null && typeof app.label !== "string") app.label = String(app.label);
+    if (app.url != null && typeof app.url !== "string") app.url = String(app.url);
+  }
+  return design;
 }
 function dayOfYear(d) {
   const start = new Date(d.getFullYear(), 0, 0);
@@ -2307,26 +2339,66 @@ function drawBgPattern(ctx, design, W, H) {
     }
   }
 }
-function drawFreestyle(design, family, bgImg, live) {
-  // v113: a design can carry the layout the user authored for THIS size —
-  // apply it so the widget matches the editor instead of stretching the
-  // authored-size coordinates.
-  if (design.sizes && design.sizes[family] && design.fitSize !== family) {
-    design = JSON.parse(JSON.stringify(design));
-    const snapList = design.sizes[family];
-    const snapById = {};
-    for (let si = 0; si < snapList.length; si++) snapById[snapList[si].id] = snapList[si];
-    const elsAll = design.canvasElements || [];
-    for (let ei = 0; ei < elsAll.length; ei++) {
-      const sv = snapById[elsAll[ei].id];
-      if (!sv) continue;
-      elsAll[ei].x = sv.x;
-      elsAll[ei].y = sv.y;
-      if (typeof sv.size === "number") elsAll[ei].size = sv.size;
-      if (typeof sv.w === "number") elsAll[ei].w = sv.w;
-      if (typeof sv.h === "number") elsAll[ei].h = sv.h;
+// v113: a design can carry the layout the user authored for THIS size —
+// apply it so the widget matches the editor instead of stretching the
+// authored-size coordinates. Returns a copy; the stored design is untouched.
+// (v125: applied ONCE in buildWidget so the baked image AND the native
+// overlays — app icons, clocks — share the same per-size coordinates.)
+function applySizeLayout(design, family) {
+  if (!(design.sizes && design.sizes[family] && design.fitSize !== family)) return design;
+  design = JSON.parse(JSON.stringify(design));
+  const snapList = design.sizes[family];
+  const snapById = {};
+  for (let si = 0; si < snapList.length; si++) snapById[snapList[si].id] = snapList[si];
+  const elsAll = design.canvasElements || [];
+  for (let ei = 0; ei < elsAll.length; ei++) {
+    const sv = snapById[elsAll[ei].id];
+    if (!sv) continue;
+    elsAll[ei].x = sv.x;
+    elsAll[ei].y = sv.y;
+    if (typeof sv.size === "number") elsAll[ei].size = sv.size;
+    if (typeof sv.w === "number") elsAll[ei].w = sv.w;
+    if (typeof sv.h === "number") elsAll[ei].h = sv.h;
+  }
+  delete design.sizes;
+  return design;
+}
+// Theme gradient + optional mesh glow + optional pattern, painted into a
+// context — the same background every kind gets in the designer preview.
+function paintBackground(ctx, design, W, H) {
+  const colors = themeColors(design);
+  const c1 = hexToRgb(colors[0]); const c2 = hexToRgb(colors[1]);
+  const steps = 60;
+  const horizontal = design.gradientDir === "horizontal";
+  for (let i = 0; i < steps; i++) {
+    const t = i / (steps - 1);
+    const mix = [0, 1, 2].map(function (j) { return c1[j] + (c2[j] - c1[j]) * t; });
+    ctx.setFillColor(new Color(rgbToHex(mix)));
+    if (horizontal) {
+      ctx.fillRect(new Rect(Math.floor((W * i) / steps), 0, Math.ceil(W / steps) + 1, H));
+    } else {
+      ctx.fillRect(new Rect(0, Math.floor((H * i) / steps), W, Math.ceil(H / steps) + 1));
     }
   }
+  if (design.gradientDir === "mesh") {
+    // Dreamy blob mesh: DrawContext has no gradients, so each blob is a
+    // stack of concentric circles at low alpha — reads as a soft glow.
+    const blobs = [[0.2, 0.22, 0.6, c2], [0.85, 0.18, 0.5, c1], [0.68, 0.85, 0.65, c2]];
+    for (const blob of blobs) {
+      const R = Math.max(W, H) * blob[2];
+      const glow = blob[3].map(function (v) { return Math.round(v * 0.55 + 255 * 0.45); });
+      const rings = 22;
+      for (let r = rings; r >= 1; r--) {
+        const frac = r / rings;
+        ctx.setFillColor(new Color(rgbToHex(glow), 0.05));
+        ctx.fillEllipse(new Rect(blob[0] * W - R * frac, blob[1] * H - R * frac, R * frac * 2, R * frac * 2));
+      }
+    }
+  }
+  drawBgPattern(ctx, design, W, H);
+}
+function drawFreestyle(design, family, bgImg, live) {
+  design = applySizeLayout(design, family);
   // Draw at the device's true widget size (in pixels) so nothing stretches.
   const pts = widgetPointSizes(family);
   let s = 3;
@@ -2336,43 +2408,19 @@ function drawFreestyle(design, family, bgImg, live) {
   ctx.size = new Size(W, H); ctx.opaque = false; ctx.respectScreenScale = false;
   if (bgImg) {
     ctx.drawImageInRect(bgImg, new Rect(0, 0, W, H));
+    // A see-through gradient over the wallpaper still carries its texture,
+    // exactly as the preview draws it.
+    if (design.background === "gradient") drawBgPattern(ctx, design, W, H);
   } else {
-    const colors = themeColors(design);
-    const c1 = hexToRgb(colors[0]); const c2 = hexToRgb(colors[1]);
-    const steps = 60;
-    const horizontal = design.gradientDir === "horizontal";
-    for (let i = 0; i < steps; i++) {
-      const t = i / (steps - 1);
-      const mix = [0, 1, 2].map(function (j) { return c1[j] + (c2[j] - c1[j]) * t; });
-      ctx.setFillColor(new Color(rgbToHex(mix)));
-      if (horizontal) {
-        ctx.fillRect(new Rect(Math.floor((W * i) / steps), 0, Math.ceil(W / steps) + 1, H));
-      } else {
-        ctx.fillRect(new Rect(0, Math.floor((H * i) / steps), W, Math.ceil(H / steps) + 1));
-      }
-    }
-    if (design.gradientDir === "mesh") {
-      // Dreamy blob mesh: DrawContext has no gradients, so each blob is a
-      // stack of concentric circles at low alpha — reads as a soft glow.
-      const blobs = [[0.2, 0.22, 0.6, c2], [0.85, 0.18, 0.5, c1], [0.68, 0.85, 0.65, c2]];
-      for (const blob of blobs) {
-        const R = Math.max(W, H) * blob[2];
-        const glow = blob[3].map(function (v) { return Math.round(v * 0.55 + 255 * 0.45); });
-        const rings = 22;
-        for (let r = rings; r >= 1; r--) {
-          const frac = r / rings;
-          ctx.setFillColor(new Color(rgbToHex(glow), 0.05));
-          ctx.fillEllipse(new Rect(blob[0] * W - R * frac, blob[1] * H - R * frac, R * frac * 2, R * frac * 2));
-        }
-      }
-    }
-    drawBgPattern(ctx, design, W, H);
+    paintBackground(ctx, design, W, H);
   }
   const scale = Math.min(W, H) / 158;
   const els = design.canvasElements || [];
   for (const el of els) {
-    // Clocks and countdowns render as live native overlays, never baked.
-    if (el.kind === "clock" || el.kind === "countdown") continue;
+    // Clocks render as live native overlays (they tick between refreshes);
+    // countdowns are baked as the day count — the same number the
+    // designer shows, never iOS's "in 3 months" phrasing.
+    if (el.kind === "clock") continue;
     const px = el.x * W; const py = el.y * H; const fs = (el.size || 20) * scale;
     const op = (typeof el.opacity === "number" && el.opacity >= 0 && el.opacity <= 1) ? el.opacity : 1;
     if (el.kind === "shape") {
@@ -2681,12 +2729,15 @@ function overlayCellSize(el) {
   return [pt, pt];
 }
 async function addFreestyleApps(w, design, family, live) {
-  const OVERLAY = { app: 1, sleeperlogo: 1, clock: 1, countdown: 1 };
+  const OVERLAY = { app: 1, sleeperlogo: 1, clock: 1 };
   let apps = (design.canvasElements || []).filter(function (el) { return OVERLAY[el.kind]; });
-  // Native texts can't stack on each other — drop shadow-twin clocks and
-  // countdowns, keeping only the topmost at a given position.
+  // Themed tiles cycle their palette by position among APP icons only —
+  // the same index the designer preview uses.
+  const appOnly = apps.filter(function (el) { return el.kind === "app"; });
+  // Native texts can't stack on each other — drop shadow-twin clocks,
+  // keeping only the topmost at a given position.
   apps = apps.filter(function (el, i) {
-    if (el.kind !== "clock" && el.kind !== "countdown") return true;
+    if (el.kind !== "clock") return true;
     for (let j = i + 1; j < apps.length; j++) {
       const o = apps[j];
       if (o.kind === el.kind && Math.abs(o.x - el.x) < 0.03 && Math.abs(o.y - el.y) < 0.03) return false;
@@ -2728,15 +2779,13 @@ async function addFreestyleApps(w, design, family, live) {
       const pt = cellDims[0];
       const left = Math.max(0, el.x * W - pt / 2);
       if (left > cursorX) rowStack.addSpacer(left - cursorX);
-      if (el.kind === "clock" || el.kind === "countdown") {
+      if (el.kind === "clock") {
         const liveCell = rowStack.addStack();
         liveCell.size = new Size(cellDims[0], cellDims[1]);
         liveCell.centerAlignContent();
         const fs = Math.min(Math.max(Number(el.size) || 34, 8), 90);
-        const t = el.kind === "clock"
-          ? liveCell.addDate(new Date())
-          : liveCell.addDate(new Date((el.dateISO || "2030-01-01") + "T00:00:00"));
-        if (el.kind === "clock") { t.applyTimeStyle(); } else { t.applyRelativeStyle(); }
+        const t = liveCell.addDate(new Date());
+        t.applyTimeStyle();
         t.font = fontFor(el.font || design.fontStyle, fs, el.bold !== false);
         t.textColor = new Color(el.colorHex || "#FFFFFF", typeof el.opacity === "number" ? el.opacity : 1);
         t.centerAlignText();
@@ -2770,7 +2819,7 @@ async function addFreestyleApps(w, design, family, live) {
       const elTheme = el.iconTheme && ICON_THEMES[el.iconTheme] ? el.iconTheme : "real";
       let realIcon = null;
       if (elTheme !== "real") {
-        const tile = iconStack.addImage(themedIconTile(el, elTheme, apps.indexOf(el), pt));
+        const tile = iconStack.addImage(themedIconTile(el, elTheme, appOnly.indexOf(el), pt));
         tile.imageSize = new Size(pt, pt);
       } else {
         // Custom pack icons travel baked into the script itself.
@@ -3359,15 +3408,35 @@ async function buildLockWidget(design, family) {
   return w;
 }
 async function buildWidget(design, position) {
+  guardDesign(design);
   const family = config.widgetFamily || "small";
   if (String(family).indexOf("accessory") === 0) {
     return buildLockWidget(design, family);
   }
+  if (design.kind === "lock") {
+    // A Lock Screen design dropped onto the Home Screen: say so instead of
+    // rendering an unrelated note.
+    design = { name: design.name, kind: "note", themeID: design.themeID || "midnight", fontStyle: "rounded",
+      textColorHex: "#FFFFFF", background: "gradient", canvasElements: [], apps: [],
+      primaryText: "“" + design.name + "” is a Lock Screen design.\nAdd it there: hold the Lock Screen → Customize → tap the widget strip → Scriptable." };
+  }
+  if (design.kind === "freestyle") design = applySizeLayout(design, family);
   const w = new ListWidget();
   w.setPadding(12, 12, 12, 12);
   const bgImg = backgroundImageFor(design, family, position);
   if (bgImg && design.kind !== "freestyle") {
     w.backgroundImage = bgImg;
+  } else if (!bgImg && design.kind !== "freestyle" && (design.bgPattern || design.gradientDir === "mesh")) {
+    // Textures and mesh glows are painted, not native gradients — every
+    // kind gets the background the designer showed, not just freestyle.
+    const pts = widgetPointSizes(family);
+    let s = 3;
+    try { s = Device.screenScale() || 3; } catch (e) {}
+    const W = Math.round(pts[0] * s), H = Math.round(pts[1] * s);
+    const bctx = new DrawContext();
+    bctx.size = new Size(W, H); bctx.opaque = false; bctx.respectScreenScale = false;
+    paintBackground(bctx, design, W, H);
+    w.backgroundImage = bctx.getImage();
   } else if (!bgImg && design.kind !== "freestyle") {
     // Freestyle paints its own background INTO its image — setting a widget
     // gradient too would layer ON TOP of that image (Scriptable draws
@@ -4945,13 +5014,14 @@ function normalizeDesign(design) {
   if (!design.kind) design.kind = "clock";
   if (!design.themeID) design.themeID = "midnight";
   if (!FONT_CSS[design.fontStyle]) design.fontStyle = "rounded";
-  if (!design.textColorHex) design.textColorHex = "#FFFFFF";
+  if (!/^#[0-9a-fA-F]{6}$/.test(design.textColorHex || "")) design.textColorHex = "#FFFFFF";
   if (design.primaryText == null) design.primaryText = "";
   if (design.secondaryText == null) design.secondaryText = "";
   if (design.targetDate == null) design.targetDate = "";
   if (!Array.isArray(design.canvasElements)) design.canvasElements = [];
   if (!Array.isArray(design.apps)) design.apps = [];
-  if (design.customColors && !(Array.isArray(design.customColors) && design.customColors.length === 2)) {
+  if (design.customColors && !(Array.isArray(design.customColors) && design.customColors.length === 2 &&
+      design.customColors.every(function (c) { return /^#[0-9a-fA-F]{6}$/.test(String(c || "")); }))) {
     design.customColors = null;
   }
   if (design.tapUrl == null) design.tapUrl = "";
@@ -4990,12 +5060,20 @@ function normalizeDesign(design) {
   for (const el of design.canvasElements) {
     if (!el.id) el.id = uid();
     if (!el.kind) el.kind = "text";
+    // Scriptable's bridge is strict: a numeric text or a NaN coordinate that
+    // slips through (hand-edited backup, old bug) crashes or blanks the
+    // widget. Strings stay strings, numbers stay finite — before the
+    // per-field defaults below get their say.
     if (el.text == null) el.text = "";
+    else if (typeof el.text !== "string") el.text = String(el.text);
+    for (const k of ["x", "y", "size", "w", "h", "opacity", "angle", "radius", "border", "count"]) {
+      if (typeof el[k] === "number" && !isFinite(el[k])) delete el[k];
+    }
     if (!el.symbolName) el.symbolName = "star.fill";
     if (typeof el.x !== "number") el.x = 0.5;
     if (typeof el.y !== "number") el.y = 0.5;
-    if (typeof el.size !== "number" || el.size <= 0) el.size = 18;
-    if (!el.colorHex) el.colorHex = "#FFFFFF";
+    if (typeof el.size !== "number" || (el.size <= 0 && el.kind !== "shape")) el.size = 18;
+    if (!/^#[0-9a-fA-F]{6}$/.test(el.colorHex || "")) el.colorHex = "#FFFFFF";
     const minOp = el.kind === "shape" ? 0 : 0.05;
     if (typeof el.opacity !== "number" || el.opacity < minOp || el.opacity > 1) el.opacity = 1;
     if (el.kind === "shape") {
@@ -5063,6 +5141,7 @@ function normalizeDesign(design) {
       // v117: a sticker is a STOCK image referenced by tiny id — never base64.
       if (typeof el.stockId !== "string" || !/^[a-z0-9-]{1,40}$/.test(el.stockId)) el.stockId = "";
       if (typeof el.w !== "number" || el.w <= 0 || el.w > 1) el.w = 0.35;
+      el.opacity = 1; // drawn artwork has no opacity on the phone
     }
     if (el.kind === "month") {
       if (typeof el.size !== "number" || el.size < 6 || el.size > 16) el.size = 9;
@@ -5603,7 +5682,7 @@ const AI_SCHEMA = {
         type: "object",
         properties: {
           kind: { type: "string", "enum": ["text", "clock", "date", "emoji", "icon", "shape", "battery", "countdown", "app", "weather", "calendar", "progress", "ring", "sleeper", "sleeperlogo", "month", "art", "sticker", "astro", "stock", "worldclock", "reminders", "news", "greeting", "week"] },
-          text: { type: "string", description: "Text or emoji content; for kind=icon a single glyph like ★ ♥ ● ▲ ☾ ⚡ ✈ ⚙ →; empty for other kinds" },
+          text: { type: "string", description: "Text or emoji content; for kind=icon a single glyph like ★ ♥ ● ▲ ☾ ⚡ ✈ ⚙ →; for kind=stock the ticker (AAPL, TSLA, BTC-USD); for kind=worldclock the city name (Tokyo, London, Paris…); for kind=art the words to curve or tilt; empty for other kinds" },
           label: { type: "string", description: "App name for kind=app; empty otherwise" },
           url: { type: "string", description: "URL scheme to open for kind=app (e.g. spotify://); empty otherwise" },
           font: { type: "string", "enum": [""].concat(Object.keys(FONT_CSS)), description: "Per-element font override; empty = the design's fontStyle" },
@@ -5619,7 +5698,7 @@ const AI_SCHEMA = {
           radius: { type: "number", description: "For kind=shape rect: corner radius in pt (0 = sharp square). 0 otherwise" },
           border: { type: "number", description: "For kind=shape: stroke width in pt (0 = no border). Enables outlined shapes and frames; with opacity 0 the shape is outline-only" },
           borderHex: { type: "string", description: "#RRGGBB border color for kind=shape when border>0; empty otherwise" },
-          count: { type: "number", description: "For kind=calendar: how many upcoming events to list, 1-4 (multi-line). 0 otherwise" },
+          count: { type: "number", description: "For kind=calendar, reminders, or news: how many lines to list, 1-4 (multi-line). 0 otherwise" },
           accentHex: { type: "string", description: "For kind=month only: #RRGGBB for the today-circle; empty otherwise" },
           angle: { type: "number", description: "For kind=art: rotated text angle in degrees (-90..90) or gradshape gradient direction (0-360). 0 otherwise" },
           mode: { type: "string", "enum": ["", "score", "record", "myteam", "opponent", "arc", "rotated", "gradshape", "now", "hilo", "full", "cond", "rain", "tomorrow", "hourly", "icon", "sun", "sunrise", "sunset", "moon", "moonicon", "next"], description: "For kind=sleeper: score/record/myteam/opponent. For kind=sleeperlogo: myteam or opponent. For kind=art: arc (text curved along a circle, w=diameter), rotated (tilted text, use angle), or gradshape (gradient-filled shape colorHex->borderHex at angle; w/h/shape/radius apply). For kind=weather: now/hilo/full/cond/rain/tomorrow/hourly, or icon = the CURRENT condition drawn as beautiful stock art (size 24-48, pairs with a small temp text). For kind=battery: icon = battery state drawn as stock art (charging bolt / full / half / low, size 24-44). For kind=astro: sun (rise+set), sunrise, sunset, moon (phase emoji+name), moonicon (big phase icon), next (flips live: sunset time during the day, sunrise time at night). Empty otherwise" },
@@ -5658,7 +5737,6 @@ const AI_EX_HERO = {
   background: "gradient", glassTint: "dark", bgOpacity: 1,
   backgroundColors: ["#2A1A34", "#B0626A"], tapUrl: "", apps: [],
   canvasElements: [
-    { kind: "clock", text: "", label: "", url: "", font: "", x: 0.508, y: 0.46, size: 34, colorHex: "#141018", opacity: 0.3, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
     { kind: "clock", text: "", label: "", url: "", font: "", x: 0.5, y: 0.45, size: 34, colorHex: "#FFF6EC", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
     { kind: "text", text: "golden hour", label: "", url: "", font: "script", x: 0.5, y: 0.66, size: 13, colorHex: "#F2B694", opacity: 1, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" },
     { kind: "icon", text: "\u2600", label: "", url: "", font: "", x: 0.86, y: 0.16, size: 14, colorHex: "#F2B694", opacity: 0.9, shape: "", w: 0, h: 0, align: "", bold: true, radius: 0, border: 0, borderHex: "", count: 0, accentHex: "", angle: 0, mode: "", source: "", dateISO: "" }
@@ -5792,7 +5870,7 @@ function aiSystemPromptStable() {
     "FINISH: consistent corner-radius family (pick one radius scale); one implied light source; optically center glyphs (a hair above true center); prefer fewer, larger, better-placed elements over many small ones.\n" +
     "Design at the level of the most beautiful Home Screen setups people share online: intentional composition, real hierarchy, restraint. The user describes a widget; return a spec.\n" +
     "Kinds: clock (time+date), date (big day), countdown, quote, note, launcher (tappable app grid), battery, freestyle (a canvas of elements — PREFER freestyle for anything creative; simple kinds are only for plain requests).\n" +
-    "FREESTYLE ELEMENTS (max 24; array order is z-order, bottom first): text, clock, date, emoji, icon (monochrome glyph ★ ☆ ♥ ● ◆ ▲ ✦ ❀ ☀ ☾ ☁ ⚡ ♪ ☕ ✈ ⌂ ✉ ⚙ ✓ → ∞, tinted via colorHex — prefer over emoji for elegance), shape (rect/pill/circle), battery, countdown, app (tappable icon: set label+url), weather (live temp), calendar (next event), progress (bar), ring (circular gauge; w=diameter 0-1 of short side, size=stroke pt 5-10; source day/year/battery/countdown), month (full mini month-calendar grid with today circled: size=day-number pt 8-10, w=grid width, accentHex=today circle color — a month grid OWNS its area: NOTHING may sit inside its span (x ± w/2, y ± .36). Pair it with a side column: month at x .27 w .44-.48 and texts at x .72-.78, or give the month the whole widget alone), calendar with count 2-4 = a multi-line upcoming-events list, art (baked decorative graphics — mode arc: STATIC text curved along a circle (w=diameter, size=font pt); mode rotated: tilted static text (angle deg); mode gradshape: gradient-filled shape colorHex to borderHex at angle. Art is for decoration only, NEVER for live values like time), astro (LIVE sunrise/sunset: mode sun both, sunrise, sunset, or next = the widget FLIPS itself — sunset time during the day, sunrise time at night; mode moon = moon phase emoji + name, moonicon = big phase icon — set moonPack (moon-cute/moon-bad-ass/moon-watercolor/moon-cozy) to draw TONIGHT'S REAL PHASE with beautiful stock moon art at size 30-56, the hero move for any moon/night widget),stock (LIVE market quote — put the ticker in text: AAPL, TSLA, BTC-USD, ETH-USD; renders 'AAPL 229 ▲1.2%' auto-colored green/red), worldclock (another city's current time — put the city in text; known: Tokyo, London, Paris, New York, Los Angeles, Sydney, Dubai, Hong Kong, Singapore, Berlin, Chicago, Honolulu), reminders (the user's REAL iOS Reminders to-do list; count 1-4 lines — great for productivity widgets), greeting (LIVE time-of-day greeting — 'Good morning ☀️' that changes through the day; the user adds their own name afterward), week ('Week 32', ISO week number). WEATHER MODES via the element's mode field: now (temp), full (temp + high/low), hilo, cond (words + temp), rain (chance %), hourly (next hours strip — needs medium width), tomorrow, icon (the CURRENT condition as drawn art — see LIVE ART). Stack 2-3 weather modes for a real forecast card.\n" +
+    "FREESTYLE ELEMENTS (max 24; array order is z-order, bottom first): text, clock, date, emoji, icon (monochrome glyph ★ ☆ ♥ ● ◆ ▲ ✦ ❀ ☀ ☾ ☁ ⚡ ♪ ☕ ✈ ⌂ ✉ ⚙ ✓ → ∞, tinted via colorHex — prefer over emoji for elegance), shape (rect/pill/circle), battery, countdown, app (tappable icon: set label+url), weather (live temp), calendar (next event), progress (bar), ring (circular gauge; w=diameter 0-1 of short side, size=stroke pt 5-10; source day/year/battery/countdown), month (full mini month-calendar grid with today circled: size=day-number pt 8-10, w=grid width, accentHex=today circle color — a month grid OWNS its area: NOTHING may sit inside its span (x ± w/2, y ± .36). Pair it with a side column: month at x .27 w .44-.48 and texts at x .72-.78, or give the month the whole widget alone), calendar with count 2-4 = a multi-line upcoming-events list, art (baked decorative graphics — mode arc: STATIC text curved along a circle (w=diameter, size=font pt); mode rotated: tilted static text (angle deg); mode gradshape: gradient-filled shape colorHex to borderHex at angle. Art is for decoration only, NEVER for live values like time), astro (LIVE sunrise/sunset: mode sun both, sunrise, sunset, or next = the widget FLIPS itself — sunset time during the day, sunrise time at night; mode moon = moon phase emoji + name, moonicon = big phase icon — set moonPack (moon-cute/moon-bad-ass/moon-watercolor/moon-cozy) to draw TONIGHT'S REAL PHASE with beautiful stock moon art at size 30-56, the hero move for any moon/night widget),stock (LIVE market quote — put the ticker in text: AAPL, TSLA, BTC-USD, ETH-USD; renders 'AAPL 229 ▲1.2%' auto-colored green/red), worldclock (another city's current time — put the city in text; known: Tokyo, London, Paris, New York, Los Angeles, Sydney, Dubai, Hong Kong, Singapore, Berlin, Chicago, Honolulu), reminders (the user's REAL iOS Reminders to-do list; count 1-4 lines — great for productivity widgets), greeting (LIVE time-of-day greeting — 'Good morning ☀️' that changes through the day; the user adds their own name afterward), week ('Week 32', ISO week number), news (LIVE top headlines; count 1-4 lines, size 8-10, medium or large widgets only — headlines are long). WEATHER MODES via the element's mode field: now (temp), full (temp + high/low), hilo, cond (words + temp), rain (chance %), hourly (next hours strip — needs medium width), tomorrow, icon (the CURRENT condition as drawn art — see LIVE ART). Stack 2-3 weather modes for a real forecast card.\n" +
     (STOCK_ART.length ? "STICKERS (kind=sticker, set stockId + w 0.2-0.45): drawn artwork from WidgetKing's own library — decorative only, never for live values. Ids by pack — " +
       STOCK_ART_PACKS.map(function (p) {
         return p.name + ": " + STOCK_ART.filter(function (a) { return a.pack === p.id; }).map(function (a) { return a.id; }).join(" ");
@@ -5811,7 +5889,7 @@ function aiSystemPromptStable() {
     "10 Pill Line (conversational): a sentence mixing plain text with live data set in capsules — 'It's [clock] , [temp pill]'. Reads like handwriting + chips.\n" +
     "8 Matchup Card (fantasy sports): sleeper score element as hero (size 22-28, shadow duplicate behind) at y .42, microlabel 'YOU  ·  OPP' 8-9pt above it, a second sleeper element mode omitted (defaults to score) — use ONE score + one record line 9-10pt, divider, plus a day ring or countdown in a side column. kind=sleeper shows the user's LIVE fantasy matchup (they link their league afterward — leave its config fields empty). Also available: mode myteam/opponent on sleeper = the TEAM NAMES, and kind=sleeperlogo (mode myteam/opponent) = circular team LOGOS 30-38pt — flank the score with both logos and put the names 8-9pt beneath them for a broadcast-style matchup card. Use these whenever fantasy football/Sleeper is mentioned.\n" +
     "CRAFT TRICKS the renderer supports:\n" +
-    "- Shadow: duplicate the SAME element first in near-black (#141018, opacity .25-.3) offset +.008-.012 x, +.01-.014 y, then the real one on top. ONLY on the one hero element, NEVER on text under 20pt, and NEVER on serif/display fonts (didot, bodoni, hoefler) — visible offsets read as double-printing, not depth.\n" +
+    "- Shadow: duplicate the SAME element first in near-black (#141018, opacity .25-.3) offset +.008-.012 x, +.01-.014 y, then the real one on top. ONLY on the one hero element, NEVER on text under 20pt, NEVER on serif/display fonts (didot, bodoni, hoefler) — visible offsets read as double-printing, not depth — and NEVER on a clock (clocks are live native text on the phone and cannot be doubled; shadow a text, date, or countdown hero instead).\n" +
     "- Glow: duplicate first in the accent color, opacity .2-.25, size +8, then the real element. Neon moods only; skip it everywhere else — crisp beats glowy.\n" +
     "- Data pill (the single highest-craft move — use for ALL small live data): a pill shape h .18-.24, w sized to the text +.08 padding, DIRECTLY UNDER a 10-13pt bold data element centered on it (same x/y). On dark canvases: pill white opacity .2-.3 with dark text #17171C — or a solid colored pill (mint #7FD8A8, coral #E8756D, gold #F0C445, lavender #B9A8F0) with dark text. Never let a bare 10pt weather/date/battery float when it could sit in a pill.\n" +
     "- Two-tone accent capsule: TWO pills side by side forming one capsule (solid accent pill + translucent pill), data text spanning them — the month-vs-day date chip look.\n" +
@@ -6099,7 +6177,7 @@ function specToDesign(spec) {
     return { emoji: app.emoji || "🌐", label: (app.label || "App").slice(0, 12), url: app.url || "" };
   });
   design.canvasElements = (spec.canvasElements || []).slice(0, 24).map(function (el) {
-    const kind = ["text","clock","date","emoji","icon","shape","battery","countdown","app","weather","calendar","progress","ring","sleeper","sleeperlogo","month","art","astro","stock","worldclock","reminders","news","greeting","week"].includes(el.kind) ? el.kind : "text";
+    const kind = ["text","clock","date","emoji","icon","shape","battery","countdown","app","weather","calendar","progress","ring","sleeper","sleeperlogo","month","art","sticker","astro","stock","worldclock","reminders","news","greeting","week"].includes(el.kind) ? el.kind : "text";
     const rawW = Number(el.w) || 0;
     const out = {
       id: uid(),
@@ -6142,6 +6220,15 @@ function specToDesign(spec) {
       out.shape = "rounded"; out.showLabel = false;
     }
     if (kind === "icon" && !out.text) out.text = "★";
+    if (kind === "sticker") {
+      // v125: the schema and prompt taught stickers since v117, but the
+      // converter never carried stockId — every AI sticker became a text
+      // element reading "Text".
+      out.stockId = stockArtById(el.stockId) ? el.stockId : ((STOCK_ART[0] || {}).id || "");
+      out.w = Math.min(Math.max(rawW || 0.35, 0.1), 1);
+      out.text = "";
+      out.opacity = 1;
+    }
     if (kind === "weather") {
       out.unit = "f";
       out.wmode = ["now","hilo","full","cond","rain","tomorrow","hourly","icon"].includes(el.mode) ? el.mode : "now";
@@ -6392,7 +6479,7 @@ function designPreviewHTML(design, sizeKey) {
     grid += '</div>';
     return grid;
   }
-  return '<div style="font-size:18px;font-weight:700;padding:0 12px">' + esc(design.primaryText || "Your text here") + '</div>';
+  return '<div style="font-size:18px;font-weight:700;padding:0 12px">' + esc(design.primaryText || design.name || "Your text here") + '</div>';
 }
 function renderFreestyleInto(node, design, w, h, interactive) {
   node.innerHTML = "";
@@ -6481,7 +6568,9 @@ function renderFreestyleInto(node, design, w, h, interactive) {
       const side = (el.w || 0.35) * Math.min(w, h);
       div.style.width = side + "px";
       div.style.height = side + "px";
-      div.style.opacity = el.opacity;
+      // Image opacity has no Scriptable drawing API — stickers are always
+      // full-strength on the phone, so the preview never pretends otherwise.
+      div.style.opacity = 1;
       div.classList.add("cel-photo");
       const url = stockArtUrl(el.stockId);
       if (url) {
@@ -6691,18 +6780,30 @@ function renderFreestyleInto(node, design, w, h, interactive) {
         div.textContent = ["○ Buy groceries · today", "○ Call the bank · tomorrow", "○ Pack for the trip · in 3d", "○ Water the plants"].slice(0, n).join("\n");
         div.style.whiteSpace = "pre-line";
         div.style.lineHeight = "1.55";
+        // Same wrap box the phone uses: the widest centered box that still
+        // fits at this x — so long headlines wrap here exactly as there.
+        div.style.maxWidth = Math.max(w * 0.3, Math.min(w, 2 * Math.min(el.x * w, w - el.x * w))) + "px";
+        div.style.overflowWrap = "anywhere";
       }
       else if (el.kind === "news") {
         const n = Math.min(Math.max(Number(el.count) || 1, 1), 4);
         div.textContent = ["▪ Markets rally into the weekend", "▪ Storm system moves up the coast", "▪ Local team clinches playoff spot", "▪ New park opens downtown"].slice(0, n).join("\n");
         div.style.whiteSpace = "pre-line";
         div.style.lineHeight = "1.55";
+        // Same wrap box the phone uses: the widest centered box that still
+        // fits at this x — so long headlines wrap here exactly as there.
+        div.style.maxWidth = Math.max(w * 0.3, Math.min(w, 2 * Math.min(el.x * w, w - el.x * w))) + "px";
+        div.style.overflowWrap = "anywhere";
       }
       else if (el.kind === "calendar") {
         const n = Math.min(Math.max(Number(el.count) || 1, 1), 4);
         div.textContent = ["Team call · 2:30 PM", "Dinner out · tomorrow", "Birthday 🎂 · in 5d", "Gym · in 6d"].slice(0, n).join("\n");
         div.style.whiteSpace = "pre-line";
         div.style.lineHeight = "1.55";
+        // Same wrap box the phone uses: the widest centered box that still
+        // fits at this x — so long headlines wrap here exactly as there.
+        div.style.maxWidth = Math.max(w * 0.3, Math.min(w, 2 * Math.min(el.x * w, w - el.x * w))) + "px";
+        div.style.overflowWrap = "anywhere";
       }
       else if (el.kind === "sleeper") div.textContent = el.mode === "record" ? "7-2 · #3"
         : el.mode === "myteam" ? "Birds of Prey" : el.mode === "opponent" ? "Waiver Wire FC" : "112.4 – 98.7";
@@ -7244,6 +7345,9 @@ function weatherArtSlugPreview() {
   return weatherArtSlug(2, previewDaylight());
 }
 function liveArtImg(div, slug, sizePx, fallbackText) {
+  // Drawn artwork has no opacity on the phone (no DrawContext alpha for
+  // images) — keep the preview honest.
+  div.style.opacity = 1;
   const img = document.createElement("img");
   img.src = stockArtUrl(slug);
   img.alt = slug;
@@ -7811,7 +7915,7 @@ function buildInspectorContent(inspector) {
     }
     const tapHint = document.createElement("p");
     tapHint.className = "hint";
-    tapHint.innerHTML = "Tappable on <b>Medium/Large</b> widgets (Small opens its first app). Tap details live in the <b>Shortcut Guide</b> on the Install tab.";
+    tapHint.innerHTML = "Tappable on <b>Medium/Large</b> widgets (Small opens its first app). Tap details live in the <b>Shortcut Guide</b> in Settings.";
     inspector.appendChild(tapHint);
   }
 
@@ -7876,7 +7980,7 @@ function buildInspectorContent(inspector) {
   if (el.kind === "greeting") {
     const nameInput = document.createElement("input");
     nameInput.type = "text";
-    nameInput.placeholder = "Your name (optional) — “Good morning, Andrew”";
+    nameInput.placeholder = "Your name (optional) — “Good morning, Sam”";
     nameInput.maxLength = 16;
     nameInput.value = el.name || "";
     nameInput.oninput = function () { el.name = nameInput.value; refreshCanvases(); };
@@ -8326,7 +8430,7 @@ function buildInspectorContent(inspector) {
     }
   }
 
-  if (["text", "clock", "date", "countdown", "battery", "icon", "weather", "calendar", "sleeper", "art", "astro", "stock", "worldclock", "reminders", "greeting", "week"].includes(el.kind)) {
+  if (["text", "clock", "date", "countdown", "battery", "icon", "weather", "calendar", "sleeper", "art", "astro", "stock", "worldclock", "reminders", "news", "month", "greeting", "week"].includes(el.kind)) {
     const fontRow = document.createElement("div");
     fontRow.className = "row";
     const fontLabel = document.createElement("span");
@@ -8518,7 +8622,11 @@ function buildInspectorContent(inspector) {
     inspector.appendChild(colorRow);
   }
   if (el.kind !== "emoji") {
-    sliderRow("Opacity", el.kind === "shape" ? 0 : 5, 100, Math.round((el.opacity || 0) * 100), function (v) { el.opacity = v / 100; });
+    // Stickers are drawn artwork with no opacity on the phone — no slider
+    // that would promise otherwise.
+    if (el.kind !== "sticker") {
+      sliderRow("Opacity", el.kind === "shape" ? 0 : 5, 100, Math.round((el.opacity || 0) * 100), function (v) { el.opacity = v / 100; });
+    }
   }
 
   // Layer / arrange / nudge controls.
@@ -9094,7 +9202,7 @@ function renderLauncherUI() {
       } catch (e) { return "Open " + app.label; }
     });
     hint.style.display = "block";
-    hint.innerHTML = "⚡ " + names.length + " app" + (names.length === 1 ? "" : "s") + " here need a one-time Shortcut — the <b>Shortcut Guide</b> on the Install tab lists them with a Set up button each.";
+    hint.innerHTML = "⚡ " + names.length + " app" + (names.length === 1 ? "" : "s") + " here need a one-time Shortcut — the <b>Shortcut Guide</b> in Settings lists them with a Set up button each.";
   } else {
     hint.style.display = "none";
   }
@@ -9587,7 +9695,7 @@ function buildTemplates() {
       { kind: "progress", source: "day", x: 0.5, y: 0.82, size: 4, w: 0.5, colorHex: "#EAF3E7", opacity: 0.8 }
     ] } },
     { category: "Zen", pack: "Zen", design: { name: "Zen Quote", kind: "quote", themeID: "sage", fontStyle: "noteworthy", textColorHex: "#F3F8F2", primaryText: "Inhale calm\nExhale worry\nBe here now\nLet it be easy" } },
-    { category: "Zen", pack: "Zen", design: { name: "Still Water", kind: "clock", themeID: "mist", fontStyle: "optima", textColorHex: "#EAF0F5" } },
+    { category: "Zen", pack: "Zen", design: { name: "Quiet Hours", kind: "clock", themeID: "mist", fontStyle: "optima", textColorHex: "#EAF0F5" } },
     { category: "Cute", pack: "Cute", design: { name: "Love Count", kind: "freestyle", themeID: "blush", fontStyle: "chalkboard", textColorHex: "#FFFFFF", canvasElements: [
       { kind: "emoji", text: "💕", x: 0.5, y: 0.18, size: 22, colorHex: "#FFFFFF", opacity: 1 },
       { kind: "countdown", x: 0.5, y: 0.47, size: 40, colorHex: "#FFFFFF", opacity: 1, dateISO: "" },
@@ -9648,7 +9756,7 @@ function buildTemplates() {
       { kind: "text", text: "battery", x: 0.5, y: 0.61, size: 10, colorHex: "#E2FFF6", opacity: 0.85 }
     ] } },
     { category: "Notes", design: { name: "Drink Water", kind: "note", themeID: "mint", fontStyle: "rounded", textColorHex: "#FFFFFF", primaryText: "Drink water 💧" } },
-    { category: "Vibes", design: { name: "Golden Hour", kind: "freestyle", themeID: "sunset", gradientDir: "horizontal", fontStyle: "serif", textColorHex: "#FFFFFF", canvasElements: [
+    { category: "Vibes", design: { name: "Sundown", kind: "freestyle", themeID: "sunset", gradientDir: "horizontal", fontStyle: "serif", textColorHex: "#FFFFFF", canvasElements: [
       { kind: "shape", shape: "pill", w: 0.72, h: 0.24, x: 0.5, y: 0.55, size: 0, colorHex: "#3B1B00", opacity: 0.25 },
       { kind: "emoji", text: "☀️", x: 0.5, y: 0.27, size: 24, colorHex: "#FFFFFF", opacity: 1 },
       { kind: "text", text: "golden hour", x: 0.5, y: 0.55, size: 15, colorHex: "#FFF3DB", opacity: 1 }
@@ -10053,10 +10161,10 @@ function renderControls() {
     bgHint.innerHTML = "🎨 With opacity under 100%, your gradient blends over <b>your wallpaper</b> like tinted glass. Needs the same one-time wallpaper setup as Glass (run the script in Scriptable → <b>Set wallpaper photo…</b>); without it, the widget falls back to a solid gradient.";
   } else if (current.background === "glass") {
     bgHint.style.display = "block";
-    bgHint.innerHTML = "🧊 Glass = a frosted slice of <b>your wallpaper</b> (preview shows a stand-in). Opacity sets frost strength. Needs the one-time wallpaper setup — see the ✨ step in the Install wizard.";
+    bgHint.innerHTML = "🧊 Glass = a frosted slice of <b>your wallpaper</b> (preview shows a stand-in). Opacity sets frost strength. Needs the one-time wallpaper setup — see the ✨ step in the setup wizard.";
   } else if (current.background === "clear") {
     bgHint.style.display = "block";
-    bgHint.innerHTML = "🫥 Clear = the exact wallpaper slice, fully transparent. Needs the one-time wallpaper setup (✨ step in the Install wizard). Pick the spot above once — the Parameter then only needs the design's name.";
+    bgHint.innerHTML = "🫥 Clear = the exact wallpaper slice, fully transparent. Needs the one-time wallpaper setup (✨ step in the setup wizard). Pick the spot above once — the Parameter then only needs the design's name.";
   } else {
     bgHint.style.display = "none";
   }
@@ -10425,7 +10533,7 @@ document.getElementById("saveBtn").onclick = function () {
   // An edit only reaches the phone after a fresh copy+paste — say so every
   // time an existing design changes, or edits look like they "didn't work".
   toast(index >= 0
-    ? "Saved “" + current.name + "” ✓ — 📋 re-copy the script to update your phone"
+    ? "Saved “" + current.name + "” ✓ — tap Update phone to send it to your phone"
     : "Saved “" + current.name + "”");
 };
 document.getElementById("newBtn").onclick = function () { loadIntoEditor(newDesign()); };
@@ -10467,7 +10575,7 @@ document.getElementById("acctSendBtn").onclick = async function () {
     await acctSendCode(email);
     document.getElementById("acctCodeRow").style.display = "flex";
     hint.style.display = "";
-    hint.textContent = "Code sent — check " + email + " (and spam, the first time). It works for 10 minutes.";
+    hint.textContent = "Code sent — check " + email + " (and spam, the first time). Enter it soon — codes expire.";
     document.getElementById("acctCode").focus();
   } catch (e) { toast("⚠️ " + e.message); }
   this.disabled = false;
@@ -10502,6 +10610,25 @@ document.getElementById("acctSyncBtn").onclick = async function () {
 document.getElementById("acctOutBtn").onclick = function () {
   setSyncSession(null);
   toast("Signed out — everything stays on this device");
+};
+// Account deletion: a security-definer SQL function removes the auth user
+// (designs cascade). Promised by the privacy policy; required by App Store
+// review. The device's own designs are never touched.
+async function acctDeleteAccount() {
+  const res = await syncFetch("/rest/v1/rpc/delete_own_account", { method: "POST", body: "{}" });
+  if (!res.ok) throw new Error("Couldn't delete the account right now (" + res.status + ") — try again, or contact us");
+  setSyncSession(null);
+}
+document.getElementById("acctDeleteBtn").onclick = async function () {
+  const s = syncSession();
+  if (!s) return;
+  if (!confirm("Delete the account for " + (s.email || "this email") + "?\n\nEvery design stored with it is erased. The designs on this device stay here. This can't be undone.")) return;
+  this.disabled = true;
+  try {
+    await acctDeleteAccount();
+    toast("Account deleted — your designs stay on this device");
+  } catch (e) { toast("⚠️ " + e.message); }
+  this.disabled = false;
 };
 renderAccountSection();
 // Quiet catch-up shortly after launch: newer designs from another device
@@ -10554,7 +10681,7 @@ function updateTapStatus() {
     const m = url.match(/name=([^&]+)/);
     try { if (m) name = decodeURIComponent(m[1]); } catch (e) {}
     status.textContent = "⚡ Opens via the Shortcut “" + (name || "Open App") +
-      "” — create it once (guide on the Install tab). Tip: search above first; most big apps open directly with no Shortcut.";
+      "” — create it once (guide in Settings). Tip: search above first; most big apps open directly with no Shortcut.";
     return;
   }
   if (url.indexOf("http") === 0) { status.textContent = "🌐 Opens a website: " + url.slice(0, 48); return; }
@@ -10586,7 +10713,7 @@ async function runTapSearch() {
         document.getElementById("tapUrlInput").value = current.tapUrl;
         updateTapStatus();
         toast(direct ? ("Tapping now opens " + label + " directly ✓")
-          : ("Tapping opens " + label + " via a one-time Shortcut (guide on the Install tab)"));
+          : ("Tapping opens " + label + " via a one-time Shortcut (guide in Settings)"));
       };
       box.appendChild(pick);
     }
@@ -10598,7 +10725,7 @@ document.getElementById("tapSearch").addEventListener("keydown", function (event
 });
 document.getElementById("tapTestBtn").onclick = function () {
   const url = (document.getElementById("tapUrlInput").value || current.tapUrl || "").trim();
-  if (!url) { toast("Set a link first, then 🧪 tests it"); return; }
+  if (!url) { toast("Set a link first, then the test button tries it"); return; }
   location.href = url;
 };
 document.getElementById("glassTint").onchange = function (e) {
@@ -10730,7 +10857,7 @@ document.getElementById("clonePickBtn").onclick = function () {
   if (!getApiKey()) {
     document.getElementById("cloneCloseBtn").onclick();
     openDesignerSetup();
-    toast("Cloning needs the full designer — finish setup first");
+    toast("Cloning needs the AI designer — set it up in Settings first");
     return;
   }
   document.getElementById("cloneCloseBtn").onclick();
@@ -10741,7 +10868,7 @@ document.getElementById("cloneInput").onchange = function (event) {
   event.target.value = "";
   if (!file) return;
   const key = getApiKey();
-  if (!key) { toast("Cloning needs the full designer — finish Designer setup first"); return; }
+  if (!key) { toast("Cloning needs the AI designer — set it up in Settings first"); return; }
   const button = document.getElementById("cloneBtn");
   const reader = new FileReader();
   reader.onload = function () {
@@ -10769,7 +10896,7 @@ document.getElementById("cloneInput").onchange = function (event) {
         toast("⚠️ Couldn't clone it: " + error.message);
       } finally {
         button.disabled = false;
-        button.innerHTML = "📷 Clone a widget<br><span style=\"font-size:11px;color:var(--muted)\">from any photo</span>";
+        button.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg> Clone a widget<br><span style="font-size:11px;color:var(--muted)">from any photo</span>';
       }
     };
     img.src = reader.result;
@@ -10821,7 +10948,7 @@ document.getElementById("remixBtn").onclick = async function () {
     toast("Remix failed: " + error.message);
   } finally {
     button.disabled = false;
-    button.textContent = "✨ Remix";
+    button.innerHTML = '<svg class="ic ic-sm" aria-hidden="true"><use href="#i-sparkle"/></svg> Remix';
   }
 };
 
@@ -11066,7 +11193,7 @@ async function buildScript() {
     // Photos don't travel inside sync links — designs that arrived that way
     // have empty photo boxes, and the widget would render without them.
     alert("⚠️ No photo attached in: " + missingPhotos.join(", ") +
-      "\n\nThose widgets will show “photo missing” on your phone. Open each one in the Editor, tap its photo box, and re-add the picture (photos don't travel in sync links — use Back up for full copies). Then copy the script again.");
+      "\n\nThose widgets will show “photo missing” on your phone. Open each one from My Widgets, tap its photo box, and re-add the picture (photos don't travel in sync links — use Back up for full copies). Then tap Update phone.");
   }
   // Stamp where this copy came from so the script can self-update from it.
   const pageUrl = location.protocol.indexOf("http") === 0 ? location.origin + location.pathname : "";
@@ -11127,7 +11254,7 @@ setTimeout(async function () {
     bar.style.cssText = "position:fixed;top:env(safe-area-inset-top);left:0;right:0;z-index:80;" +
       "background:var(--accent);color:var(--accent-text);padding:10px 14px;display:flex;" +
       "align-items:center;justify-content:center;gap:10px;font-size:13px;font-weight:600";
-    bar.textContent = "✨ Update available (v" + m[1] + " — you're on v" + scriptVersion() + ")";
+    bar.textContent = "Update available (v" + m[1] + " — you're on v" + scriptVersion() + ")";
     const btn = document.createElement("button");
     btn.textContent = "Reload";
     btn.style.cssText = "background:rgba(0,0,0,.25);border:none;color:inherit;border-radius:9px;padding:6px 12px;font-weight:700";
@@ -11171,7 +11298,7 @@ function fallbackCopy(text, message) {
   area.select();
   const ok = document.execCommand("copy");
   area.remove();
-  toast(ok ? (message || "✅ Copied") : "⚠️ Couldn't copy — use ⬇️ Download Script instead");
+  toast(ok ? (message || "✅ Copied") : "⚠️ Couldn't copy — use Download Script instead");
 }
 document.getElementById("downloadScriptBtn").onclick = async function () {
   download("WidgetKing.js", await buildScript(), "text/javascript");
@@ -11184,7 +11311,7 @@ document.getElementById("backupBtn").onclick = function () {
   const backup = { app: "WidgetKing", version: 1, exportedAt: new Date().toISOString(), designs: designs, pages: pages };
   download("widgetking-backup-" + stamp + ".json", JSON.stringify(backup, null, 2), "application/json");
   markBackedUp();
-  toast("Backup saved — keep it in Files/iCloud. Restore any time with 📂");
+  toast("Backup saved — keep it in Files/iCloud. Restore any time with Restore / Import");
 };
 function download(name, content, type) {
   const blob = new Blob([content], { type: type });
@@ -11455,7 +11582,7 @@ document.getElementById("syncAllBtn").onclick = async function () {
       includeAI = confirm("Include your AI key in this link, so the other device gets AI with zero setup?\n\nOnly send the link to family/people you trust — anyone with the link can use your (capped) credits.");
     }
     const link = await allDesignsLink(includeAI);
-    if (link.hadPhotos) toast("Note: photos don't fit in a link — use 💾 Backup via iCloud Files for those");
+    if (link.hadPhotos) toast("Note: photos don't fit in a link — use Back up all designs for those");
     if (navigator.share) {
       await navigator.share({ title: "WidgetKing — all my designs", url: link.url });
     } else if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -12203,7 +12330,7 @@ function keylessTweak(wish) {
     notes.push("smaller hero");
   }
   if (notes.length === 0) {
-    toast("💡 Tap a chip below — or add an AI key in ⚙️ Settings to ask for anything in your own words");
+    toast("💡 Tap a chip below — or set up the AI designer in Settings to ask for anything in your own words");
     return;
   }
   syncControls();
@@ -12472,10 +12599,10 @@ function renderStatusCard() {
     Number(localStorage.getItem("widgetking.lastcopy") || 0);
   let html = "", act = "";
   if (designs.length && dirty) {
-    html = '<div class="grow">🔁 Your designs changed since the last phone update.</div><button class="primary" id="statusActBtn">Update</button>';
+    html = '<div class="grow">Your designs changed since the last phone update.</div><button class="primary" id="statusActBtn">Update</button>';
     act = "push";
   } else if (designs.length && !getApiKey()) {
-    html = '<div class="grow">✨ The AI designer isn’t set up on this device yet.</div><button class="primary" id="statusActBtn">Set up</button>';
+    html = '<div class="grow">The AI designer isn\'t set up on this device yet.</div><button class="primary" id="statusActBtn">Set up</button>';
     act = "setup";
   } else {
     let marker = {};
@@ -12483,7 +12610,7 @@ function renderStatusCard() {
     const grown = designs.length - (Number(marker.count) || 0) >= 10;
     const stale = Date.now() - (Number(marker.time) || 0) > 7 * 24 * 3600 * 1000;
     if (designs.length >= 5 && (grown || stale)) {
-      html = '<div class="grow">💾 Your designs haven’t been backed up in a while.</div><button class="primary" id="statusActBtn">Back up</button>';
+      html = '<div class="grow">Your designs haven\'t been backed up in a while.</div><button class="primary" id="statusActBtn">Back up</button>';
       act = "backup";
     }
   }
@@ -12954,7 +13081,7 @@ document.getElementById("bAI").onclick = async function () {
     toast("⚠️ Couldn't fancy it up: " + error.message);
   } finally {
     button.disabled = false;
-    button.textContent = "👑 Have WidgetKing fancy it up";
+    button.innerHTML = '<svg class="ic ic-sm" aria-hidden="true"><use href="#i-crown"/></svg> Have WidgetKing fancy it up';
   }
 };
 
@@ -13463,7 +13590,7 @@ document.getElementById("pageAIBtn").onclick = async function () {
     toast("⚠️ Couldn't design the page: " + error.message);
   } finally {
     button.disabled = false;
-    button.textContent = "✨ Design my page";
+    button.innerHTML = '<svg class="ic ic-sm" aria-hidden="true"><use href="#i-sparkle"/></svg> Design my page';
   }
 };
 document.getElementById("pageSaveBtn").onclick = function () {
@@ -13489,7 +13616,7 @@ document.getElementById("pageSaveBtn").onclick = function () {
   persist();
   const list = document.getElementById("pageChecklist");
   let html = '<h2 style="font-size:15px">📋 Placement checklist</h2>' +
-    '<p class="hint">Re-copy the script into Scriptable first (your designs ride inside it — each now remembers its spot), then add each widget:</p>';
+    '<p class="hint">Tap <b>Update phone</b> first (your designs ride inside the script — each now remembers its spot), then add each widget:</p>';
   filled.forEach(function (slot, index) {
     const design = designs.find(function (d) { return d.id === designAtSlot[slotKey(slot)]; });
     const param = design.name;
@@ -13854,7 +13981,7 @@ document.getElementById("iconsToWidgetBtn").onclick = async function () {
   }
   loadIntoEditor(design);
   switchTab("editor");
-  toast("🧩 Launcher built — save it, then 🔁 Update phone. No Shortcuts needed ✓");
+  toast("🧩 Launcher built — save it, then Update phone. No Shortcuts needed ✓");
 };
 document.getElementById("iconsToHomeBtn").onclick = function () {
   iconHomeFlowOpen = !iconHomeFlowOpen;
@@ -13991,7 +14118,7 @@ function renderExplore() {
     return (entry.name + " " + entry.tags.join(" ")).toLowerCase().includes(query);
   });
   if (!shown.length) {
-    list.innerHTML = '<p class="hint">No styles match — try another word, or upload your own pack in Editor → App icons.</p>';
+    list.innerHTML = '<p class="hint">No styles match — try another word, or upload your own pack in Studio.</p>';
     return;
   }
   for (const entry of shown) {
@@ -14175,11 +14302,11 @@ document.getElementById("wizardBtn").onclick = function () {
 const GUIDES = [
   { ic: "i-sparkle", tint: "#8F52FA", title: "Your first widget", promise: "From idea to a saved design in about a minute.",
     steps: [
-      "Open <b>My Widgets</b> and tap <b>Create a widget</b> — or start on the Create tab with <b>Build it for me</b>.",
+      "Open <b>Create</b> and tap <b>Create new widget</b> — or tap <b>Build it for me</b> to let the AI designer start.",
       "Pick a door: describe your idea to the AI, start from a template, or begin with a blank canvas.",
       "Drag things around the canvas. Every tool lives in the bottom sheet — swipe through the rail to see them all.",
-      "In the <b>Widget</b> tool, Quick Tweaks suggests three changes read from your design — tap one, or type your own.",
-      "Tap <b>💾 Save design</b>. It's now in My Widgets, ready for your phone."
+      "In the <b>Widget</b> tool, Quick tweaks suggests three changes read from your design — tap one, or type your own.",
+      "Tap <b>Save</b>. It's now in My Widgets, ready for your phone."
     ],
     action: { ic: "i-refresh", label: "Replay the welcome tour", run: function () { closeGuide(); showWelcomeTour(); } } },
   { ic: "i-phone", tint: "#0A84FF", title: "Put it on your Home Screen", promise: "One-time setup, then updates are one tap.",
@@ -14195,7 +14322,7 @@ const GUIDES = [
     steps: [
       "The <b>Background</b> tool holds themes, custom colors, dreamy mesh blends, and soft textures — or type a mood and tap Generate.",
       "The <b>Text</b> tool changes fonts and text colors; every element can override them.",
-      "Quick Tweaks (in the <b>Widget</b> tool) always has three ideas ready — tap through them, nothing is permanent.",
+      "Quick tweaks (in the <b>Widget</b> tool) always has three ideas ready — tap through them, nothing is permanent.",
       "Undo lives next to Save. Experiment freely; every change steps back cleanly."
     ],
     action: { ic: "i-crown", label: "Open My Widgets", run: function () { closeGuide(); switchTab("widgets"); } } },
@@ -14217,7 +14344,7 @@ const GUIDES = [
     steps: [
       "Pick <b>Clear</b> or <b>Glass</b> in the Background tool.",
       "One-time trick for Clear: swipe to an empty Home Screen page, take a screenshot, and pick that screenshot when the widget asks — iOS shades wallpapers, so a screenshot matches perfectly.",
-      "Set your exact iPhone model in the device picker (Create tab) so the slice lines up.",
+      "Run the WidgetKing script inside Scriptable once and pick <b>iPhone model</b> from its menu so the slice lines up.",
       "Glass needs no setup — it blurs whatever is behind it."
     ] },
   { ic: "i-refresh", tint: "#0EA5E9", title: "Keep everything fresh", promise: "Edit here, tap once, done on your phone.",

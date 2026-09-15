@@ -90,7 +90,24 @@ const r = await pg.evaluate(async () => {
     const meter = JSON.parse(localStorage.getItem('widgetking.meter.ai'));
     out.meterCounts = meter.count === 2 && meter.month === new Date().toISOString().slice(0, 7);
 
-    // sign out clears session, keeps designs
+    // v125: account deletion calls the RPC with auth, then signs out; the
+    // device's designs are untouched
+    calls.length = 0;
+    const n0 = designs.length;
+    const realConfirm = window.confirm;
+    window.confirm = () => true;
+    window.fetch = function (url, init) {
+      calls.push({ url: String(url), method: init && init.method, headers: (init && init.headers) || {} });
+      return Promise.resolve({ ok: true, status: 204, json: () => Promise.resolve({}) });
+    };
+    await document.getElementById('acctDeleteBtn').onclick.call(document.getElementById('acctDeleteBtn'));
+    window.confirm = realConfirm;
+    const del = calls.find(c => c.url.includes('/rest/v1/rpc/delete_own_account'));
+    out.deleteRpc = !!del && del.method === 'POST' && del.headers.Authorization === 'Bearer at1';
+    out.deleteSignsOut = !syncSession() && designs.length === n0;
+
+    // sign out (from a fresh session) clears session, keeps designs
+    setSyncSession({ access_token: 'at2', refresh_token: 'rt2', email: 'andrew@example.com' });
     const n = designs.length;
     document.getElementById('acctOutBtn').onclick();
     out.signOut = !syncSession() && designs.length === n &&

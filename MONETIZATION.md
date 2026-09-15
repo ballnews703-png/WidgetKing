@@ -1,9 +1,18 @@
 # WidgetKing — Monetization Plan
 
-Status: **agreed, not yet built.** Nothing in the app enforces any of this today —
-it requires the accounts backend (sign-in, usage metering, payments), which is a
-future phase with its own go decision. This document is the source of truth for
-that build.
+Status: **agreed; build-order step 1 shipped (v124, dark), steps 2–3 not built.**
+Nothing in the app enforces any of this today. The client side of accounts —
+email-code sign-in, design sync, and the AI-build meter — is in the app but
+invisible until the backend keys are filled in (see ACCOUNTS_SETUP.md).
+Enforcement of free-tier caps and payments remain future phases with their own
+go decision. This document is the source of truth for that build.
+
+Note on the existing dollar budget: today the AI runs on the user's own access
+key, so the app shows a **spend budget in dollars** (Settings → AI designer).
+That is a bring-your-own-key safety rail, not the free-tier counter below.
+When Pro ships, subscribers use WidgetKing's key and the dollar budget UI goes
+away for them; the "AI builds per month" counter (already recorded per device)
+becomes the visible limit.
 
 ## Philosophy
 
