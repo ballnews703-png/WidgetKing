@@ -19,9 +19,9 @@ const r = await pg.evaluate(async () => {
   const out = {};
   const sleep = ms => new Promise(res => setTimeout(res, ms));
 
-  // dark by default: no config, no section
-  out.darkShip = WK_SYNC_URL === '' && WK_SYNC_KEY === '' &&
-    document.getElementById('accountSec').style.display === 'none';
+  // v128: the real project is baked in and the section shows by default
+  out.configured = /^https:\/\/[a-z]+\.supabase\.co$/.test(WK_SYNC_URL) && WK_SYNC_KEY.startsWith('eyJ') &&
+    document.getElementById('accountSec').style.display !== 'none';
 
   // configure via the test override; section appears
   localStorage.setItem('widgetking.sync.url', 'https://stub.supabase.co');

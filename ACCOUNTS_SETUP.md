@@ -63,12 +63,11 @@ their own rows — enforced by the database itself, not by app code.
   launch we plug in a real sender via SMTP, e.g. Resend's free tier, so codes
   arrive instantly and reliably).
 
-## 4. Light it up (Claude)
+## 4. Light it up (Claude) — DONE in v128
 
-- Put the two values into `web/index.html`:
-  `WK_SYNC_URL = "https://<project>.supabase.co"` and
-  `WK_SYNC_KEY = "<anon key>"`.
-- Ship. The Account & sync section appears in Settings for everyone.
+Project `jobvxinourslunfysxcc` is baked into `web/index.html`; the Account &
+sync section shows for everyone. Steps 2 and 3 above must be completed in
+the dashboard for sign-in and sync to actually work.
 
 To test on one device before baking the constants: in Safari's console on
 that device run

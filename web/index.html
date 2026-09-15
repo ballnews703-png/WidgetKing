@@ -1267,7 +1267,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 127;
+const WK_VERSION = 128;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -5285,13 +5285,14 @@ function toast(message) {
 function getApiKey() { return (localStorage.getItem("widgetking.apikey") || "").trim(); }
 
 // ==================== Account & cloud sync (phase 1 — ships dark) ==========
-// Backed by a Supabase project (setup: ACCOUNTS_SETUP.md). The Account
-// section stays invisible until BOTH constants are filled at build time —
-// or overridden for testing via localStorage widgetking.sync.url / .key.
+// Backed by a Supabase project (setup: ACCOUNTS_SETUP.md). Live since
+// v128; tests point elsewhere via localStorage widgetking.sync.url / .key.
 // Free-tier counters stay on the device by design (see MONETIZATION.md);
 // the account carries the valuables: designs, and later Pro status.
-const WK_SYNC_URL = "";
-const WK_SYNC_KEY = "";
+const WK_SYNC_URL = "https://jobvxinourslunfysxcc.supabase.co";
+// The anon key is designed to be public: it can only do what row-level
+// security lets a signed-in user do to their own rows.
+const WK_SYNC_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpvYnZ4aW5vdXJzbHVuZnlzeGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0OTY1MTYsImV4cCI6MjEwNTA3MjUxNn0.AacTORswF0G1sEN1dSa1txJd74HpBQ_3Pl3NQZ_sOxo";
 function syncConfig() {
   const url = (localStorage.getItem("widgetking.sync.url") || WK_SYNC_URL).replace(/\/+$/, "");
   const key = localStorage.getItem("widgetking.sync.key") || WK_SYNC_KEY;
