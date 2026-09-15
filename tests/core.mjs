@@ -56,8 +56,9 @@ const r = await pg.evaluate(async ([ver]) => {
   const el = AI_SCHEMA.properties.canvasElements.items;
   out.schemaModes = ['now', 'hilo', 'cond', 'hourly', 'icon', 'sun', 'moonicon', 'next'].every(x => el.properties.mode.enum.includes(x));
   out.schemaSticker = el.properties.kind.enum.includes('sticker') && el.properties.stockId.enum.length === STOCK_ART.length + 1;
-  out.promptCore = (s => s.includes('LIVE ART') && s.includes('STICKERS') && s.includes('STYLE REFERENCES'))(aiSystemPrompt('x'));
-  out.promptSplit = aiSystemPrompt('x').indexOf(aiSystemPromptStable()) === 0 && !aiSystemPromptStable().includes('STYLE REFERENCES');
+  const stable = aiSystemPromptStable(), variable = aiSystemPromptVariable('x');
+  out.promptCore = stable.includes('LIVE ART') && stable.includes('STICKERS') && variable.includes('STYLE REFERENCES');
+  out.promptSplit = !stable.includes('STYLE REFERENCES') && stable === aiSystemPromptStable();
   out.models = JSON.stringify([...document.getElementById('aiModel').options].map(o => o.value)) ===
     JSON.stringify(['claude-sonnet-5', 'claude-haiku-4-5']) && aiModel() === 'claude-sonnet-5';
   // v125: AI stickers must survive conversion (they became "Text" before)

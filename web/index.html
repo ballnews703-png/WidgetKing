@@ -66,7 +66,6 @@
     box-shadow: 0 1px 2px var(--shadow);
   }
   h2 { font-size: 17px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
-  .step { display: none; }
   .hint { color: var(--muted); font-size: 13px; margin-bottom: 10px; line-height: 1.45; }
   textarea, input[type=text], input[type=password], input[type=date], input[type=email], select {
     width: 100%; background: var(--card2); color: var(--text);
@@ -90,7 +89,6 @@
   .editor-grid { display: grid; grid-template-columns: auto 1fr; gap: 22px; }
   @media (max-width: 760px) {
     .editor-grid { grid-template-columns: 1fr; }
-    .swatch { width: 42px; height: 42px; }
   }
   /* v106: floating pill tab bar (was edge-to-edge). Every offset that
      assumed the old 64px bar moved with it — sheet, save row, toast, body. */
@@ -175,7 +173,6 @@
     box-shadow: 0 2px 12px var(--shadow); border: 1px solid var(--line); background: var(--card); }
   .pill-chip.pill-accent { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
   .pill-input, .sheet-panel input[type="text"] { border-radius: 999px; padding: 12px 16px; }
-  .tpl-row { display: flex; flex-wrap: wrap; gap: 10px; }
   #editorModeHead #saveRow { position: static; margin: 0 0 0 auto; display: flex; gap: 6px; padding: 0; }
   #editorModeHead #saveRow button { min-height: 38px; padding: 6px 12px; font-size: 13px; flex: none; }
   #editorModeHead { flex: none; display: flex; align-items: center; gap: 6px;
@@ -236,6 +233,9 @@
   .swatch { width: 34px; height: 34px; border-radius: 50%; cursor: pointer;
     border: 2px solid transparent; transition: transform .12s ease; }
   .swatch:hover { transform: scale(1.12); }
+  /* Phone-sized tap targets — must follow the base rule (same specificity,
+     source order wins; an earlier copy of this override never applied). */
+  @media (max-width: 760px) { .swatch { width: 42px; height: 42px; } }
   .swatch.active { border-color: var(--text); }
   #canvasWrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
   /* The preview + size + undo controls stay pinned; everything below scrolls.
@@ -290,10 +290,6 @@
     /* Checkerboard painted as a raster tile by paintStageTile() — a live
        repeating-conic-gradient repaints on every scroll frame on iOS. */
     background-color: var(--stage-b); background-repeat: repeat; }
-  #studioTools { display: flex; gap: 6px; margin-bottom: 10px; position: sticky; top: 0;
-    background: var(--bg); padding: 4px 0; z-index: 3; }
-  #studioTools button { flex: 1; border-radius: 12px; font-weight: 600; min-height: 40px; }
-  #studioTools button.active { background: var(--accent); color: var(--accent-text); border-color: transparent; }
   .pal-head { font-size: 11px; letter-spacing: .07em; text-transform: uppercase;
     color: var(--muted); margin: 10px 2px 6px; }
   .pal-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
@@ -337,7 +333,6 @@
     background: none; border: none; border-bottom: 1px solid var(--line); padding: 12px 2px;
     min-height: 56px; color: inherit; }
   .guide-row:last-child { border-bottom: none; }
-  .guide-row .gi { font-size: 22px; flex-shrink: 0; width: 30px; text-align: center; }
   .guide-row .gt { flex: 1; }
   .guide-row .gl { font-size: 10px; letter-spacing: 0.08em; color: var(--accent); font-weight: 700; }
   .guide-row .gn { font-size: 15px; font-weight: 700; }
@@ -373,19 +368,6 @@
     color: #fff; font-size: 11px; font-weight: 600; background: rgba(0,0,0,.18);
     text-shadow: 0 1px 3px rgba(0,0,0,.5); }
   .pslot.filled { border: none; background: none; }
-  .pslot.picking { border-color: var(--accent); border-style: solid; }
-  /* Layout picker: a tidy grid of small page diagrams. */
-  #pageLayouts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .lay-chip { display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-    gap: 5px; padding: 9px 4px 7px; min-height: 0; width: 100%; border-radius: 14px; }
-  .lay-chip span { font-size: 9.5px; color: var(--muted); line-height: 1.15; }
-  .lay-chip.sel { border-color: var(--accent); background: var(--accent-soft, rgba(139,92,246,.16)); }
-  .lay-mini { position: relative; display: block; width: 30px; aspect-ratio: 1206 / 2622;
-    border: 1px solid var(--border); border-radius: 5px; flex-shrink: 0; }
-  .lay-mini.ai { display: flex; align-items: center; justify-content: center; font-size: 15px; }
-  .lay-mini i { position: absolute; background: var(--accent); opacity: .75; border-radius: 2px; }
-  .lay-chip.sel .lay-mini i { background: #fff; opacity: .95; }
-  .lay-chip.sel span { color: #fff; }
   #iconGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
     gap: 14px; margin-top: 14px; }
   .im-cell { text-align: center; }
@@ -405,8 +387,6 @@
   .launch-label { font-size: 9px; opacity: .85; }
   #appSearchResults button { display: flex; align-items: center; gap: 6px; }
   #appSearchResults img { width: 22px; height: 22px; border-radius: 6px; }
-  #inspector { background: var(--card2); border-radius: 12px; padding: 12px; margin-top: 10px; }
-  #inspector .row { margin-bottom: 8px; }
   input[type=range] { flex: 1; min-width: 60px; }
   input[type=color] { width: 44px; height: 32px; border: none; background: none; padding: 0; cursor: pointer; }
   .tpl-row { display: flex; align-items: stretch; gap: 10px; overflow-x: auto; padding: 4px 2px 12px;
@@ -638,12 +618,6 @@
   </div>
   <div id="studioStage"><div id="studioCanvas"></div><div id="studioQuickbar" style="display:none"></div></div>
   <div id="studioPanel">
-    <div id="studioTools">
-      <button data-tool="add" class="active">➕ Add</button>
-      <button data-tool="edit">🎚 Edit</button>
-      <button data-tool="layers">📚 Layers</button>
-    </div>
-    <div id="studioAddPane"><div id="studioPalette"></div></div>
     <div id="studioEditPane" style="display:none">
       <div id="studioInspector" style="display:none"></div>
       <p class="hint" id="studioEditHint">Tap any element on the canvas to edit it — or drag it to move, pinch to resize.</p>
@@ -656,7 +630,6 @@
 </div>
 
 <section id="editorSection">
-  <h2 id="editorTitle" style="display:none">Make it yours</h2>
   <div id="previewDock">
     <div id="canvas"></div>
     <div class="row size-buttons" id="sizeButtons"></div>
@@ -667,16 +640,11 @@
   </div>
   <div class="editor-grid">
     <div id="canvasWrap">
-      <button id="openStudioBtn" style="width:100%;max-width:380px">🖐 Make it drag &amp; drop — every piece becomes a movable element</button>
-      <div id="freestyleTools" style="display:none; width: 100%; max-width: 380px;">
-        <div class="chips" id="palette"></div>
-        <div id="inspector" style="display:none;"></div>
-        <p class="hint" id="freestyleHint">Tap a chip to add an element, then drag it anywhere — it snaps to center lines. Click an element to edit, layer, and fine-tune it. Pinch a held element with a second finger to resize.</p>
-      </div>
+      <button id="openStudioBtn" style="width:100%;max-width:380px"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-shapes"/></svg> Make it drag &amp; drop — every piece becomes a movable element</button>
       <input type="file" id="photoInput" accept="image/*" style="display:none">
     </div>
     <div>
-      <details class="dcard" open id="dcardName"><summary>✏️ Name &amp; type</summary><div class="dbody">
+      <details class="dcard" open id="dcardName"><summary><svg class="ic ic-sm" aria-hidden="true" style="vertical-align:-3px;margin-right:4px"><use href="#i-type"/></svg>Name &amp; type</summary><div class="dbody">
       <div class="field"><label>Name</label><input type="text" id="nameInput"></div>
       <div class="field"><label>Type</label><div class="row kind-buttons" id="kindButtons"></div></div>
       </div></details>
@@ -686,7 +654,7 @@
         <input type="date" id="countDate">
       </div>
       <div class="field" id="fQuote" style="display:none">
-        <label>Quote — put several on separate lines and the widget shows a different one each day 🔄</label>
+        <label>Quote — put several on separate lines and the widget shows a different one each day</label>
         <textarea id="quoteText" placeholder="Dream big&#10;One day at a time&#10;Make it count" rows="3" style="margin-bottom:8px"></textarea>
         <input type="text" id="quoteAuthor" placeholder="Author (optional)">
       </div>
@@ -695,7 +663,7 @@
         <input type="text" id="noteText" placeholder="Your text">
       </div>
       <div class="field" id="fPlaylist" style="display:none">
-        <label>Day Flow — one widget spot, different designs through the day 🔄</label>
+        <label>Day Flow — one widget spot, different designs through the day</label>
         <div id="playlistSlots"></div>
         <p class="hint">Pick a design for each part of the day (skip any — the widget falls back to the first one you set). The preview above shows what's live right now.</p>
       </div>
@@ -1055,7 +1023,7 @@
   <label style="font-size:12px;color:var(--muted);margin-top:6px;display:block">Your apps — tap a name to rename it, ✕ to remove. Search works for any App Store app.</label>
   <div class="row">
     <input type="text" id="iconAppSearch" placeholder="Type an app name… (e.g. Instagram)" style="flex:1">
-    <button id="iconAppAdd">＋ Add</button>
+    <button id="iconAppAdd"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-plus"/></svg> Add</button>
   </div>
   <div class="chips" id="iconAppChips"></div>
   <div id="iconGrid"></div>
@@ -1081,7 +1049,7 @@
   <details class="dcard"><summary><svg class="ic ic-sm" aria-hidden="true" style="vertical-align:-3px;margin-right:4px"><use href="#i-bolt"/></svg>Your Shortcut Guide — reads your widgets</summary><div class="dbody">
   <p class="hint">What each app button does on tap, auto-generated from your saved widgets. Zero-flash tip: a single-app widget can skip Scriptable entirely — long-press it → <b>Edit Widget → When Interacting → Open URL</b> → paste the link (📋 below).</p>
   <div id="shortcutGuideList"></div>
-  <a class="wiz-action" href="shortcuts://" style="margin-top:10px">🚀 Open the Shortcuts app</a>
+  <a class="wiz-action" href="shortcuts://" style="margin-top:10px">Open the Shortcuts app</a>
   </div></details>
   <p class="hint" style="text-align:center;margin-top:16px">
     <a href="privacy.html" style="color:var(--muted)">Privacy policy</a> — your designs stay on your device.
@@ -1166,7 +1134,7 @@
 </div>
 <div id="setupWizard">
   <div id="wizardHead">
-    <span class="title">🪄 Set up your iPhone</span>
+    <span class="title"><svg class="ic" aria-hidden="true" style="vertical-align:-5px;margin-right:4px"><use href="#i-wand"/></svg>Set up your iPhone</span>
     <button id="wizardCloseBtn">✕ Done</button>
   </div>
   <div id="wizardBody">
@@ -1175,7 +1143,7 @@
       <div class="wiz-text">
         <b>Get the free Scriptable app</b>
         <p>It's the little engine that draws your widgets. Free, no account, one download.</p>
-        <a class="wiz-action" href="https://apps.apple.com/app/scriptable/id1405459188" target="_blank" rel="noopener">⬇️ Open the App Store</a>
+        <a class="wiz-action" href="https://apps.apple.com/app/scriptable/id1405459188" target="_blank" rel="noopener">Open the App Store</a>
       </div>
     </div>
     <div class="wiz-card">
@@ -1183,7 +1151,7 @@
       <div class="wiz-text">
         <b>Copy your widgets</b>
         <p>This copies every design you've saved, ready to paste.</p>
-        <button class="wiz-action" id="wizardCopyBtn">📋 Copy my widgets</button>
+        <button class="wiz-action" id="wizardCopyBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-copy"/></svg> Copy my widgets</button>
       </div>
     </div>
     <div class="wiz-card">
@@ -1191,7 +1159,7 @@
       <div class="wiz-text">
         <b>Paste into Scriptable</b>
         <p>In Scriptable: tap <b>+</b> (top right) → tap in the empty page and <b>Paste</b> → tap the name at the top and call it <b>WidgetKing</b> → Done.</p>
-        <a class="wiz-action" href="scriptable:///">🚀 Open Scriptable</a>
+        <a class="wiz-action" href="scriptable:///">Open Scriptable</a>
       </div>
     </div>
     <div class="wiz-card">
@@ -1221,7 +1189,7 @@
 
 <div id="pageStudio">
   <div class="modal-head">
-    <span class="title">📱 Design a page</span>
+    <span class="title"><svg class="ic" aria-hidden="true" style="vertical-align:-5px;margin-right:4px"><use href="#i-phone"/></svg>Design a page</span>
     <button id="pageCloseBtn">✕ Done</button>
   </div>
   <div id="pageBody">
@@ -1247,7 +1215,7 @@
 
 <div id="builderModal">
   <div id="wizardHeadB" class="modal-head">
-    <span class="title">✨ Let's build your widget</span>
+    <span class="title"><svg class="ic" aria-hidden="true" style="vertical-align:-5px;margin-right:4px"><use href="#i-sparkle"/></svg>Let's build your widget</span>
     <button id="builderCloseBtn">✕</button>
   </div>
   <div id="builderBody">
@@ -1272,12 +1240,12 @@
       <input type="text" id="bExtraText" placeholder="What are we counting down to?" style="margin-bottom:8px">
       <input type="date" id="bExtraDate">
     </div>
-    <button class="primary" id="bGo" style="width:100%;font-size:16px;padding:15px;margin-top:14px" disabled>🎁 Show me my widget</button>
+    <button class="primary" id="bGo" style="width:100%;font-size:16px;padding:15px;margin-top:14px" disabled>Show me my widget</button>
     <div id="bResult" style="display:none">
       <div id="bPreviewWrap"></div>
       <div class="row" style="margin-top:14px;justify-content:center">
         <button id="bAgain"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-refresh"/></svg> Show me another</button>
-        <button class="primary" id="bKeep">💜 Perfect — let me tweak it</button>
+        <button class="primary" id="bKeep">Perfect — let me tweak it</button>
       </div>
       <button id="bAI" style="width:100%;margin-top:10px;display:none"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-crown"/></svg> Have WidgetKing fancy it up</button>
     </div>
@@ -1299,7 +1267,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 125;
+const WK_VERSION = 126;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -3772,6 +3740,22 @@ Script.complete();
 </script>
 
 <script>
+const WK_SITE_URL = "https://ballnews703-png.github.io/WidgetKing/";
+// ==================== Shared allowlists ====================
+// One source of truth for every enumerated design value. The sanitizer, the
+// AI schema, and the AI converter all read THESE — so a new mode can never be
+// taught in one place and silently stripped in another (the v119 bug: the
+// schema enum forbade modes the prompt taught).
+const BG_PATTERNS = ["grain", "dots", "grid", "stripes", "waves", "paper", "blobs"];
+const BACKGROUNDS = ["gradient", "glass", "clear"];
+const GRADIENT_DIRS = ["diagonal", "vertical", "horizontal", "mesh"];
+const SHAPES = ["rect", "pill", "circle"];
+const ALIGNS = ["left", "center", "right"];
+const WEATHER_MODES = ["now", "hilo", "full", "cond", "rain", "tomorrow", "hourly", "icon"];
+const ASTRO_MODES = ["sun", "sunrise", "sunset", "moon", "moonicon", "next"];
+const ART_TYPES = ["arc", "rotated", "gradshape"];
+const SLEEPER_MODES = ["score", "record", "myteam", "opponent"];
+const GAUGE_SOURCES = ["battery", "day", "year", "countdown"];
 "use strict";
 
 // Belt-and-braces for the display-mode media query (see CSS note above).
@@ -5029,8 +5013,8 @@ function normalizeDesign(design) {
   const POSITIONS = ["top-left", "top-right", "middle-left", "middle-right", "bottom-left", "bottom-right", "top", "middle", "bottom"];
   if (POSITIONS.indexOf(design.position) < 0) delete design.position;
   if (!design.gradientDir) design.gradientDir = "diagonal";
-  if (!["grain", "dots", "grid", "stripes", "waves", "paper", "blobs"].includes(design.bgPattern)) design.bgPattern = "";
-  if (!["gradient", "glass", "clear"].includes(design.background)) design.background = "gradient";
+  if (!BG_PATTERNS.includes(design.bgPattern)) design.bgPattern = "";
+  if (!BACKGROUNDS.includes(design.background)) design.background = "gradient";
   if (design.glassTint !== "light") design.glassTint = "dark";
   if (typeof design.bgOpacity !== "number" || design.bgOpacity < 0.1 || design.bgOpacity > 1) design.bgOpacity = 1;
   design.launcherStyle = launcherStyleOf(design);
@@ -5077,7 +5061,7 @@ function normalizeDesign(design) {
     const minOp = el.kind === "shape" ? 0 : 0.05;
     if (typeof el.opacity !== "number" || el.opacity < minOp || el.opacity > 1) el.opacity = 1;
     if (el.kind === "shape") {
-      if (!["rect", "pill", "circle"].includes(el.shape)) el.shape = "rect";
+      if (!SHAPES.includes(el.shape)) el.shape = "rect";
       if (typeof el.w !== "number" || el.w <= 0) el.w = 0.5;
       if (typeof el.h !== "number" || el.h <= 0) el.h = 0.25;
       if (typeof el.radius !== "number" || el.radius < 0 || el.radius > 40) delete el.radius;
@@ -5099,7 +5083,7 @@ function normalizeDesign(design) {
     }
     if (el.kind === "weather") {
       if (el.unit !== "c") el.unit = "f";
-      if (!["now", "hilo", "full", "cond", "rain", "tomorrow", "hourly", "icon"].includes(el.wmode)) el.wmode = "now";
+      if (!WEATHER_MODES.includes(el.wmode)) el.wmode = "now";
     }
     if (el.kind === "greeting") {
       if (typeof el.name !== "string") el.name = "";
@@ -5110,7 +5094,7 @@ function normalizeDesign(design) {
       el.count = Math.min(Math.max(Math.round(Number(el.count) || 1), 1), 4);
     }
     if (el.kind === "astro") {
-      if (!["sun", "sunrise", "sunset", "moon", "moonicon", "next"].includes(el.mode)) el.mode = "sun";
+      if (!ASTRO_MODES.includes(el.mode)) el.mode = "sun";
       if (el.moonPack != null && ["moon-cute", "moon-bad-ass", "moon-watercolor", "moon-cozy"].indexOf(el.moonPack) < 0) delete el.moonPack;
     }
     if (el.kind === "battery" && el.mode != null && el.mode !== "icon") delete el.mode;
@@ -5128,13 +5112,13 @@ function normalizeDesign(design) {
       if (el.showCity !== false) el.showCity = true;
     }
     if (el.kind === "art") {
-      if (!["arc", "rotated", "gradshape"].includes(el.artType)) el.artType = "arc";
+      if (!ART_TYPES.includes(el.artType)) el.artType = "arc";
       if (el.text == null || el.text === "") el.text = "curved text";
       if (typeof el.angle !== "number") el.angle = el.artType === "gradshape" ? 135 : 0;
       if (!/^#[0-9a-fA-F]{6}$/.test(el.color2Hex || "")) el.color2Hex = "#8F52FA";
       if (typeof el.w !== "number" || el.w <= 0 || el.w > 1) el.w = el.artType === "gradshape" ? 0.5 : 0.7;
       if (typeof el.h !== "number" || el.h <= 0 || el.h > 1) el.h = 0.25;
-      if (!["rect", "pill", "circle"].includes(el.shape)) el.shape = "pill";
+      if (!SHAPES.includes(el.shape)) el.shape = "pill";
       if (el.flip !== true) el.flip = false;
     }
     if (el.kind === "sticker") {
@@ -5153,14 +5137,14 @@ function normalizeDesign(design) {
       if (typeof el.userID !== "string") el.userID = "";
       if (typeof el.leagueID !== "string") el.leagueID = "";
       if (typeof el.leagueName !== "string") el.leagueName = "";
-      if (el.kind === "sleeper" && !["score", "record", "myteam", "opponent"].includes(el.mode)) el.mode = "score";
+      if (el.kind === "sleeper" && !SLEEPER_MODES.includes(el.mode)) el.mode = "score";
       if (el.kind === "sleeperlogo") {
         if (el.side !== "opp") el.side = "me";
         if (typeof el.size !== "number" || el.size < 16) el.size = 34;
       }
     }
     if (el.kind === "progress" || el.kind === "ring") {
-      if (!["battery", "day", "year", "countdown"].includes(el.source)) el.source = el.kind === "ring" ? "battery" : "day";
+      if (!GAUGE_SOURCES.includes(el.source)) el.source = el.kind === "ring" ? "battery" : "day";
       if (typeof el.w !== "number" || el.w <= 0 || el.w > 1) el.w = el.kind === "ring" ? 0.55 : 0.7;
       if (el.source === "countdown") {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(el.dateISO || "")) el.dateISO = isoInDays(30);
@@ -5187,7 +5171,7 @@ function normalizeDesign(design) {
     if (el.font != null && !FONT_CSS[el.font]) delete el.font;
     if (el.kind === "text") {
       if (typeof el.w !== "number" || el.w < 0 || el.w > 1) el.w = 0;
-      if (!["left", "center", "right"].includes(el.align)) el.align = "center";
+      if (!ALIGNS.includes(el.align)) el.align = "center";
       if (typeof el.bold !== "boolean") el.bold = true;
     }
     if (el.kind === "countdown" && !/^\d{4}-\d{2}-\d{2}$/.test(el.dateISO || "")) {
@@ -5650,9 +5634,9 @@ const AI_SCHEMA = {
     primaryText: { type: "string", description: "Quote/note text or countdown title; empty if unused" },
     secondaryText: { type: "string", description: "Quote author; empty if unused" },
     targetDate: { type: "string", description: "yyyy-MM-dd for countdowns; empty otherwise" },
-    background: { type: "string", "enum": ["gradient", "glass", "clear"], description: "gradient = colored; glass = frosted blurred wallpaper; clear = fully transparent (shows wallpaper). Use glass/clear when the user asks for transparent, see-through, frosted, glassy, or minimal-blends-with-wallpaper looks" },
+    background: { type: "string", "enum": BACKGROUNDS, description: "gradient = colored; glass = frosted blurred wallpaper; clear = fully transparent (shows wallpaper). Use glass/clear when the user asks for transparent, see-through, frosted, glassy, or minimal-blends-with-wallpaper looks" },
     glassTint: { type: "string", "enum": ["dark", "light"], description: "Frost tint for glass backgrounds" },
-    gradientDir: { type: "string", "enum": ["diagonal", "vertical", "horizontal", "mesh"], description: "Gradient direction. 'mesh' = dreamy multi-color blob background (freestyle only) — soft glows of the two colors; lovely for minimal clocks, moods, and aesthetic setups" },
+    gradientDir: { type: "string", "enum": GRADIENT_DIRS, description: "Gradient direction. 'mesh' = dreamy multi-color blob background (freestyle only) — soft glows of the two colors; lovely for minimal clocks, moods, and aesthetic setups" },
     bgPattern: { type: "string", "enum": ["", "grain", "dots", "grid", "stripes", "waves", "paper", "blobs"], description: "Optional texture drawn over the gradient, theme-tinted. Name one EXACTLY or use empty string. grain = film noise (cozy/vintage), dots = polka grid (playful), grid = fine graph lines (professional/tech), stripes = diagonal pinstripes (energetic), waves = flowing lines (calm/water), paper = notebook texture (writerly), blobs = two soft glows (dreamy). Use sparingly — one pattern, only when it serves the mood" },
     bgOpacity: { type: "number", description: "Background opacity 0.1-1. Below 1: gradient blends see-through over the wallpaper (tinted glass); for glass it scales frost strength. Use 1 unless the user wants see-through/subtle." },
     backgroundColors: {
@@ -5701,7 +5685,7 @@ const AI_SCHEMA = {
           count: { type: "number", description: "For kind=calendar, reminders, or news: how many lines to list, 1-4 (multi-line). 0 otherwise" },
           accentHex: { type: "string", description: "For kind=month only: #RRGGBB for the today-circle; empty otherwise" },
           angle: { type: "number", description: "For kind=art: rotated text angle in degrees (-90..90) or gradshape gradient direction (0-360). 0 otherwise" },
-          mode: { type: "string", "enum": ["", "score", "record", "myteam", "opponent", "arc", "rotated", "gradshape", "now", "hilo", "full", "cond", "rain", "tomorrow", "hourly", "icon", "sun", "sunrise", "sunset", "moon", "moonicon", "next"], description: "For kind=sleeper: score/record/myteam/opponent. For kind=sleeperlogo: myteam or opponent. For kind=art: arc (text curved along a circle, w=diameter), rotated (tilted text, use angle), or gradshape (gradient-filled shape colorHex->borderHex at angle; w/h/shape/radius apply). For kind=weather: now/hilo/full/cond/rain/tomorrow/hourly, or icon = the CURRENT condition drawn as beautiful stock art (size 24-48, pairs with a small temp text). For kind=battery: icon = battery state drawn as stock art (charging bolt / full / half / low, size 24-44). For kind=astro: sun (rise+set), sunrise, sunset, moon (phase emoji+name), moonicon (big phase icon), next (flips live: sunset time during the day, sunrise time at night). Empty otherwise" },
+          mode: { type: "string", "enum": [""].concat(SLEEPER_MODES, ART_TYPES, WEATHER_MODES, ASTRO_MODES), description: "For kind=sleeper: score/record/myteam/opponent. For kind=sleeperlogo: myteam or opponent. For kind=art: arc (text curved along a circle, w=diameter), rotated (tilted text, use angle), or gradshape (gradient-filled shape colorHex->borderHex at angle; w/h/shape/radius apply). For kind=weather: now/hilo/full/cond/rain/tomorrow/hourly, or icon = the CURRENT condition drawn as beautiful stock art (size 24-48, pairs with a small temp text). For kind=battery: icon = battery state drawn as stock art (charging bolt / full / half / low, size 24-44). For kind=astro: sun (rise+set), sunrise, sunset, moon (phase emoji+name), moonicon (big phase icon), next (flips live: sunset time during the day, sunrise time at night). Empty otherwise" },
           source: { type: "string", "enum": ["", "day", "year", "battery", "countdown"], description: "For kind=progress (bar) and kind=ring (circular gauge): what it measures; empty otherwise. Rings: w = diameter 0-1 of the short side, size = stroke thickness pt (5-10)" },
           bold: { type: "boolean", description: "For kind=text: false for lighter body text; true otherwise" },
           dateISO: { type: "string", description: "yyyy-MM-dd for countdown elements; empty otherwise" },
@@ -5917,9 +5901,6 @@ function aiSystemPromptVariable(requestText) {
     }).join("\n") + "\n" +
     "VARIETY: similar requests must NOT produce similar widgets. Rotate archetypes, pick a fresh palette (never a reference's), vary the hero (clock vs date vs ring vs type), and add one unexpected-but-tasteful touch per design — an unusual font pairing, an off-center anchor, a two-tone capsule, a wildcard accent.\n" +
     "Today is " + today + ". Resolve relative dates to yyyy-MM-dd. Names under 24 chars. Fill unused fields with empty strings, 0, or empty arrays. Compose like a designer, not a form-filler: every element should earn its place.";
-}
-function aiSystemPrompt(requestText) {
-  return aiSystemPromptStable() + aiSystemPromptVariable(requestText);
 }
 // v114: a serialized SVG foreignObject carries NONE of the page's
 // stylesheets, so class-styled nodes lose those rules when rasterized —
@@ -6166,9 +6147,9 @@ function specToDesign(spec) {
     design.themeID = "custom";
     design.customColors = [bg[0].toUpperCase(), bg[1].toUpperCase()];
   }
-  if (["gradient", "glass", "clear"].includes(spec.background)) design.background = spec.background;
-  if (["diagonal", "vertical", "horizontal", "mesh"].includes(spec.gradientDir)) design.gradientDir = spec.gradientDir;
-  if (["grain", "dots", "grid", "stripes", "waves", "paper", "blobs"].includes(spec.bgPattern)) design.bgPattern = spec.bgPattern;
+  if (BACKGROUNDS.includes(spec.background)) design.background = spec.background;
+  if (GRADIENT_DIRS.includes(spec.gradientDir)) design.gradientDir = spec.gradientDir;
+  if (BG_PATTERNS.includes(spec.bgPattern)) design.bgPattern = spec.bgPattern;
   if (spec.glassTint === "light") design.glassTint = "light";
   const specOp = Number(spec.bgOpacity);
   if (isFinite(specOp) && specOp >= 0.1 && specOp < 1) design.bgOpacity = specOp;
@@ -6191,7 +6172,7 @@ function specToDesign(spec) {
       dateISO: /^\d{4}-\d{2}-\d{2}$/.test(el.dateISO || "") ? el.dateISO : ""
     };
     if (kind === "shape") {
-      out.shape = ["rect","pill","circle"].includes(el.shape) ? el.shape : "rect";
+      out.shape = SHAPES.includes(el.shape) ? el.shape : "rect";
       out.w = Math.min(Math.max(rawW || 0.5, 0.02), 1);
       out.h = Math.min(Math.max(Number(el.h) || 0.25, 0.02), 1);
       out.opacity = Math.min(Math.max(Number(el.opacity) || 0, 0), 1);
@@ -6204,7 +6185,7 @@ function specToDesign(spec) {
     if (kind === "text") {
       // w=0 keeps auto-width single-line text; >0 makes a wrapping box.
       out.w = Math.min(Math.max(rawW, 0), 1);
-      out.align = ["left","center","right"].includes(el.align) ? el.align : "center";
+      out.align = ALIGNS.includes(el.align) ? el.align : "center";
       out.bold = el.bold !== false;
       // Fit guard: a single line that would render wider than the widget gets
       // forced into a wrapping box so the AI can't spill text past the edges.
@@ -6231,13 +6212,13 @@ function specToDesign(spec) {
     }
     if (kind === "weather") {
       out.unit = "f";
-      out.wmode = ["now","hilo","full","cond","rain","tomorrow","hourly","icon"].includes(el.mode) ? el.mode : "now";
+      out.wmode = WEATHER_MODES.includes(el.mode) ? el.mode : "now";
     }
     if (kind === "battery" && el.mode === "icon") out.mode = "icon";
     if (kind === "greeting") { out.name = ""; out.emoji = true; }
     if (kind === "calendar" || kind === "reminders" || kind === "news") out.count = Math.min(Math.max(Math.round(Number(el.count) || 1), 1), 4);
     if (kind === "astro") {
-      out.mode = ["sun","sunrise","sunset","moon","moonicon","next"].includes(el.mode) ? el.mode : "sun";
+      out.mode = ASTRO_MODES.includes(el.mode) ? el.mode : "sun";
       if (out.mode === "moonicon" && ["moon-cute","moon-bad-ass","moon-watercolor","moon-cozy"].includes(el.moonPack)) out.moonPack = el.moonPack;
     }
     if (kind === "stock") {
@@ -6250,12 +6231,12 @@ function specToDesign(spec) {
       out.city = city[0]; out.tz = city[1]; out.offsetMin = city[2]; out.showCity = true;
     }
     if (kind === "art") {
-      out.artType = ["arc","rotated","gradshape"].includes(el.mode) ? el.mode : "arc";
+      out.artType = ART_TYPES.includes(el.mode) ? el.mode : "arc";
       out.text = el.text || "curved text";
       out.angle = Math.max(-360, Math.min(360, Number(el.angle) || (out.artType === "gradshape" ? 135 : 0)));
       out.w = Math.min(Math.max(rawW || (out.artType === "gradshape" ? 0.5 : 0.7), 0.05), 1);
       out.h = Math.min(Math.max(Number(el.h) || 0.25, 0.05), 1);
-      out.shape = ["rect","pill","circle"].includes(el.shape) ? el.shape : "pill";
+      out.shape = SHAPES.includes(el.shape) ? el.shape : "pill";
       if (/^#[0-9a-fA-F]{6}$/.test(el.borderHex || "")) out.color2Hex = el.borderHex.toUpperCase();
       if (isFinite(Number(el.radius)) && el.radius >= 0) out.radius = Math.min(Number(el.radius), 40);
     }
@@ -6266,11 +6247,11 @@ function specToDesign(spec) {
     }
     if (kind === "sleeper" || kind === "sleeperlogo") {
       out.username = ""; out.userID = ""; out.leagueID = ""; out.leagueName = "";
-      if (kind === "sleeper") out.mode = ["score","record","myteam","opponent"].includes(el.mode) ? el.mode : "score";
+      if (kind === "sleeper") out.mode = SLEEPER_MODES.includes(el.mode) ? el.mode : "score";
       if (kind === "sleeperlogo") { out.side = el.mode === "opponent" ? "opp" : "me"; out.size = Math.min(Math.max(Number(el.size) || 34, 16), 96); }
     }
     if (kind === "progress" || kind === "ring") {
-      out.source = ["day","year","battery","countdown"].includes(el.source) ? el.source : (kind === "ring" ? "battery" : "day");
+      out.source = GAUGE_SOURCES.includes(el.source) ? el.source : (kind === "ring" ? "battery" : "day");
       out.w = Math.min(Math.max(rawW || (kind === "ring" ? 0.55 : 0.7), 0.1), 1);
       out.size = Math.min(Math.max(Number(el.size) || (kind === "ring" ? 7 : 8), 2), 30);
       if (out.source === "countdown") { out.startISO = isoInDays(0); if (!out.dateISO) out.dateISO = isoInDays(30); }
@@ -7040,7 +7021,6 @@ function refreshCanvases() {
   if (studioOpen) renderStudioCanvas();
 }
 function refreshEditors() {
-  renderFreestyleUI();
   if (studioOpen) renderStudioUI();
   refreshCanvases();
 }
@@ -7334,12 +7314,6 @@ function weatherArtSlug(code, isDay) {
   if (c === 95) return "thunderstorm";
   if (c === 96 || c === 99) return "hail";
   return "cloudy";
-}
-function batteryArtSlug(level, charging) {
-  if (charging) return "battery-charging";
-  if (level >= 0.75) return "battery-full";
-  if (level >= 0.35) return "battery-half";
-  return "battery-low";
 }
 function weatherArtSlugPreview() {
   return weatherArtSlug(2, previewDaylight());
@@ -7797,7 +7771,8 @@ function buildInspectorContent(inspector) {
     searchInput.placeholder = "Search the App Store… (e.g. Spotify)";
     searchInput.style.flex = "1";
     const searchBtn = document.createElement("button");
-    searchBtn.textContent = "🔍";
+    searchBtn.innerHTML = '<svg class="ic ic-sm" aria-hidden="true" style="margin:0"><use href="#i-search"/></svg>';
+    searchBtn.setAttribute("aria-label", "Search");
     const results = document.createElement("div");
     results.className = "chips";
     async function runSearch() {
@@ -8348,7 +8323,7 @@ function buildInspectorContent(inspector) {
     userInput.style.flex = "1";
     userInput.oninput = function () { el.username = userInput.value.trim(); };
     const findBtn = document.createElement("button");
-    findBtn.textContent = "🔎 Find leagues";
+    findBtn.textContent = "Find leagues";
     findBtn.onclick = async function () {
       const name = (el.username || "").trim();
       if (!name) { toast("Type your Sleeper username first"); return; }
@@ -8384,7 +8359,7 @@ function buildInspectorContent(inspector) {
         toast("Couldn't find that Sleeper user — check the spelling");
       } finally {
         findBtn.disabled = false;
-        findBtn.textContent = "🔎 Find leagues";
+        findBtn.textContent = "Find leagues";
       }
     };
     userRow.append(userInput, findBtn);
@@ -8505,7 +8480,7 @@ function buildInspectorContent(inspector) {
     shapeSelect.value = el.shape || "rounded";
     shapeSelect.onchange = function () { el.shape = shapeSelect.value; refreshEditors(); };
     const replaceBtn = document.createElement("button");
-    replaceBtn.textContent = "🔄 Change photo";
+    replaceBtn.textContent = "Change photo";
     replaceBtn.onclick = function () {
       pendingPhoto = { mode: "replace", el: el };
       document.getElementById("photoInput").click();
@@ -8530,10 +8505,10 @@ function buildInspectorContent(inspector) {
     frameRow.append(frameLabel, frameSel);
     if (el.dataUrl) {
       const cutBtn = document.createElement("button");
-      cutBtn.textContent = "✂️ Remove background";
+      cutBtn.textContent = "Remove background";
       cutBtn.onclick = async function () {
         cutBtn.disabled = true;
-        cutBtn.textContent = "✂️ Working…";
+        cutBtn.textContent = "Working…";
         const sources = (el.photos && el.photos.length) ? el.photos : [el.dataUrl];
         const cut = [];
         for (const src of sources) cut.push(await removeImageBackground(src));
@@ -8557,7 +8532,7 @@ function buildInspectorContent(inspector) {
     rotRow.style.marginTop = "8px";
     const addBtn = document.createElement("button");
     const count = (el.photos || []).length || (el.dataUrl ? 1 : 0);
-    addBtn.textContent = "➕ Add photo (" + count + "/5)";
+    addBtn.textContent = "Add photo (" + count + "/5)";
     addBtn.disabled = count >= 5;
     addBtn.onclick = function () {
       pendingPhoto = { mode: "add", el: el };
@@ -8574,7 +8549,7 @@ function buildInspectorContent(inspector) {
       rotSel.value = el.rotate === "refresh" ? "refresh" : "day";
       rotSel.onchange = function () { el.rotate = rotSel.value; };
       const oneBtn = document.createElement("button");
-      oneBtn.textContent = "1️⃣ Keep first only";
+      oneBtn.textContent = "Keep first only";
       oneBtn.onclick = function () {
         el.photos = el.photos.slice(0, 1);
         el.dataUrl = el.photos[0];
@@ -8701,7 +8676,7 @@ function buildInspectorContent(inspector) {
     note.className = "hint";
     note.style.margin = "0";
     const count = current.canvasElements.filter(function (e) { return e.groupId === el.groupId; }).length;
-    note.textContent = "🔗 Grouped (" + count + ") — they move as one.";
+    note.textContent = "Grouped (" + count + ") — they move as one.";
     groupRow.appendChild(note);
     groupRow.appendChild(smallButton("Ungroup", "Split this group back into single items", false, function () {
       const gid = el.groupId;
@@ -8723,11 +8698,6 @@ function buildInspectorContent(inspector) {
   return true;
 }
 
-function renderFreestyleUI() {
-  // v84: the form-side freestyle palette/inspector retired — the Studio
-  // surface (panes + quickbar) is the one home for freestyle editing.
-  document.getElementById("freestyleTools").style.display = "none";
-}
 
 // ==================== Studio (fullscreen editor) ====================
 let studioOpen = false;
@@ -8862,7 +8832,7 @@ function renderStudioUI() {
       };
       const delChip = document.createElement("div");
       delChip.className = "layer-chip";
-      delChip.textContent = "🗑 Delete (" + multiSelect.size + ")";
+      delChip.textContent = "Delete (" + multiSelect.size + ")";
       delChip.onclick = function () {
         if (!multiSelect.size) return;
         current.canvasElements = current.canvasElements.filter(function (e) { return !multiSelect.has(e.id); });
@@ -8876,7 +8846,7 @@ function renderStudioUI() {
       cancelChip.onclick = function () { multiSelect = null; refreshEditors(); };
       layers.append(groupChip, delChip, cancelChip);
     } else {
-      groupChip.textContent = "🔗 Group items";
+      groupChip.textContent = "Group items";
       groupChip.onclick = function () {
         multiSelect = new Set(selectedElId ? [selectedElId] : []);
         toast("Tap the items that belong together, then ✓ Group");
@@ -8984,12 +8954,6 @@ function openStudio() {
   refreshEditors();
   document.getElementById("editorMode").scrollTop = 0;
   if (converted) toast("Every part is now a drag-and-drop element — tap, drag, pinch ✨");
-}
-function closeStudio() {
-  multiSelect = null;
-  syncControls();
-  renderAll();
-  closeEditor();
 }
 document.getElementById("openStudioBtn").onclick = openStudio;
 // Empty-canvas touches: a tap clears the selection, a drag sweeps out a
@@ -10071,7 +10035,7 @@ function renderControls() {
     });
     if (current.lockRows.length < maxRows) {
       const addBtn = document.createElement("button");
-      addBtn.textContent = "➕ Add row";
+      addBtn.textContent = "Add row";
       addBtn.onclick = function () { current.lockRows.push({ kind: "text", text: "" }); renderAll(); };
       rowsBox.appendChild(addBtn);
     }
@@ -10471,7 +10435,6 @@ function dedupedName(name, excludeId) {
 }
 function renderAll() {
   renderControls();
-  renderFreestyleUI();
   renderLauncherUI();
   renderPreview();
   syncEditorSurface();
@@ -11144,7 +11107,7 @@ async function buildScript() {
     const stockAbs = function (rel) {
       return (location.protocol.indexOf("http") === 0
         ? location.origin + location.pathname.replace(/[^/]*$/, "")
-        : "https://ballnews703-png.github.io/WidgetKing/") + rel;
+        : WK_SITE_URL) + rel;
     };
     const lsTheme = String((design.launcherStyle || {}).iconTheme || "");
     if (lsTheme.indexOf("pack:stock:") === 0) {
@@ -11440,7 +11403,7 @@ async function designToLink(design) {
     try { bytes = await pipeBytes(raw, new CompressionStream("gzip")); mode = "g"; } catch (e) { bytes = raw; }
   }
   const base = location.origin.startsWith("http") ? location.origin + location.pathname
-    : "https://ballnews703-png.github.io/WidgetKing/";
+    : WK_SITE_URL;
   return { url: base + "#d=" + mode + b64urlEncode(bytes), hadPhotos: hadPhotos };
 }
 // Share a design as a social-ready image card: the widget rendered on a soft
@@ -11571,7 +11534,7 @@ async function allDesignsLink(includeAI) {
     try { bytes = await pipeBytes(raw, new CompressionStream("gzip")); mode = "g"; } catch (e) { bytes = raw; }
   }
   const base = location.origin.startsWith("http") ? location.origin + location.pathname
-    : "https://ballnews703-png.github.io/WidgetKing/";
+    : WK_SITE_URL;
   return { url: base + "#s=" + mode + b64urlEncode(bytes), hadPhotos: hadPhotos, count: copies.length };
 }
 document.getElementById("syncAllBtn").onclick = async function () {
@@ -13027,7 +12990,7 @@ function renderBuilderPreview() {
   wrap.appendChild(node);
   document.getElementById("bResult").style.display = "block";
   document.getElementById("bAI").style.display = getApiKey() ? "block" : "none";
-  document.getElementById("bGo").textContent = "🎁 Show me my widget";
+  document.getElementById("bGo").textContent = "Show me my widget";
 }
 document.getElementById("builderBtn").onclick = function () {
   document.getElementById("builderModal").classList.add("open");
@@ -13480,18 +13443,6 @@ document.getElementById("pageWallInput").onchange = function (event) {
   };
   reader.readAsDataURL(file);
 };
-function layoutMini(layout) {
-  const mini = document.createElement("span");
-  mini.className = "lay-mini";
-  for (const slot of layout.slots) {
-    const r = slotRect(slot);
-    const block = document.createElement("i");
-    block.style.cssText = "left:" + (r.x * 100) + "%;top:" + (r.y * 100) + "%;width:" +
-      (r.w * 100) + "%;height:" + (r.h * 100) + "%";
-    mini.appendChild(block);
-  }
-  return mini;
-}
 function renderPageStudio() {
   document.getElementById("pageAIRow").style.display = getApiKey() ? "flex" : "none";
   renderPageFrame();
@@ -14227,7 +14178,7 @@ function renderShortcutGuide() {
       right.innerHTML = '⚠️ <b>' + esc(shortcutName) + '</b> ';
       right.style.color = "var(--muted)";
       const setupBtn = document.createElement("button");
-      setupBtn.textContent = "⚙️ Set up";
+      setupBtn.textContent = "Set up";
       setupBtn.style.cssText = "font-size:12px;padding:6px 10px;min-height:32px;margin-left:6px";
       setupBtn.onclick = function () {
         const finish = function () {
@@ -14244,7 +14195,7 @@ function renderShortcutGuide() {
       right.textContent = "✓ direct link ";
       right.style.color = "var(--accent)";
       const copyBtn = document.createElement("button");
-      copyBtn.textContent = "📋 " + app.url.slice(0, 18) + (app.url.length > 18 ? "…" : "");
+      copyBtn.textContent = app.url.slice(0, 18) + (app.url.length > 18 ? "…" : "");
       copyBtn.title = app.url;
       copyBtn.style.cssText = "font-size:11px;padding:5px 9px;min-height:30px;margin-left:6px";
       copyBtn.onclick = function () {

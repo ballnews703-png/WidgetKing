@@ -39,7 +39,9 @@ const r = await pg.evaluate(async () => {
   out.stableNoRefs = !s1.includes('STYLE REFERENCES') && s1.includes('LIVE ART') && s1.includes('STICKERS');
   const v = aiSystemPromptVariable('a cozy moon widget');
   out.variableHasRefs = v.includes('STYLE REFERENCES') && v.includes('Reference [') && v.includes('Today is');
-  out.joinedMatches = aiSystemPrompt('x').indexOf(s1) === 0;
+  // the request body is built as stable + variable — the stable block must
+  // be the exact prefix (v126 removed the joined helper as dead code)
+  out.joinedMatches = (s1 + aiSystemPromptVariable('x')).indexOf(s1) === 0 && !s1.includes('Today is');
 
   // the real request body: stub fetch, run callClaudeOnce, inspect
   localStorage.setItem('widgetking.spend', '0');

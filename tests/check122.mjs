@@ -63,6 +63,28 @@ const r = await pg.evaluate(async () => {
   for (const inp of document.querySelectorAll('input[placeholder]')) {
     if (inp.id !== 'customEmoji' && EMOJI.test(strip(inp.placeholder))) offenders.push('ph:' + inp.placeholder.slice(0, 25));
   }
+  // v126: the blind spots the first sweep missed — Studio/Explore panes,
+  // the setup wizard, the guided builder, Page Studio, and the editor's own
+  // buttons — checked by DIRECT text (picker tiles like the kind buttons,
+  // palette, pattern chips, and explore tags keep their glyphs by design).
+  for (const pane of ['studio', 'explore']) {
+    switchTab(pane); await sleep(60);
+    for (const n of document.querySelectorAll('.pane-' + pane + ' button, .pane-' + pane + ' summary')) {
+      if (n.closest('#iconStyleChips, #iconPackChips, #exploreTags, #packChips, #myIconPacks')) continue;
+      const direct = [...n.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent).join('');
+      if (visible(n) && EMOJI.test(strip(direct))) offenders.push(pane + ':' + direct.trim().slice(0, 25));
+    }
+  }
+  const chromeIds = ['openStudioBtn', 'iconAppAdd', 'wizardCopyBtn', 'bGo', 'bKeep', 'pageAIBtn', 'pageSaveBtn', 'acctDeleteBtn'];
+  for (const id of chromeIds) {
+    const n = document.getElementById(id);
+    const direct = n ? [...n.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent).join('') : '';
+    if (n && EMOJI.test(strip(direct))) offenders.push('#' + id + ':' + direct.trim().slice(0, 25));
+  }
+  for (const n of document.querySelectorAll('#setupWizard .wiz-action, #setupWizard .title, #pageStudio .title, #builderModal .title, #dcardName > summary')) {
+    const direct = [...n.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent).join('');
+    if (EMOJI.test(strip(direct))) offenders.push('modal:' + direct.trim().slice(0, 25));
+  }
   out.chromeSwept = offenders.length === 0 || offenders;
 
   // Content emoji survives (theme pack names keep their character)
