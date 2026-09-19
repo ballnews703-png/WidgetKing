@@ -29,7 +29,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 128;
+const WK_VERSION = 129;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -804,10 +804,10 @@ const SCREEN_FRAMES = {
 };
 // Named models for the in-app picker (screen-height key -> label).
 const DEVICE_MODELS = [
-  ["2868", "iPhone 17 Pro Max / 16 Pro Max"],
-  ["2622", "iPhone 17 Pro / 17 / 16 Pro"],
+  ["2868", "iPhone 18 Pro Max / 17 Pro Max / 16 Pro Max"],
+  ["2622", "iPhone 18 Pro / 17 Pro / 17 / 16 Pro"],
   ["2796", "iPhone 16 Plus / 15 Pro Max / 15 Plus / 14 Pro Max"],
-  ["2556", "iPhone 16e / 16 / 15 / 15 Pro / 14 Pro"],
+  ["2556", "iPhone 17e / 16e / 16 / 15 / 15 Pro / 14 Pro"],
   ["2532", "iPhone 14 / 13 / 13 Pro / 12 / 12 Pro"],
   ["2436", "iPhone 13 mini / 12 mini / 11 Pro / XS / X"],
   ["1334", "iPhone SE (2nd/3rd gen)"]
@@ -850,10 +850,14 @@ function widgetPointSizes(family) {
       const small = f[0] / scale, med = f[1] / scale, large = f[2] / scale;
       if (family === "medium") return [med, small];
       if (family === "large") return [med, large];
+      // iOS 27 extra-large portrait (4x6 grid): as wide as large, about
+      // twice as tall. iPad extra large: two mediums side by side.
+      if (family === "extraLargePortrait") return [med, large + (large - small) + small];
+      if (family === "extraLarge") return [med * 2 + (large - small - small) / 2, large];
       return [small, small];
     }
   } catch (e) {}
-  const PT = { small: [155, 155], medium: [329, 155], large: [329, 345] };
+  const PT = { small: [155, 155], medium: [329, 155], large: [329, 345], extraLargePortrait: [329, 540], extraLarge: [676, 345] };
   return PT[family] || PT.small;
 }
 function widgetRect(imgW, imgH, family, position) {
