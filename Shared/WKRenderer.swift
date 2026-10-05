@@ -192,14 +192,17 @@ struct WKRenderer {
                 ctx.move(to: CGPoint(x: 0, y: baseY))
                 var x: CGFloat = 0
                 while x <= W {
-                    ctx.addLine(to: CGPoint(x: x, y: baseY + sin((x / W) * .pi * 3 + CGFloat(r)) * 5 * u))
+                    let phase: CGFloat = (x / W) * CGFloat.pi * 3 + CGFloat(r)
+                    let wy: CGFloat = baseY + sin(phase) * 5 * u
+                    ctx.addLine(to: CGPoint(x: x, y: wy))
                     x += 6 * u
                 }
                 ctx.strokePath()
             }
         case "grain", "paper":
             var seed: Int64 = 7
-            let n = min(700, Int((W * H) / (140 * u * u)))
+            let cells: CGFloat = (W * H) / (140 * u * u)
+            let n = min(700, Int(cells))
             for i in 0..<max(0, n) {
                 seed = (seed * 16807) % 2147483647
                 let x = CGFloat(seed % Int64(max(1, Int(W))))
@@ -333,9 +336,11 @@ struct WKRenderer {
         // Point-space layout (the same math the designer preview uses), scaled.
         let Wp = W / scale, Hp = H / scale
         let pad: CGFloat = 12, rowGap: CGFloat = 10
-        let cellH = iconPt + (showLabels ? labelPt + 3 : 0)
-        let rowCount = Int(ceil(Double(apps.count) / Double(perRow)))
-        let contentH = CGFloat(rowCount) * cellH + CGFloat(rowCount - 1) * rowGap
+        let cellH: CGFloat = iconPt + (showLabels ? labelPt + 3 : 0)
+        let rowCount: Int = Int(ceil(Double(apps.count) / Double(perRow)))
+        let rowsH: CGFloat = CGFloat(rowCount) * cellH
+        let gapsH: CGFloat = CGFloat(max(0, rowCount - 1)) * rowGap
+        let contentH: CGFloat = rowsH + gapsH
         var y = max(0, (Hp - contentH) / 2)
         var i = 0
         while i < apps.count {
@@ -348,9 +353,12 @@ struct WKRenderer {
                 drawAppTile(ctx, app, theme: theme, index: i + j, rect: tileRect, circle: circle)
                 if showLabels {
                     let label = app.str("label", "App")
+                    let lx: CGFloat = (x - gap / 2) * scale
+                    let ly: CGFloat = (y + iconPt + 3) * scale
+                    let lw: CGFloat = (iconPt + gap) * scale
+                    let lh: CGFloat = (labelPt + 4) * scale
                     drawText(ctx, label.isEmpty ? "App" : label, font: font(style, labelPt * scale, bold: false), color: tc.withAlphaComponent(0.85),
-                             rect: CGRect(x: (x - gap / 2) * scale, y: (y + iconPt + 3) * scale, width: (iconPt + gap) * scale, height: (labelPt + 4) * scale),
-                             align: .center, lineBreak: .byTruncatingTail)
+                             rect: CGRect(x: lx, y: ly, width: lw, height: lh), align: .center, lineBreak: .byTruncatingTail)
                 }
                 x += iconPt + gap
             }
@@ -391,10 +399,12 @@ struct WKRenderer {
         if t.neu {
             let space = CGColorSpaceCreateDeviceRGB()
             if let g1 = CGGradient(colorsSpace: space, colors: [WKColor.color("#FFFFFF", 0.10).cgColor, WKColor.color("#FFFFFF", 0).cgColor] as CFArray, locations: [0, 1]) {
-                ctx.drawLinearGradient(g1, start: CGPoint(x: rect.minX, y: rect.minY), end: CGPoint(x: rect.minX, y: rect.minY + S * 0.3), options: [])
+                let g1End = CGPoint(x: rect.minX, y: rect.minY + S * 0.3)
+                ctx.drawLinearGradient(g1, start: CGPoint(x: rect.minX, y: rect.minY), end: g1End, options: [])
             }
             if let g2 = CGGradient(colorsSpace: space, colors: [WKColor.color("#000000", 0).cgColor, WKColor.color("#000000", 0.28).cgColor] as CFArray, locations: [0, 1]) {
-                ctx.drawLinearGradient(g2, start: CGPoint(x: rect.minX, y: rect.minY + S * 0.5), end: CGPoint(x: rect.minX, y: rect.maxY), options: [])
+                let g2Start = CGPoint(x: rect.minX, y: rect.minY + S * 0.5)
+                ctx.drawLinearGradient(g2, start: g2Start, end: CGPoint(x: rect.minX, y: rect.maxY), options: [])
             }
         }
         if let duo = t.duo {
@@ -421,7 +431,8 @@ struct WKRenderer {
         let label = app.str("label", "App").trimmingCharacters(in: .whitespaces)
         if t.wordTile {
             let word = label.isEmpty ? "App" : label
-            let fs = min(S * 0.3, (S * 0.8) / (CGFloat(word.count) * 0.48))
+            let perChar: CGFloat = CGFloat(word.count) * 0.48
+            let fs: CGFloat = min(S * 0.3, (S * 0.8) / max(0.48, perChar))
             let wc = t.wordColors.map { $0[index % $0.count] } ?? t.glyph
             drawText(ctx, word, font: font(t.wordStyle.isEmpty ? "serif" : t.wordStyle, fs.rounded(), bold: false), color: WKColor.color(wc),
                      rect: CGRect(x: rect.minX, y: rect.minY + S * 0.5 - fs * 0.72, width: S, height: fs * 1.5), align: .center, lineBreak: .byClipping)
@@ -484,11 +495,16 @@ struct WKRenderer {
             if pts.count < 2 { continue }
             for i in 0..<(pts.count - 1) {
                 let p0 = pts[i], p1 = pts[i + 1]
-                let t = (p0[0] + p0[1] + p1[0] + p1[1]) / 4
+                let sum: Double = p0[0] + p0[1] + p1[0] + p1[1]
+                let t: Double = sum / 4
                 let color = b != nil ? WKColor.lerp(a, b!, t).withAlphaComponent(CGFloat(alpha)) : WKColor.color(a, alpha)
                 ctx.setStrokeColor(color.cgColor)
-                ctx.move(to: CGPoint(x: center.x + CGFloat(p0[0] - 0.5) * size, y: center.y + CGFloat(p0[1] - 0.5) * size))
-                ctx.addLine(to: CGPoint(x: center.x + CGFloat(p1[0] - 0.5) * size, y: center.y + CGFloat(p1[1] - 0.5) * size))
+                let x0: CGFloat = center.x + CGFloat(p0[0] - 0.5) * size
+                let y0: CGFloat = center.y + CGFloat(p0[1] - 0.5) * size
+                let x1: CGFloat = center.x + CGFloat(p1[0] - 0.5) * size
+                let y1: CGFloat = center.y + CGFloat(p1[1] - 0.5) * size
+                ctx.move(to: CGPoint(x: x0, y: y0))
+                ctx.addLine(to: CGPoint(x: x1, y: y1))
                 ctx.strokePath()
             }
         }
@@ -537,7 +553,8 @@ struct WKRenderer {
                 ctx.addArc(center: CGPoint(x: px, y: py), radius: rr, startAngle: 0, endAngle: .pi * 2, clockwise: false); ctx.strokePath()
                 if pct > 0.01 {
                     ctx.setStrokeColor(WKColor.color(el.colorHex, op).cgColor)
-                    ctx.addArc(center: CGPoint(x: px, y: py), radius: rr, startAngle: -.pi / 2, endAngle: -.pi / 2 + .pi * 2 * pct, clockwise: false); ctx.strokePath()
+                    let endAngle: CGFloat = -CGFloat.pi / 2 + CGFloat.pi * 2 * pct
+                    ctx.addArc(center: CGPoint(x: px, y: py), radius: rr, startAngle: -CGFloat.pi / 2, endAngle: endAngle, clockwise: false); ctx.strokePath()
                 }
                 ctx.setLineCap(.butt)
             case "month":
@@ -606,7 +623,9 @@ struct WKRenderer {
         let rect = CGRect(x: px - wPx / 2, y: py - hPx / 2, width: wPx, height: hPx)
         if list.isEmpty {
             ctx.setFillColor(WKColor.color("#808080", 0.25).cgColor)
-            ctx.addPath(UIBezierPath(roundedRect: CGRect(x: px - 74 * s / 3, y: py - 10 * s / 3, width: 148 * s / 3, height: 20 * s / 3), cornerRadius: 10 * s / 3).cgPath); ctx.fillPath()
+            let u: CGFloat = s / 3
+            let chip = CGRect(x: px - 74 * u, y: py - 10 * u, width: 148 * u, height: 20 * u)
+            ctx.addPath(UIBezierPath(roundedRect: chip, cornerRadius: 10 * u).cgPath); ctx.fillPath()
             drawText(ctx, "photo missing - re-add in designer", font: UIFont.systemFont(ofSize: 9 * s), color: WKColor.color("#606060", 0.95),
                      rect: CGRect(x: px - 70 * s, y: py - 6 * s, width: 140 * s, height: 14 * s), align: .center)
             return
@@ -625,8 +644,11 @@ struct WKRenderer {
         ctx.addPath(path.cgPath); ctx.clip()
         ctx.setAlpha(CGFloat(el.opacity))
         // cover-fit: scale the image to fill the rect, centered
-        let k = max(rect.width / img.size.width, rect.height / img.size.height)
-        let dw = img.size.width * k, dh = img.size.height * k
+        let kx: CGFloat = rect.width / max(1, img.size.width)
+        let ky: CGFloat = rect.height / max(1, img.size.height)
+        let k: CGFloat = max(kx, ky)
+        let dw: CGFloat = img.size.width * k
+        let dh: CGFloat = img.size.height * k
         img.draw(in: CGRect(x: rect.midX - dw / 2, y: rect.midY - dh / 2, width: dw, height: dh))
         ctx.restoreGState()
         let frame = el.str("frame", "none")
@@ -660,10 +682,12 @@ struct WKRenderer {
             ctx.addPath(path.cgPath); ctx.clip()
             let space = CGColorSpaceCreateDeviceRGB()
             if let g = CGGradient(colorsSpace: space, colors: [WKColor.color(el.colorHex, op).cgColor, WKColor.color(el.hex("color2Hex") ?? "#8F52FA", op).cgColor] as CFArray, locations: [0, 1]) {
-                let ang = CGFloat(el.num("angle", 135)) * .pi / 180
-                let r = max(wPx, hPx)
+                let ang: CGFloat = CGFloat(el.num("angle", 135)) * CGFloat.pi / 180
+                let r: CGFloat = max(wPx, hPx) / 2
+                let dx: CGFloat = cos(ang) * r
+                let dy: CGFloat = sin(ang) * r
                 let c = CGPoint(x: rect.midX, y: rect.midY)
-                ctx.drawLinearGradient(g, start: CGPoint(x: c.x - cos(ang) * r / 2, y: c.y - sin(ang) * r / 2), end: CGPoint(x: c.x + cos(ang) * r / 2, y: c.y + sin(ang) * r / 2), options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+                ctx.drawLinearGradient(g, start: CGPoint(x: c.x - dx, y: c.y - dy), end: CGPoint(x: c.x + dx, y: c.y + dy), options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
             }
             ctx.restoreGState()
             return
@@ -684,14 +708,17 @@ struct WKRenderer {
         let chars = Array(text)
         let widths = chars.map { textSize(String($0), font: f, width: 10000).width }
         let total = widths.reduce(0, +)
-        let totalAngle = total / max(1, radius)
-        var angle = -totalAngle / 2
+        let safeR: CGFloat = max(1, radius)
+        let totalAngle: CGFloat = total / safeR
+        var angle: CGFloat = -totalAngle / 2
         for (i, ch) in chars.enumerated() {
-            let half = widths[i] / 2 / max(1, radius)
-            let a = angle + half
+            let half: CGFloat = widths[i] / 2 / safeR
+            let a: CGFloat = angle + half
             ctx.saveGState()
             let theta: CGFloat = flip ? (CGFloat.pi / 2 - a) : (-CGFloat.pi / 2 + a)
-            ctx.translateBy(x: px + cos(theta) * radius, y: py + sin(theta) * radius)
+            let tx: CGFloat = px + cos(theta) * radius
+            let ty: CGFloat = py + sin(theta) * radius
+            ctx.translateBy(x: tx, y: ty)
             ctx.rotate(by: flip ? (theta - CGFloat.pi / 2) : (theta + CGFloat.pi / 2))
             let size = textSize(String(ch), font: f, width: 10000)
             drawText(ctx, String(ch), font: f, color: color, rect: CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width + 2, height: size.height + 2), align: .center, lineBreak: .byClipping)
@@ -710,9 +737,12 @@ struct WKRenderer {
         let startDow = cal.component(.weekday, from: first) - 1
         let daysIn = cal.range(of: .day, in: .month, for: now)!.count
         let rows = Int(ceil(Double(startDow + daysIn) / 7))
-        let rowH = fsM * 1.7
-        let gh = rowH * CGFloat(rows + 1)
-        let x0 = px - gw / 2, y0 = py - gh / 2
+        let rowH: CGFloat = fsM * 1.7
+        let lineH: CGFloat = fsM * 1.4
+        let yOff: CGFloat = (rowH - lineH) / 2
+        let gh: CGFloat = rowH * CGFloat(rows + 1)
+        let x0: CGFloat = px - gw / 2
+        let y0: CGFloat = py - gh / 2
         let headers = ["S", "M", "T", "W", "T", "F", "S"]
         let style = el.font ?? design.fontStyle
         for c in 0..<7 {
@@ -723,29 +753,36 @@ struct WKRenderer {
         let prevDays = cal.range(of: .day, in: .month, for: prevMonth)!.count
         let dim = WKColor.color(el.colorHex, op * 0.3)
         for b in 0..<startDow {
+            let bx: CGFloat = x0 + CGFloat(b) * cell
+            let by: CGFloat = y0 + rowH + yOff
             drawText(ctx, String(prevDays - startDow + 1 + b), font: font(style, fsM, bold: false), color: dim,
-                     rect: CGRect(x: x0 + CGFloat(b) * cell, y: y0 + rowH + (rowH - fsM * 1.4) / 2, width: cell, height: fsM * 1.4), align: .center)
+                     rect: CGRect(x: bx, y: by, width: cell, height: lineH), align: .center)
         }
         let tail = rows * 7 - (startDow + daysIn)
         for a in 0..<max(0, tail) {
-            let idx = startDow + daysIn + a
+            let idx: Int = startDow + daysIn + a
+            let ax: CGFloat = x0 + CGFloat(idx % 7) * cell
+            let ay: CGFloat = y0 + CGFloat(idx / 7 + 1) * rowH + yOff
             drawText(ctx, String(a + 1), font: font(style, fsM, bold: false), color: dim,
-                     rect: CGRect(x: x0 + CGFloat(idx % 7) * cell, y: y0 + CGFloat(idx / 7 + 1) * rowH + (rowH - fsM * 1.4) / 2, width: cell, height: fsM * 1.4), align: .center)
+                     rect: CGRect(x: ax, y: ay, width: cell, height: lineH), align: .center)
         }
         let today = comps.day ?? 1
         for d in 1...daysIn {
-            let idx = startDow + d - 1
-            let r = idx / 7, c = idx % 7
-            let cx = x0 + CGFloat(c) * cell, cy = y0 + CGFloat(r + 1) * rowH
+            let idx: Int = startDow + d - 1
+            let r: Int = idx / 7
+            let c: Int = idx % 7
+            let cx: CGFloat = x0 + CGFloat(c) * cell
+            let cy: CGFloat = y0 + CGFloat(r + 1) * rowH
+            let textRect = CGRect(x: cx, y: cy + yOff, width: cell, height: lineH)
             if d == today {
                 ctx.setFillColor(WKColor.color(el.hex("accentHex") ?? "#4A90F6", op).cgColor)
-                let dia = min(cell, rowH) * 0.95
-                ctx.fillEllipse(in: CGRect(x: cx + (cell - dia) / 2, y: cy + (rowH - dia) / 2, width: dia, height: dia))
-                drawText(ctx, String(d), font: font(style, fsM, bold: true), color: .white,
-                         rect: CGRect(x: cx, y: cy + (rowH - fsM * 1.4) / 2, width: cell, height: fsM * 1.4), align: .center)
+                let dia: CGFloat = min(cell, rowH) * 0.95
+                let ex: CGFloat = cx + (cell - dia) / 2
+                let ey: CGFloat = cy + (rowH - dia) / 2
+                ctx.fillEllipse(in: CGRect(x: ex, y: ey, width: dia, height: dia))
+                drawText(ctx, String(d), font: font(style, fsM, bold: true), color: .white, rect: textRect, align: .center)
             } else {
-                drawText(ctx, String(d), font: font(style, fsM, bold: false), color: WKColor.color(el.colorHex, op * 0.9),
-                         rect: CGRect(x: cx, y: cy + (rowH - fsM * 1.4) / 2, width: cell, height: fsM * 1.4), align: .center)
+                drawText(ctx, String(d), font: font(style, fsM, bold: false), color: WKColor.color(el.colorHex, op * 0.9), rect: textRect, align: .center)
             }
         }
     }
@@ -816,11 +853,15 @@ struct WKRenderer {
         }
         let isList = el.kind == "calendar" || el.kind == "reminders" || el.kind == "news"
         if isList {
-            let boxW = max(W * 0.3, min(W, 2 * min(px, W - px)))
-            let perLine = max(6, Int(boxW / (fs * 0.52)))
+            let edge: CGFloat = min(px, W - px)
+            let boxW: CGFloat = max(W * 0.3, min(W, 2 * edge))
+            let perLine: Int = max(6, Int(boxW / (fs * 0.52)))
             var lineCount = 0
-            for ln in text.split(separator: "\n", omittingEmptySubsequences: false) { lineCount += max(1, Int(ceil(Double(ln.count) / Double(perLine)))) }
-            let estH = fs * 1.55 * CGFloat(lineCount)
+            for ln in text.split(separator: "\n", omittingEmptySubsequences: false) {
+                let needed: Double = ceil(Double(ln.count) / Double(perLine))
+                lineCount += max(1, Int(needed))
+            }
+            let estH: CGFloat = fs * 1.55 * CGFloat(lineCount)
             drawText(ctx, text, font: f, color: color, rect: CGRect(x: px - boxW / 2, y: py - estH / 2, width: boxW, height: estH + fs), align: .center)
         } else {
             drawText(ctx, text, font: f, color: color, rect: CGRect(x: px - W / 2, y: py - fs * 0.72, width: W, height: fs * 1.7), align: .center)
@@ -850,8 +891,10 @@ struct WKRenderer {
             let ctx = rc.cgContext
             // iOS supplies the frosted background; the stand-in matches the designer preview.
             ctx.setFillColor(WKColor.color("#FFFFFF", 0.22).cgColor)
-            let shape = circle ? UIBezierPath(ovalIn: CGRect(x: 0, y: 0, width: min(W, H), height: min(W, H)).offsetBy(dx: (W - min(W, H)) / 2, dy: 0))
-                               : UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: W, height: H), cornerRadius: 16 * scale)
+            let side: CGFloat = min(W, H)
+            let ovalRect = CGRect(x: (W - side) / 2, y: 0, width: side, height: side)
+            let shape: UIBezierPath = circle ? UIBezierPath(ovalIn: ovalRect)
+                                             : UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: W, height: H), cornerRadius: 16 * scale)
             ctx.addPath(shape.cgPath); ctx.fillPath()
             var lines: [Line] = []
             for (i, row) in rows.enumerated() {
@@ -865,7 +908,13 @@ struct WKRenderer {
                 case "countdown":
                     let iso = row.str("dateISO").isEmpty ? design.targetDate : row.str("dateISO")
                     if iso.isEmpty { text = "Set a date" }
-                    else { let d = WKText.daysUntil(iso, now: now); text = abs(d) >= 60 ? "in \(Int((Double(d) / 30).rounded())) months" : (d >= 0 ? "in \(d) days" : "\(abs(d)) days ago") }
+                    else {
+                        let d = WKText.daysUntil(iso, now: now)
+                        let months = Int((Double(d) / 30).rounded())
+                        if abs(d) >= 60 { text = "in \(months) months" }
+                        else if d >= 0 { text = "in \(d) days" }
+                        else { text = "\(abs(d)) days ago" }
+                    }
                 case "battery": text = "🔋 \(Int((live.batteryLevel * 100).rounded()))%"
                 case "weather": text = WKText.weather(WKElement(["unit": row.str("unit", "f")]), live.weather)
                 case "reminder":

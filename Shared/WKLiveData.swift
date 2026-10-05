@@ -49,8 +49,9 @@ struct WKLiveData {
                     "BTC-USD": WKStockQuote(price: 64210, pct: 2.4), "ETH-USD": WKStockQuote(price: 3120, pct: -1.1)]
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
-        l.astro = WKAstro(sunrise: cal.date(byAdding: .minute, value: 6 * 60 + 52, to: today)!,
-                          sunset: cal.date(byAdding: .minute, value: 19 * 60 + 4, to: today)!)
+        let sunrise: Date = cal.date(byAdding: .minute, value: 412, to: today) ?? today
+        let sunset: Date = cal.date(byAdding: .minute, value: 1144, to: today) ?? today
+        l.astro = WKAstro(sunrise: sunrise, sunset: sunset)
         l.sleeper = ["": WKSleeper(me: 112.4, opp: 98.7, wins: 5, losses: 2, rank: 2, myTeamName: "Crown Jewels", oppTeamName: "Gridiron Goats")]
         return l
     }
@@ -260,7 +261,9 @@ enum WKText {
             let y = cal.component(.year, from: now)
             let start = cal.date(from: DateComponents(year: y, month: 1, day: 1))!
             let end = cal.date(from: DateComponents(year: y + 1, month: 1, day: 1))!
-            return now.timeIntervalSince(start) / end.timeIntervalSince(start)
+            let elapsed: Double = now.timeIntervalSince(start)
+            let span: Double = end.timeIntervalSince(start)
+            return span > 0 ? elapsed / span : 0
         }
         if src == "countdown" {
             let startISO = el.str("startISO")
@@ -270,7 +273,11 @@ enum WKText {
             return span > 0 ? Double(done) / Double(span) : 1
         }
         let c = cal.dateComponents([.hour, .minute, .second], from: now)
-        return Double((c.hour ?? 0) * 3600 + (c.minute ?? 0) * 60 + (c.second ?? 0)) / 86400
+        let hours: Int = c.hour ?? 0
+        let minutes: Int = c.minute ?? 0
+        let seconds: Int = c.second ?? 0
+        let total: Int = hours * 3600 + minutes * 60 + seconds
+        return Double(total) / 86400.0
     }
     static func timeString(_ d: Date) -> String {
         let f = DateFormatter(); f.timeStyle = .short; f.dateStyle = .none
