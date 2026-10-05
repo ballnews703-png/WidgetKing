@@ -81,5 +81,11 @@ final class WKLiveFetchTests: XCTestCase {
         let img = r.render(design, family: .accessoryRectangular, pointSize: CGSize(width: 160, height: 72))
         XCTAssertEqual(img.size.width, 320)
         XCTAssertEqual(img.size.height, 144)
+        // canvas-mode lock widget: pieces drawn at real points on the tile
+        let canvas = WKDesign(["kind": "lock", "lockMode": "canvas", "lockStyle": "circle",
+                               "canvasElements": [["kind": "ring", "source": "battery", "x": 0.5, "y": 0.5, "w": 0.92, "size": 5],
+                                                  ["kind": "battery", "x": 0.5, "y": 0.5, "size": 15, "bold": true]]])
+        let c = r.render(canvas, family: .accessoryCircular)
+        XCTAssertEqual(c.size.width, 152)
     }
 }

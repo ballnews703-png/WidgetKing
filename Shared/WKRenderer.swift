@@ -522,8 +522,8 @@ struct WKRenderer {
 
     // MARK: freestyle
 
-    func drawFreestyle(_ ctx: CGContext, _ design: WKDesign, W: CGFloat, H: CGFloat) {
-        let s = min(W, H) / 158
+    func drawFreestyle(_ ctx: CGContext, _ design: WKDesign, W: CGFloat, H: CGFloat, base: CGFloat = 158) {
+        let s = min(W, H) / base
         let appOnly = design.elements.filter { $0.kind == "app" }
         for el in design.elements {
             let px = CGFloat(el.x) * W, py = CGFloat(el.y) * H
@@ -884,6 +884,24 @@ struct WKRenderer {
         let pts = pointSize ?? family.points
         let W = (pts.width * scale).rounded(), H = (pts.height * scale).rounded()
         let circle = family == .accessoryCircular || design.lockStyle == "circle"
+        // v133 canvas lock widgets: the composition baked at the accessory
+        // size, element sizes in real points (76pt short side), no background
+        // of its own — iOS supplies the tile and draws in one color.
+        if design.kind == "lock", design.str("lockMode") == "canvas", !design.elements.isEmpty {
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1; format.opaque = false
+            return UIGraphicsImageRenderer(size: CGSize(width: W, height: H), format: format).image { rc in
+                let ctx = rc.cgContext
+                if lockBackdrop {
+                    ctx.setFillColor(WKColor.color("#FFFFFF", 0.22).cgColor)
+                    let side: CGFloat = min(W, H)
+                    let shape: UIBezierPath = circle ? UIBezierPath(ovalIn: CGRect(x: (W - side) / 2, y: 0, width: side, height: side))
+                                                     : UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: W, height: H), cornerRadius: 16 * scale)
+                    ctx.addPath(shape.cgPath); ctx.fillPath()
+                }
+                drawFreestyle(ctx, design, W: W, H: H, base: 76)
+            }
+        }
         var rows: [WKElement] = design.kind == "lock" ? Array(design.lockRows.prefix(circle ? 2 : 3)) : []
         if rows.isEmpty {
             switch design.kind {

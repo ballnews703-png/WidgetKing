@@ -29,7 +29,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 132;
+const WK_VERSION = 133;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -842,6 +842,8 @@ function frameEntryKey() {
   return "";
 }
 function widgetPointSizes(family) {
+  const ACC = { accessoryRectangular: [172, 76], accessoryCircular: [76, 76], accessoryInline: [172, 24] };
+  if (ACC[family]) return ACC[family];
   try {
     const scale = Device.screenScale();
     const entry = SCREEN_FRAMES[frameEntryKey()];
@@ -1146,21 +1148,24 @@ function drawFreestyle(design, family, bgImg, live) {
   const W = Math.round(pts[0] * s), H = Math.round(pts[1] * s);
   const ctx = new DrawContext();
   ctx.size = new Size(W, H); ctx.opaque = false; ctx.respectScreenScale = false;
+  // Lock Screen canvases: iOS supplies the tile, draws in one color, and
+  // allows no live overlays — so no background, and clocks bake in.
+  const accessory = String(family).indexOf("accessory") === 0;
   if (bgImg) {
     ctx.drawImageInRect(bgImg, new Rect(0, 0, W, H));
     // A see-through gradient over the wallpaper still carries its texture,
     // exactly as the preview draws it.
     if (design.background === "gradient") drawBgPattern(ctx, design, W, H);
-  } else {
+  } else if (!accessory) {
     paintBackground(ctx, design, W, H);
   }
-  const scale = Math.min(W, H) / 158;
+  const scale = Math.min(W, H) / (accessory ? 76 : 158);
   const els = design.canvasElements || [];
   for (const el of els) {
     // Clocks render as live native overlays (they tick between refreshes);
     // countdowns are baked as the day count — the same number the
     // designer shows, never iOS's "in 3 months" phrasing.
-    if (el.kind === "clock") continue;
+    if (el.kind === "clock" && !accessory) continue;
     const px = el.x * W; const py = el.y * H; const fs = (el.size || 20) * scale;
     const op = (typeof el.opacity === "number" && el.opacity >= 0 && el.opacity <= 1) ? el.opacity : 1;
     if (el.kind === "shape") {
@@ -2123,6 +2128,20 @@ async function buildLockWidget(design, family) {
   // The slot's family decides the physical shape; the design's chosen style
   // decides the row cap — so the phone shows the rows the preview showed.
   const circle = family === "accessoryCircular" || design.lockStyle === "circle";
+  if (design.lockMode === "canvas" && Array.isArray(design.canvasElements) && design.canvasElements.length) {
+    // v133: a drag-and-drop lock widget — the composition baked as one
+    // image at the accessory size; iOS tints it and adds the frosted tile.
+    const liveC = await liveDataFor(design);
+    const img = drawFreestyle(design, family, null, liveC);
+    w.setPadding(0, 0, 0, 0);
+    try { w.addAccessoryWidgetBackground = true; } catch (e) {}
+    const pts = widgetPointSizes(family);
+    const wi = w.addImage(img);
+    wi.imageSize = new Size(pts[0], pts[1]);
+    try { wi.centerAlignImage(); } catch (e) {}
+    w.refreshAfterDate = new Date(Date.now() + 5 * 60 * 1000);
+    return w;
+  }
   let rows = Array.isArray(design.lockRows) ? design.lockRows.slice(0, circle ? 2 : 3) : [];
   if (!rows.length) {
     // Any regular design still works on the Lock Screen — map it to rows.

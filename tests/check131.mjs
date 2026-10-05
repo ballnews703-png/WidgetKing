@@ -18,12 +18,14 @@ const r = await pg.evaluate(async () => {
   out.defaultFull = lockClockMode === 'full';
   const kinds = LOCK_ROW_KINDS.map(k => k[0]);
   const pack = buildTemplates().filter(t => t.pack === 'Lock');
-  out.packSize = pack.length === 6;
+  // v131 shipped 6 rows-mode designs; v133 added 8 canvas-mode ones.
+  const rowsPack = pack.filter(t => t.design.lockMode !== 'canvas');
+  out.packSize = rowsPack.length === 6 && pack.length >= 14;
   out.packChip = PACK_CHIPS.some(p => p[0] === 'Lock');
-  out.packLock = pack.every(t => t.design.kind === 'lock' && t.design.lockRows.length >= 1 &&
+  out.packLock = pack.every(t => t.design.kind === 'lock') && rowsPack.every(t => t.design.lockRows.length >= 1 &&
     t.design.lockRows.length <= (t.design.lockStyle === 'circle' ? 2 : 3) &&
     t.design.lockRows.every(r => kinds.includes(r.kind)));
-  out.packNoTimeRow = pack.every(t => !t.design.lockRows.some(r => r.kind === 'time'));
+  out.packNoTimeRow = rowsPack.every(t => !t.design.lockRows.some(r => r.kind === 'time'));
   out.packThumbs = pack.every(t => makeThumb(normalizeDesign(JSON.parse(JSON.stringify(t.design))), 0.5).textContent.length > 0);
   // Editor preview: full-size clock layout
   const copy = normalizeDesign(JSON.parse(JSON.stringify(pack[0].design))); copy.id = uid();

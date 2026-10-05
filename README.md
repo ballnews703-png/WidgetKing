@@ -18,6 +18,9 @@ What makes it different:
   reminders, news, stocks, world clocks, sun & moon, battery, sports), photos,
   a 129-piece sticker library, glass and see-through backgrounds, month grids,
   gauges, and 21 fonts.
+- **🔒 Lock Screen canvases** — Lock Screen widgets are either simple rows or
+  a drag-and-drop canvas on the real 172×76 / 76×76 tile: rings, bars,
+  icons, weather, countdowns, baked as one image that iOS tints.
 - **🪟 Home Screen look aware** — set Clear or Tinted (iOS 26+) once and every
   preview shows the one-color stencil iOS will draw, templates say which ones
   survive it, and the AI designs for it. A Clear-look template pack ships

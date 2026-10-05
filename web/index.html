@@ -319,6 +319,10 @@
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     text-align: center; user-select: none; -webkit-user-select: none; }
   #studioPanel { padding: 10px 0 18px; }
+  /* v133: Lock Screen canvases edit on a dark wallpaper stand-in, in one color. */
+  #studioStage.lock-stage { background: radial-gradient(circle at 22% 24%, #5b4fc0, transparent 55%),
+    radial-gradient(circle at 80% 18%, #b4548a, transparent 50%), radial-gradient(circle at 60% 82%, #2f8a93, transparent 55%), #15151c !important; }
+  #studioCanvas.lock-canvas { filter: grayscale(1) brightness(1.08); box-shadow: none; }
   #studioLayers { display: flex; gap: 6px; overflow-x: auto; padding: 6px 0;
     -webkit-overflow-scrolling: touch; }
   .layer-chip { flex-shrink: 0; display: flex; align-items: center; gap: 5px; font-size: 12px;
@@ -683,9 +687,11 @@
         <p class="hint">Pick a design for each part of the day (skip any — the widget falls back to the first one you set). The preview above shows what's live right now.</p>
       </div>
       <div class="field" id="fLock" style="display:none">
-        <label>Lock Screen widget — up to 3 rows</label>
+        <label>Lock Screen widget</label>
+        <div class="row" id="lockModeRow" style="margin-bottom:6px"></div>
         <div class="row" id="lockStyleRow" style="margin-bottom:6px"></div>
         <div id="lockRowsBox"></div>
+        <p class="hint" id="lockCanvasHint" style="display:none">Canvas mode: compose the widget with any piece — rings, bars, icons, weather, countdowns. iOS draws Lock Screen widgets in one color on its own frosted tile, so the canvas shows it that way. Sizes here are real points: the tile is 172×76 (rectangular) or 76×76 (circular).</p>
         <label style="margin-top:10px">Your Lock Screen clock (preview only)</label>
         <div class="row" id="lockClockRow" style="margin-bottom:6px"></div>
         <p class="hint">Apple draws Lock Screen widgets in frosted monochrome — that's normal. Time and Countdown rows stay live on their own. To add it: hold your Lock Screen → Customize → tap the widget strip → Scriptable → set Script to WidgetKing and Parameter to this design's name.</p>
@@ -1286,7 +1292,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 132;
+const WK_VERSION = 133;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -2099,6 +2105,8 @@ function frameEntryKey() {
   return "";
 }
 function widgetPointSizes(family) {
+  const ACC = { accessoryRectangular: [172, 76], accessoryCircular: [76, 76], accessoryInline: [172, 24] };
+  if (ACC[family]) return ACC[family];
   try {
     const scale = Device.screenScale();
     const entry = SCREEN_FRAMES[frameEntryKey()];
@@ -2403,21 +2411,24 @@ function drawFreestyle(design, family, bgImg, live) {
   const W = Math.round(pts[0] * s), H = Math.round(pts[1] * s);
   const ctx = new DrawContext();
   ctx.size = new Size(W, H); ctx.opaque = false; ctx.respectScreenScale = false;
+  // Lock Screen canvases: iOS supplies the tile, draws in one color, and
+  // allows no live overlays — so no background, and clocks bake in.
+  const accessory = String(family).indexOf("accessory") === 0;
   if (bgImg) {
     ctx.drawImageInRect(bgImg, new Rect(0, 0, W, H));
     // A see-through gradient over the wallpaper still carries its texture,
     // exactly as the preview draws it.
     if (design.background === "gradient") drawBgPattern(ctx, design, W, H);
-  } else {
+  } else if (!accessory) {
     paintBackground(ctx, design, W, H);
   }
-  const scale = Math.min(W, H) / 158;
+  const scale = Math.min(W, H) / (accessory ? 76 : 158);
   const els = design.canvasElements || [];
   for (const el of els) {
     // Clocks render as live native overlays (they tick between refreshes);
     // countdowns are baked as the day count — the same number the
     // designer shows, never iOS's "in 3 months" phrasing.
-    if (el.kind === "clock") continue;
+    if (el.kind === "clock" && !accessory) continue;
     const px = el.x * W; const py = el.y * H; const fs = (el.size || 20) * scale;
     const op = (typeof el.opacity === "number" && el.opacity >= 0 && el.opacity <= 1) ? el.opacity : 1;
     if (el.kind === "shape") {
@@ -3380,6 +3391,20 @@ async function buildLockWidget(design, family) {
   // The slot's family decides the physical shape; the design's chosen style
   // decides the row cap — so the phone shows the rows the preview showed.
   const circle = family === "accessoryCircular" || design.lockStyle === "circle";
+  if (design.lockMode === "canvas" && Array.isArray(design.canvasElements) && design.canvasElements.length) {
+    // v133: a drag-and-drop lock widget — the composition baked as one
+    // image at the accessory size; iOS tints it and adds the frosted tile.
+    const liveC = await liveDataFor(design);
+    const img = drawFreestyle(design, family, null, liveC);
+    w.setPadding(0, 0, 0, 0);
+    try { w.addAccessoryWidgetBackground = true; } catch (e) {}
+    const pts = widgetPointSizes(family);
+    const wi = w.addImage(img);
+    wi.imageSize = new Size(pts[0], pts[1]);
+    try { wi.centerAlignImage(); } catch (e) {}
+    w.refreshAfterDate = new Date(Date.now() + 5 * 60 * 1000);
+    return w;
+  }
   let rows = Array.isArray(design.lockRows) ? design.lockRows.slice(0, circle ? 2 : 3) : [];
   if (!rows.length) {
     // Any regular design still works on the Lock Screen — map it to rows.
@@ -3867,7 +3892,13 @@ function resolvePlaylist(design) {
   const wanted = pl[activePlaylistSlot()] || pl.morning || pl.midday || pl.evening || pl.night || "";
   return designs.find(function (d) { return d.id === wanted && d.kind !== "playlist"; }) || null;
 }
-const SIZES = { small: [158, 158], medium: [338, 158], large: [338, 354] };
+const SIZES = { small: [158, 158], medium: [338, 158], large: [338, 354],
+  // Lock Screen canvases (accessory widgets): element sizes on these are real points.
+  lockRect: [172, 76], lockCircle: [76, 76] };
+// Freestyle element sizes are relative to the 158pt small-widget short side;
+// Lock Screen canvases use their own 76pt short side so a size reads as points.
+function freestyleBase(design) { return design && design.kind === "lock" ? 76 : 158; }
+function isLockCanvas(design) { return !!design && design.kind === "lock" && design.lockMode === "canvas"; }
 // Font ids map to iOS built-in fonts in the Scriptable renderer and CSS
 // stacks here (exact on iPhone Safari; close fallbacks elsewhere).
 const FONT_CSS = {
@@ -5096,6 +5127,10 @@ function normalizeDesign(design) {
   }
   if (design.kind === "lock") {
     if (design.lockStyle !== "circle") design.lockStyle = "rect";
+    // v133: rows (simple text lines) or canvas (any freestyle piece, baked
+    // as one monochrome image). The shape decides the canvas size.
+    if (design.lockMode !== "canvas") design.lockMode = "rows";
+    design.fitSize = design.lockStyle === "circle" ? "lockCircle" : "lockRect";
     if (!Array.isArray(design.lockRows) || !design.lockRows.length) {
       design.lockRows = [{ kind: "time" }, { kind: "date" }];
     }
@@ -6675,7 +6710,7 @@ function designPreviewHTML(design, sizeKey) {
 }
 function renderFreestyleInto(node, design, w, h, interactive) {
   node.innerHTML = "";
-  const scale = Math.min(w, h) / 158;
+  const scale = Math.min(w, h) / freestyleBase(design);
   const now = new Date();
   const selEl = interactive && !multiSelect && selectedElId
     ? design.canvasElements.find(function (e) { return e.id === selectedElId; }) : null;
@@ -7041,6 +7076,17 @@ function lockRowPreviewText(row) {
 }
 function lockPreviewHTML(design) {
   const circle = design.lockStyle === "circle";
+  if (design.lockMode === "canvas") {
+    // Drag-and-drop lock widget: the composition drawn on its real canvas,
+    // desaturated like iOS will draw it, on the frosted stand-in tile.
+    const dims = SIZES[circle ? "lockCircle" : "lockRect"];
+    const holder = document.createElement("div");
+    holder.style.cssText = "position:relative;overflow:hidden;width:" + dims[0] + "px;height:" + dims[1] + "px;" +
+      "border-radius:" + (circle ? "50%" : "16px") + ";background:rgba(255,255,255,.22);filter:grayscale(1) brightness(1.08);" +
+      "color:#fff;font-family:" + (FONT_CSS[design.fontStyle] || FONT_CSS.rounded);
+    renderFreestyleInto(holder, design, dims[0], dims[1], false);
+    return '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">' + holder.outerHTML + "</div>";
+  }
   const rows = (design.lockRows || []).slice(0, circle ? 2 : 3);
   let inner = "";
   rows.forEach(function (row, index) {
@@ -7074,7 +7120,8 @@ const LOCK_PREVIEW_DIMS = [186, 300];
 // The widget tile at a reduced scale, in a box of its scaled size.
 function lockTileHTML(design, scale) {
   const circle = design.lockStyle === "circle";
-  const w = circle ? 76 : 172, h = circle ? 76 : 64;
+  const canvasDims = design.lockMode === "canvas" ? SIZES[circle ? "lockCircle" : "lockRect"] : null;
+  const w = canvasDims ? canvasDims[0] : (circle ? 76 : 172), h = canvasDims ? canvasDims[1] : (circle ? 76 : 64);
   return '<div style="position:relative;width:' + Math.round(w * scale) + 'px;height:' + Math.round(h * scale) + 'px;flex:none">' +
     '<div style="position:absolute;left:0;top:0;width:' + w + 'px;height:' + h + 'px;transform:scale(' + scale + ');transform-origin:top left">' +
     lockPreviewHTML(design) + '</div></div>';
@@ -7119,7 +7166,7 @@ function renderPreview() {
   recordHistory();
   // v85 perf: while the Studio surface is the canvas, the preview dock is
   // hidden — don't pay to paint it on every edit and drag frame.
-  if (studioOpen && current && current.kind === "freestyle") return;
+  if (studioOpen && current && (current.kind === "freestyle" || isLockCanvas(current))) return;
   const canvas = document.getElementById("canvas");
   const dims = SIZES[previewSize];
   canvas.style.width = dims[0] + "px";
@@ -8972,14 +9019,27 @@ window.addEventListener("resize", function () {
 });
 function renderStudioCanvas() {
   const canvas = document.getElementById("studioCanvas");
+  const lockCanvas = isLockCanvas(current);
+  if (lockCanvas && !SIZES[studioSize]) studioSize = current.fitSize;
   const dims = SIZES[studioSize];
   const scale = studioScaleFor(dims);
   const w = Math.round(dims[0] * scale);
   const h = Math.round(dims[1] * scale);
   canvas.style.width = w + "px";
   canvas.style.height = h + "px";
-  canvas.style.borderRadius = Math.round(28 * scale * 0.75) + "px";
-  applyDesignBackground(canvas, current);
+  const stage = document.getElementById("studioStage");
+  stage.classList.toggle("lock-stage", lockCanvas);
+  canvas.classList.toggle("lock-canvas", lockCanvas);
+  if (lockCanvas) {
+    // iOS supplies the frosted tile and draws everything in one color.
+    canvas.style.borderRadius = current.lockStyle === "circle" ? "50%" : Math.round(16 * scale) + "px";
+    canvas.style.background = "rgba(255,255,255,.22)";
+    canvas.style.color = "#FFFFFF";
+    canvas.style.fontFamily = FONT_CSS[current.fontStyle] || FONT_CSS.rounded;
+  } else {
+    canvas.style.borderRadius = Math.round(28 * scale * 0.75) + "px";
+    applyDesignBackground(canvas, current);
+  }
   renderFreestyleInto(canvas, current, w, h, true);
   renderStudioLook();
 }
@@ -9083,11 +9143,24 @@ function renderStudioUI() {
   document.getElementById("studioEditHint").style.display = selectedElId ? "none" : "block";
   const sizeRow = document.getElementById("studioSizeButtons");
   sizeRow.innerHTML = "";
-  for (const key of ["small", "medium", "large"]) {
+  const lockCanvas = isLockCanvas(current);
+  const sizeKeys = lockCanvas ? ["lockRect", "lockCircle"] : ["small", "medium", "large"];
+  for (const key of sizeKeys) {
     const button = document.createElement("button");
-    button.textContent = key === "small" ? "S" : key === "medium" ? "M" : "L";
+    button.textContent = key === "small" ? "S" : key === "medium" ? "M" : key === "large" ? "L" : key === "lockRect" ? "▭" : "◯";
+    button.title = key === "lockRect" ? "Rectangular" : key === "lockCircle" ? "Circular" : "";
     button.className = studioSize === key ? "active" : "";
     button.onclick = function () {
+      if (lockCanvas) {
+        current.lockStyle = key === "lockCircle" ? "circle" : "rect";
+        current.fitSize = key;
+        studioSize = key;
+        previewSize = key;
+        renderStudioUI();
+        renderStudioCanvas();
+        renderControls();
+        return;
+      }
       switchDesignSize(current, studioSize, key);
       studioSize = key;
       previewSize = key;
@@ -9224,19 +9297,47 @@ function convertToFreestyle(design) {
 function syncEditorSurface() {
   if (!current) return;
   const freestyle = current.kind === "freestyle";
-  studioOpen = freestyle;
-  document.getElementById("studio").classList.toggle("open", freestyle);
-  document.getElementById("previewDock").style.display = freestyle ? "none" : "";
-  document.getElementById("openStudioBtn").style.display = freestyle ? "none" : "";
-  if (freestyle) {
-    studioSize = previewSize;
+  const lockCanvas = isLockCanvas(current);
+  const studio = freestyle || lockCanvas;
+  studioOpen = studio;
+  document.getElementById("studio").classList.toggle("open", studio);
+  document.getElementById("previewDock").style.display = studio ? "none" : "";
+  document.getElementById("openStudioBtn").style.display = studio ? "none" : "";
+  if (studio) {
+    studioSize = lockCanvas ? current.fitSize : previewSize;
     renderStudioUI();
     renderStudioCanvas();
   }
 }
+// A rows-mode Lock Screen design becomes a canvas: each row turns into the
+// matching freestyle piece, stacked where the rows sat. Stays a lock design.
+function convertLockToCanvas(design) {
+  if (!design || design.kind !== "lock" || design.lockMode === "canvas") return false;
+  const circle = design.lockStyle === "circle";
+  const rows = (design.lockRows || []).slice(0, circle ? 2 : 3);
+  const n = rows.length || 1;
+  const els = [];
+  rows.forEach(function (row, i) {
+    const y = n === 1 ? 0.5 : 0.24 + (0.52 * i) / (n - 1);
+    const big = n === 1 || (circle && i === 0);
+    const size = big ? (circle ? 18 : 17) : (n >= 3 ? 10 : 12);
+    const base = { id: uid(), kind: "text", text: "", x: 0.5, y: y, size: size, colorHex: "#FFFFFF", opacity: i === 0 ? 1 : 0.85, bold: i === 0 };
+    if (row.kind === "time") els.push(Object.assign(base, { kind: "clock" }));
+    else if (row.kind === "date") els.push(Object.assign(base, { kind: "date" }));
+    else if (row.kind === "countdown") els.push(Object.assign(base, { kind: "countdown", dateISO: row.dateISO || design.targetDate || isoInDays(30) }));
+    else if (row.kind === "battery") els.push(Object.assign(base, { kind: "battery" }));
+    else if (row.kind === "weather") els.push(Object.assign(base, { kind: "weather", wmode: "now", unit: row.unit || "f" }));
+    else if (row.kind === "reminder") els.push(Object.assign(base, { kind: "reminders", count: 1 }));
+    else els.push(Object.assign(base, { text: row.text || "" }));
+  });
+  design.canvasElements = els;
+  design.lockMode = "canvas";
+  design.fitSize = circle ? "lockCircle" : "lockRect";
+  return true;
+}
 function openStudio() {
-  const converted = convertToFreestyle(current);
-  studioSize = previewSize;
+  const converted = current.kind === "lock" ? convertLockToCanvas(current) : convertToFreestyle(current);
+  studioSize = current.kind === "lock" ? current.fitSize : previewSize;
   openEditor();
   syncEditorSurface();
   refreshEditors();
@@ -9892,6 +9993,47 @@ function buildTemplates() {
     { category: "Lock Screen", pack: "Lock", size: "small", design: { name: "Focus", kind: "lock", lockStyle: "circle", fontStyle: "futura", textColorHex: "#FFFFFF", lockRows: [
       { kind: "text", text: "FOCUS" }, { kind: "reminder" }
     ] } },
+    // Canvas lock widgets (v133): any piece, baked as one monochrome image.
+    // Sizes are real points on a 172×76 or 76×76 tile.
+    { category: "Lock Screen", pack: "Lock", size: "small", design: { name: "Ring Battery", kind: "lock", lockMode: "canvas", lockStyle: "circle", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "ring", source: "battery", x: 0.5, y: 0.5, w: 0.92, size: 5, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "battery", x: 0.5, y: 0.5, size: 15, colorHex: "#FFFFFF", opacity: 1, bold: true }
+    ] } },
+    { category: "Lock Screen", pack: "Lock", size: "small", design: { name: "Day Dial", kind: "lock", lockMode: "canvas", lockStyle: "circle", fontStyle: "avenir", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "ring", source: "day", x: 0.5, y: 0.5, w: 0.92, size: 4, colorHex: "#FFFFFF", opacity: 0.95 },
+      { kind: "date", x: 0.5, y: 0.44, size: 8, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "week", x: 0.5, y: 0.63, size: 7, colorHex: "#FFFFFF", opacity: 0.7 }
+    ] } },
+    { category: "Lock Screen", pack: "Lock", size: "small", design: { name: "Split Weather", kind: "lock", lockMode: "canvas", lockStyle: "rect", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.5, w: 0.012, h: 0.66, colorHex: "#FFFFFF", opacity: 0.4 },
+      { kind: "weather", wmode: "now", unit: "f", x: 0.27, y: 0.5, size: 20, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "weather", wmode: "cond", unit: "f", x: 0.74, y: 0.28, size: 8, colorHex: "#FFFFFF", opacity: 0.9 },
+      { kind: "weather", wmode: "hilo", unit: "f", x: 0.74, y: 0.52, size: 8, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "weather", wmode: "rain", unit: "f", x: 0.74, y: 0.76, size: 8, colorHex: "#FFFFFF", opacity: 0.75 }
+    ] } },
+    { category: "Lock Screen", pack: "Lock", size: "small", design: { name: "Countdown Bar", kind: "lock", lockMode: "canvas", lockStyle: "rect", fontStyle: "futura", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "text", text: "NEW YEAR", x: 0.5, y: 0.2, size: 7, colorHex: "#FFFFFF", opacity: 0.75 },
+      { kind: "countdown", dateISO: "2027-01-01", x: 0.42, y: 0.48, size: 18, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "text", text: "days", x: 0.64, y: 0.51, size: 8, colorHex: "#FFFFFF", opacity: 0.8 },
+      { kind: "progress", source: "countdown", dateISO: "2027-01-01", startISO: "2026-10-01", x: 0.5, y: 0.8, w: 0.82, size: 4, colorHex: "#FFFFFF", opacity: 1 }
+    ] } },
+    { category: "Lock Screen", pack: "Lock", size: "small", design: { name: "Agenda", kind: "lock", lockMode: "canvas", lockStyle: "rect", fontStyle: "avenir", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "text", text: "NEXT UP", x: 0.5, y: 0.18, size: 7, colorHex: "#FFFFFF", opacity: 0.7 },
+      { kind: "calendar", count: 2, x: 0.5, y: 0.58, size: 8, colorHex: "#FFFFFF", opacity: 1 }
+    ] } },
+    { category: "Lock Screen", pack: "Lock", size: "small", design: { name: "Sky Dial", kind: "lock", lockMode: "canvas", lockStyle: "circle", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "astro", mode: "moonicon", x: 0.5, y: 0.4, size: 26, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "astro", mode: "next", x: 0.5, y: 0.78, size: 7, colorHex: "#FFFFFF", opacity: 0.9 }
+    ] } },
+    { category: "Lock Screen", pack: "Lock", size: "small", design: { name: "Power Line", kind: "lock", lockMode: "canvas", lockStyle: "rect", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "battery", x: 0.28, y: 0.42, size: 20, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "text", text: "BATTERY", x: 0.28, y: 0.74, size: 7, colorHex: "#FFFFFF", opacity: 0.7 },
+      { kind: "progress", source: "battery", x: 0.72, y: 0.5, w: 0.4, size: 6, colorHex: "#FFFFFF", opacity: 1 }
+    ] } },
+    { category: "Lock Screen", pack: "Lock", size: "small", design: { name: "Market Pulse", kind: "lock", lockMode: "canvas", lockStyle: "rect", fontStyle: "mono", textColorHex: "#FFFFFF", canvasElements: [
+      { kind: "stock", symbol: "AAPL", mode: "both", autoColor: false, x: 0.5, y: 0.33, size: 10, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "stock", symbol: "BTC-USD", mode: "both", autoColor: false, x: 0.5, y: 0.67, size: 10, colorHex: "#FFFFFF", opacity: 1, bold: true }
+    ] } },
     { category: "Live", pack: "Live", design: { name: "Weather Glass", kind: "freestyle", background: "glass", glassTint: "dark", themeID: "navy", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
       { kind: "weather", x: 0.5, y: 0.4, size: 30, colorHex: "#FFFFFF", opacity: 1, unit: "f" },
       { kind: "date", x: 0.5, y: 0.63, size: 12, colorHex: "#FFFFFF", opacity: 0.85 }
@@ -10073,7 +10215,153 @@ function buildTemplates() {
       { kind: "shape", shape: "pill", w: 0.72, h: 0.24, x: 0.5, y: 0.55, size: 0, colorHex: "#3B1B00", opacity: 0.25 },
       { kind: "emoji", text: "☀️", x: 0.5, y: 0.27, size: 24, colorHex: "#FFFFFF", opacity: 1 },
       { kind: "text", text: "golden hour", x: 0.5, y: 0.55, size: 15, colorHex: "#FFF3DB", opacity: 1 }
-    ] } }
+    ] } },
+    // v133 — more in every pack, each one leaning on the pieces people
+    // asked for: rings, split cards, live data, texture.
+    { category: "Picks", pack: "Picks", size: "medium", design: { name: "Pulse Board", kind: "freestyle", themeID: "navy", fontStyle: "avenir", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
+      { kind: "greeting", name: "", emoji: true, x: 0.27, y: 0.18, size: 14, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "date", x: 0.27, y: 0.36, size: 10, colorHex: "#8FD3FE", opacity: 0.95 },
+      { kind: "calendar", count: 3, x: 0.27, y: 0.66, size: 9, colorHex: "#FFFFFF", opacity: 0.9 },
+      { kind: "ring", source: "battery", x: 0.76, y: 0.42, w: 0.5, size: 7, colorHex: "#8FD3FE", opacity: 1 },
+      { kind: "battery", x: 0.76, y: 0.42, size: 14, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "week", x: 0.76, y: 0.86, size: 9, colorHex: "#FFFFFF", opacity: 0.55 }
+    ] } },
+    { category: "Picks", pack: "Picks", size: "small", design: { name: "Orbit Clock", kind: "freestyle", themeID: "cosmos", fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "ring", source: "day", x: 0.5, y: 0.5, w: 0.84, size: 5, colorHex: "#B9A8F0", opacity: 0.95 },
+      { kind: "clock", x: 0.5, y: 0.46, size: 24, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "date", x: 0.5, y: 0.62, size: 9, colorHex: "#D8C9F5", opacity: 0.85 }
+    ] } },
+    { category: "Bento", pack: "Bento", size: "medium", design: { name: "Quad Grid", kind: "freestyle", themeID: "custom", customColors: ["#0E0E12", "#15151B"], fontStyle: "avenir", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
+      { kind: "shape", shape: "rect", x: 0.27, y: 0.28, w: 0.44, h: 0.42, radius: 14, colorHex: "#FFFFFF", opacity: 0.08 },
+      { kind: "shape", shape: "rect", x: 0.73, y: 0.28, w: 0.44, h: 0.42, radius: 14, colorHex: "#FFFFFF", opacity: 0.08 },
+      { kind: "shape", shape: "rect", x: 0.27, y: 0.73, w: 0.44, h: 0.42, radius: 14, colorHex: "#FFFFFF", opacity: 0.08 },
+      { kind: "shape", shape: "rect", x: 0.73, y: 0.73, w: 0.44, h: 0.42, radius: 14, colorHex: "#FFFFFF", opacity: 0.08 },
+      { kind: "clock", x: 0.27, y: 0.28, size: 18, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "weather", wmode: "now", unit: "f", x: 0.73, y: 0.28, size: 18, colorHex: "#FFD75E", opacity: 1, bold: true },
+      { kind: "battery", x: 0.27, y: 0.73, size: 18, colorHex: "#B9FBC0", opacity: 1, bold: true },
+      { kind: "date", x: 0.73, y: 0.73, size: 11, colorHex: "#FFFFFF", opacity: 0.9 }
+    ] } },
+    { category: "Bento", pack: "Bento", size: "small", design: { name: "Stat Pills", kind: "freestyle", themeID: "custom", customColors: ["#111116", "#1A1A22"], fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "shape", shape: "pill", x: 0.5, y: 0.3, w: 0.82, h: 0.24, colorHex: "#FFFFFF", opacity: 0.1 },
+      { kind: "shape", shape: "circle", x: 0.2, y: 0.3, w: 0.07, colorHex: "#FFD75E", opacity: 1 },
+      { kind: "battery", x: 0.56, y: 0.3, size: 12, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "shape", shape: "pill", x: 0.5, y: 0.62, w: 0.82, h: 0.24, colorHex: "#FFFFFF", opacity: 0.1 },
+      { kind: "shape", shape: "circle", x: 0.2, y: 0.62, w: 0.07, colorHex: "#8FD3FE", opacity: 1 },
+      { kind: "weather", wmode: "now", unit: "f", x: 0.56, y: 0.62, size: 12, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "date", x: 0.5, y: 0.88, size: 8, colorHex: "#FFFFFF", opacity: 0.6 }
+    ] } },
+    { category: "Vibes", pack: "Cute", size: "small", design: { name: "Cloud Nine", kind: "freestyle", themeID: "candy", fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "emoji", text: "☁️", x: 0.5, y: 0.34, size: 34, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "clock", x: 0.5, y: 0.64, size: 18, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "text", text: "have a soft day", x: 0.5, y: 0.84, size: 8, colorHex: "#FFF3F8", opacity: 0.9 }
+    ] } },
+    { category: "Vibes", pack: "Cute", size: "small", design: { name: "Berry Days", kind: "freestyle", themeID: "blush", fontStyle: "cochin", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "emoji", text: "🍓", x: 0.8, y: 0.2, size: 18, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "text", text: "days until summer", x: 0.5, y: 0.3, size: 10, colorHex: "#FFE4EC", opacity: 0.95 },
+      { kind: "countdown", dateISO: "2027-06-21", x: 0.5, y: 0.56, size: 34, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "shape", shape: "pill", x: 0.5, y: 0.82, w: 0.3, h: 0.025, colorHex: "#FFFFFF", opacity: 0.6 }
+    ] } },
+    { category: "Minimal", pack: "Minimal", size: "small", design: { name: "Hairline", kind: "freestyle", themeID: "paper", fontStyle: "classic", textColorHex: "#2A2A2A", fitSize: "small", canvasElements: [
+      { kind: "clock", x: 0.5, y: 0.42, size: 30, colorHex: "#2A2A2A", opacity: 1, bold: false },
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.6, w: 0.5, h: 0.005, colorHex: "#2A2A2A", opacity: 0.4 },
+      { kind: "date", x: 0.5, y: 0.72, size: 9, colorHex: "#555555", opacity: 1 }
+    ] } },
+    { category: "Minimal", pack: "Minimal", size: "medium", design: { name: "Column", kind: "freestyle", themeID: "mist", fontStyle: "avenir", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
+      { kind: "text", text: "TODAY", x: 0.17, y: 0.3, size: 9, colorHex: "#FFFFFF", opacity: 0.6 },
+      { kind: "date", x: 0.17, y: 0.52, size: 12, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "week", x: 0.17, y: 0.72, size: 9, colorHex: "#FFFFFF", opacity: 0.55 },
+      { kind: "shape", shape: "rect", x: 0.36, y: 0.5, w: 0.004, h: 0.6, colorHex: "#FFFFFF", opacity: 0.3 },
+      { kind: "calendar", count: 3, x: 0.68, y: 0.5, size: 10, colorHex: "#FFFFFF", opacity: 0.95 }
+    ] } },
+    { category: "Zen", pack: "Zen", size: "small", design: { name: "Tide", kind: "freestyle", themeID: "ocean", gradientDir: "mesh", fontStyle: "serif", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "text", text: "breathe in", x: 0.5, y: 0.36, size: 13, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "text", text: "the day is", x: 0.5, y: 0.52, size: 9, colorHex: "#FFFFFF", opacity: 0.7 },
+      { kind: "progress", source: "day", x: 0.5, y: 0.66, w: 0.6, size: 4, colorHex: "#FFFFFF", opacity: 0.95 },
+      { kind: "astro", mode: "next", x: 0.5, y: 0.84, size: 8, colorHex: "#FFFFFF", opacity: 0.8 }
+    ] } },
+    { category: "Zen", pack: "Zen", size: "small", design: { name: "Lantern", kind: "freestyle", themeID: "mocha", fontStyle: "cochin", textColorHex: "#F6E7D8", fitSize: "small", canvasElements: [
+      { kind: "icon", text: "☾", x: 0.5, y: 0.3, size: 30, colorHex: "#F2C58C", opacity: 1 },
+      { kind: "text", text: "rest well", x: 0.5, y: 0.6, size: 13, colorHex: "#F6E7D8", opacity: 1 },
+      { kind: "date", x: 0.5, y: 0.8, size: 8, colorHex: "#F6E7D8", opacity: 0.7 }
+    ] } },
+    { category: "Work", pack: "Work", size: "medium", design: { name: "Standup", kind: "freestyle", themeID: "navy", fontStyle: "avenir", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
+      { kind: "text", text: "STANDUP", x: 0.25, y: 0.18, size: 9, colorHex: "#8FD3FE", opacity: 0.9 },
+      { kind: "calendar", count: 3, x: 0.25, y: 0.56, size: 10, colorHex: "#FFFFFF", opacity: 0.95 },
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.5, w: 0.004, h: 0.7, colorHex: "#FFFFFF", opacity: 0.25 },
+      { kind: "text", text: "TO DO", x: 0.75, y: 0.18, size: 9, colorHex: "#8FD3FE", opacity: 0.9 },
+      { kind: "reminders", count: 2, x: 0.75, y: 0.52, size: 10, colorHex: "#FFFFFF", opacity: 0.95 }
+    ] } },
+    { category: "Work", pack: "Work", size: "small", design: { name: "Sprint Ring", kind: "freestyle", themeID: "custom", customColors: ["#101418", "#1D2530"], fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "ring", source: "countdown", dateISO: "2026-12-31", startISO: "2026-10-01", x: 0.5, y: 0.46, w: 0.7, size: 7, colorHex: "#4ADE80", opacity: 1 },
+      { kind: "countdown", dateISO: "2026-12-31", x: 0.5, y: 0.46, size: 20, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "text", text: "days to ship", x: 0.5, y: 0.84, size: 8, colorHex: "#FFFFFF", opacity: 0.7 }
+    ] } },
+    { category: "Neon", pack: "Neon", size: "small", design: { name: "Grid Runner", kind: "freestyle", themeID: "custom", customColors: ["#07000F", "#1A0033"], bgPattern: "grid", fontStyle: "futura", textColorHex: "#00F0FF", fitSize: "small", canvasElements: [
+      { kind: "clock", x: 0.5, y: 0.44, size: 28, colorHex: "#00F0FF", opacity: 1, bold: true },
+      { kind: "date", x: 0.5, y: 0.64, size: 9, colorHex: "#FF2079", opacity: 1 },
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.76, w: 0.6, h: 0.01, colorHex: "#FF2079", opacity: 0.8 }
+    ] } },
+    { category: "Neon", pack: "Neon", size: "medium", design: { name: "Laser Weather", kind: "freestyle", themeID: "custom", customColors: ["#04040C", "#120B2E"], fontStyle: "futura", textColorHex: "#39FF14", fitSize: "medium", canvasElements: [
+      { kind: "weather", wmode: "now", unit: "f", x: 0.25, y: 0.42, size: 34, colorHex: "#39FF14", opacity: 1, bold: true },
+      { kind: "weather", wmode: "hilo", unit: "f", x: 0.25, y: 0.72, size: 10, colorHex: "#FFD300", opacity: 1 },
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.5, w: 0.004, h: 0.7, colorHex: "#FF2079", opacity: 0.9 },
+      { kind: "weather", wmode: "hourly", unit: "f", x: 0.75, y: 0.42, size: 8, colorHex: "#00F0FF", opacity: 1 },
+      { kind: "weather", wmode: "cond", unit: "f", x: 0.75, y: 0.7, size: 9, colorHex: "#FF2079", opacity: 1 }
+    ] } },
+    { category: "Neon", pack: "Neon", size: "small", design: { name: "Pulse Battery", kind: "freestyle", themeID: "custom", customColors: ["#0B0014", "#14002E"], fontStyle: "rounded", textColorHex: "#00F0FF", fitSize: "small", canvasElements: [
+      { kind: "ring", source: "battery", x: 0.5, y: 0.46, w: 0.7, size: 8, colorHex: "#FF2079", opacity: 1 },
+      { kind: "battery", x: 0.5, y: 0.46, size: 18, colorHex: "#00F0FF", opacity: 1, bold: true },
+      { kind: "text", text: "CHARGE", x: 0.5, y: 0.86, size: 8, colorHex: "#FFD300", opacity: 0.9 }
+    ] } },
+    { category: "Live", pack: "Live", size: "small", design: { name: "Tomorrow", kind: "freestyle", themeID: "aurora", fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "weather", wmode: "tomorrow", unit: "f", x: 0.5, y: 0.28, size: 11, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "weather", wmode: "rain", unit: "f", x: 0.5, y: 0.5, size: 12, colorHex: "#E9FFF4", opacity: 1 },
+      { kind: "astro", mode: "sunset", x: 0.5, y: 0.7, size: 10, colorHex: "#FFFFFF", opacity: 0.9 },
+      { kind: "week", x: 0.5, y: 0.87, size: 8, colorHex: "#FFFFFF", opacity: 0.6 }
+    ] } },
+    { category: "Live", pack: "Live", size: "medium", design: { name: "Street Ticker", kind: "freestyle", themeID: "custom", customColors: ["#0B0B0F", "#15151F"], fontStyle: "mono", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
+      { kind: "stock", symbol: "AAPL", mode: "change", x: 0.17, y: 0.28, size: 10, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "stock", symbol: "TSLA", mode: "change", x: 0.5, y: 0.28, size: 10, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "stock", symbol: "BTC-USD", mode: "change", x: 0.83, y: 0.28, size: 10, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.46, w: 0.9, h: 0.006, colorHex: "#FFFFFF", opacity: 0.2 },
+      { kind: "news", count: 2, x: 0.5, y: 0.72, size: 9, colorHex: "#D7D7E0", opacity: 0.95 }
+    ] } },
+    { category: "Designer", pack: "Designer", size: "medium", design: { name: "Masthead", kind: "freestyle", themeID: "paper", fontStyle: "didot", textColorHex: "#1C1C1C", fitSize: "medium", canvasElements: [
+      { kind: "text", text: "THE DAILY", x: 0.5, y: 0.18, size: 16, colorHex: "#1C1C1C", opacity: 1, bold: true },
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.32, w: 0.8, h: 0.006, colorHex: "#1C1C1C", opacity: 0.5 },
+      { kind: "date", x: 0.25, y: 0.5, size: 10, colorHex: "#333333", opacity: 1 },
+      { kind: "weather", wmode: "cond", unit: "f", x: 0.75, y: 0.5, size: 10, colorHex: "#333333", opacity: 1 },
+      { kind: "calendar", count: 2, x: 0.5, y: 0.78, size: 9, colorHex: "#444444", opacity: 1 }
+    ] } },
+    { category: "Designer", pack: "Designer", size: "small", design: { name: "Duotone", kind: "freestyle", themeID: "custom", customColors: ["#1B1B2F", "#E94560"], gradientDir: "horizontal", fontStyle: "futura", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "shape", shape: "circle", x: 0.82, y: 0.18, w: 0.16, colorHex: "#FFFFFF", opacity: 0.9 },
+      { kind: "clock", x: 0.5, y: 0.44, size: 30, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "date", x: 0.5, y: 0.64, size: 10, colorHex: "#FFFFFF", opacity: 0.85 }
+    ] } },
+    { category: "Glass", pack: "Glass", size: "small", design: { name: "Frost Ring", kind: "freestyle", background: "glass", glassTint: "light", bgOpacity: 0.55, themeID: "liquidglass", fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.5, w: 0.93, h: 0.93, radius: 24, colorHex: "#FFFFFF", opacity: 0.07, border: 1, borderHex: "#FFFFFF" },
+      { kind: "ring", source: "day", x: 0.5, y: 0.46, w: 0.62, size: 6, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "date", x: 0.5, y: 0.46, size: 9, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "text", text: "today", x: 0.5, y: 0.84, size: 9, colorHex: "#FFFFFF", opacity: 0.75 }
+    ] } },
+    { category: "Glass", pack: "Glass", size: "medium", design: { name: "Glass Ticker", kind: "freestyle", background: "glass", glassTint: "dark", bgOpacity: 0.6, themeID: "glassnoir", fontStyle: "mono", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.5, w: 0.96, h: 0.9, radius: 18, colorHex: "#FFFFFF", opacity: 0.06, border: 1, borderHex: "#FFFFFF" },
+      { kind: "stock", symbol: "AAPL", mode: "both", x: 0.27, y: 0.38, size: 13, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "stock", symbol: "TSLA", mode: "both", x: 0.73, y: 0.38, size: 13, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "news", count: 1, x: 0.5, y: 0.74, size: 9, colorHex: "#FFFFFF", opacity: 0.85 }
+    ] } },
+    { category: "Sports", pack: "Sports", size: "medium", design: { name: "Scoreboard", kind: "freestyle", themeID: "custom", customColors: ["#0C1A0C", "#153015"], fontStyle: "futura", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
+      { kind: "text", text: "MY LEAGUE", x: 0.5, y: 0.16, size: 8, colorHex: "#B9FBC0", opacity: 0.8 },
+      { kind: "sleeper", mode: "score", x: 0.5, y: 0.42, size: 24, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "sleeper", mode: "record", x: 0.5, y: 0.68, size: 10, colorHex: "#B9FBC0", opacity: 1 },
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.84, w: 0.5, h: 0.006, colorHex: "#FFFFFF", opacity: 0.3 }
+    ] } },
+    { category: "Sports", pack: "Sports", size: "small", design: { name: "Kickoff", kind: "freestyle", themeID: "custom", customColors: ["#1A0A0A", "#3A1212"], fontStyle: "futura", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "emoji", text: "🏈", x: 0.82, y: 0.18, size: 16, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "text", text: "KICKOFF", x: 0.5, y: 0.24, size: 9, colorHex: "#FFFFFF", opacity: 0.75 },
+      { kind: "countdown", dateISO: "2026-10-11", x: 0.5, y: 0.5, size: 34, colorHex: "#FFD75E", opacity: 1, bold: true },
+      { kind: "text", text: "days", x: 0.5, y: 0.74, size: 10, colorHex: "#FFFFFF", opacity: 0.8 }
+    ] } },
   ];
 }
 let activePack = "all";
@@ -10244,6 +10532,7 @@ function upgradeAppLinks(design) {
 }
 function loadIntoEditor(design) {
   current = normalizeDesign(JSON.parse(JSON.stringify(design)));
+  if (current.kind !== "lock" && String(previewSize).indexOf("lock") === 0) previewSize = "small";
   // Open at the size the layout was made for — clicking a size button then
   // refits from the TRUE authored size. (Before this, a medium design opened
   // as small got double-refitted, and only Undo restored the proportions.)
@@ -10339,13 +10628,33 @@ function renderControls() {
   document.getElementById("fNote").style.display = current.kind === "note" ? "block" : "none";
   document.getElementById("fLock").style.display = current.kind === "lock" ? "block" : "none";
   if (current.kind === "lock") {
+    const modeRow = document.getElementById("lockModeRow");
+    modeRow.innerHTML = "";
+    for (const [value, label] of [["rows", "Simple rows"], ["canvas", "Drag & drop canvas"]]) {
+      const button = document.createElement("button");
+      button.textContent = label;
+      if ((current.lockMode || "rows") === value) button.className = "active";
+      button.onclick = function () {
+        if (value === "canvas") convertLockToCanvas(current);
+        else current.lockMode = "rows";
+        renderAll();
+        if (value === "canvas") toast("Every row is now a movable piece — add rings, bars, icons from Pieces ✨");
+      };
+      modeRow.appendChild(button);
+    }
+    document.getElementById("lockCanvasHint").style.display = isLockCanvas(current) ? "block" : "none";
     const styleRow = document.getElementById("lockStyleRow");
     styleRow.innerHTML = "";
     for (const [value, label] of [["rect", "▭ Rectangular (above/below clock)"], ["circle", "◯ Circular"]]) {
       const button = document.createElement("button");
       button.textContent = label;
       if ((current.lockStyle || "rect") === value) button.className = "active";
-      button.onclick = function () { current.lockStyle = value; renderAll(); };
+      button.onclick = function () {
+        current.lockStyle = value;
+        current.fitSize = value === "circle" ? "lockCircle" : "lockRect";
+        if (isLockCanvas(current)) { studioSize = current.fitSize; previewSize = current.fitSize; }
+        renderAll();
+      };
       styleRow.appendChild(button);
     }
     const clockRow = document.getElementById("lockClockRow");
@@ -10359,6 +10668,7 @@ function renderControls() {
     }
     const rowsBox = document.getElementById("lockRowsBox");
     rowsBox.innerHTML = "";
+    rowsBox.style.display = isLockCanvas(current) ? "none" : "";
     const maxRows = current.lockStyle === "circle" ? 2 : 3;
     current.lockRows = (current.lockRows || []).slice(0, maxRows);
     current.lockRows.forEach(function (row, index) {
