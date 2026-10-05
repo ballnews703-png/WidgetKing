@@ -686,7 +686,10 @@
         <label>Lock Screen widget — up to 3 rows</label>
         <div class="row" id="lockStyleRow" style="margin-bottom:6px"></div>
         <div id="lockRowsBox"></div>
+        <label style="margin-top:10px">Your Lock Screen clock (preview only)</label>
+        <div class="row" id="lockClockRow" style="margin-bottom:6px"></div>
         <p class="hint">Apple draws Lock Screen widgets in frosted monochrome — that's normal. Time and Countdown rows stay live on their own. To add it: hold your Lock Screen → Customize → tap the widget strip → Scriptable → set Script to WidgetKing and Parameter to this design's name.</p>
+        <p class="hint">iOS 27 can shrink the clock into the top row (Customize → tap the clock → the two-bars icon). Your wallpaper breathes and the widget row becomes the star — flip the preview above to design for that layout.</p>
       </div>
       <div class="field" id="fLauncher" style="display:none">
         <label>Add any app with its real App Store icon</label>
@@ -1283,7 +1286,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 130;
+const WK_VERSION = 131;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -7041,6 +7044,51 @@ function lockPreviewHTML(design) {
     'padding:4px;box-sizing:border-box;font-family:' + (FONT_CSS[design.fontStyle] || FONT_CSS.rounded) + '">' +
     inner + "</div></div>";
 }
+// v131: the editor preview for a Lock Screen design is a whole mini Lock
+// Screen — wallpaper, date, clock, the widget row with this design in its
+// slot — in either clock layout: full-size (classic) or iOS 27's compact
+// clock tucked into the top row. Preview-only preference: it's a phone
+// setting, not design data.
+let lockClockMode = localStorage.getItem("widgetking.lockclock") === "compact" ? "compact" : "full";
+function setLockClockMode(mode) {
+  lockClockMode = mode === "compact" ? "compact" : "full";
+  localStorage.setItem("widgetking.lockclock", lockClockMode);
+  if (current) renderAll();
+}
+const LOCK_PREVIEW_DIMS = [186, 300];
+// The widget tile at a reduced scale, in a box of its scaled size.
+function lockTileHTML(design, scale) {
+  const circle = design.lockStyle === "circle";
+  const w = circle ? 76 : 172, h = circle ? 76 : 64;
+  return '<div style="position:relative;width:' + Math.round(w * scale) + 'px;height:' + Math.round(h * scale) + 'px;flex:none">' +
+    '<div style="position:absolute;left:0;top:0;width:' + w + 'px;height:' + h + 'px;transform:scale(' + scale + ');transform-origin:top left">' +
+    lockPreviewHTML(design) + '</div></div>';
+}
+function lockScreenPreviewHTML(design) {
+  const compact = lockClockMode === "compact";
+  const now = new Date();
+  const time = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }).replace(/\s?[AP]M$/i, "");
+  const date = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+  const circle = design.lockStyle === "circle";
+  const slots = circle ? 4 : 2;
+  let row = '<div class="lock-row" style="display:flex;gap:6px;justify-content:center;align-items:center">' + lockTileHTML(design, 0.5);
+  for (let i = 1; i < slots; i++) {
+    row += '<div style="width:' + (circle ? 38 : 86) + 'px;height:' + (circle ? 38 : 32) + 'px;border-radius:' + (circle ? "50%" : "8px") +
+      ';border:1px dashed rgba(255,255,255,.4);flex:none"></div>';
+  }
+  row += "</div>";
+  const top = compact
+    ? '<div class="lock-top compact" style="font-size:12px;font-weight:600;opacity:.95;white-space:nowrap">' + esc(date) + ' &nbsp;·&nbsp; ' + esc(time) + '</div>'
+    : '<div class="lock-top" style="font-size:11px;font-weight:600;opacity:.9">' + esc(date) + '</div>' +
+      '<div class="lock-clock" style="font-size:54px;font-weight:300;line-height:1;letter-spacing:-1.5px;margin:2px 0 8px">' + esc(time) + '</div>';
+  return '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;padding-top:' + (compact ? 34 : 26) +
+    'px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.35);font-family:-apple-system,BlinkMacSystemFont,sans-serif;text-align:center">' +
+    top + '<div style="margin-top:' + (compact ? 12 : 0) + 'px">' + row + '</div>' +
+    '<div style="position:absolute;bottom:16px;left:22px;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.22)"></div>' +
+    '<div style="position:absolute;bottom:16px;right:22px;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.22)"></div>' +
+    '<div style="position:absolute;bottom:5px;left:50%;transform:translateX(-50%);width:52px;height:3px;border-radius:2px;background:rgba(255,255,255,.75)"></div>' +
+    "</div>";
+}
 // Logo-style previews render async: original shows instantly, the derived
 // version swaps in when the canvas pipeline finishes.
 function upgradeRealPreviews(root) {
@@ -7062,10 +7110,10 @@ function renderPreview() {
   canvas.style.width = dims[0] + "px";
   canvas.style.height = dims[1] + "px";
   if (current.kind === "lock") {
-    canvas.style.width = "220px";
-    canvas.style.height = "110px";
-    canvas.style.background = "linear-gradient(160deg, #2A2A3E, #101018)";
-    canvas.innerHTML = lockPreviewHTML(current);
+    canvas.style.width = LOCK_PREVIEW_DIMS[0] + "px";
+    canvas.style.height = LOCK_PREVIEW_DIMS[1] + "px";
+    canvas.style.background = WALLPAPER_STANDIN;
+    canvas.innerHTML = lockScreenPreviewHTML(current);
     return;
   }
   if (current.kind === "playlist") {
@@ -9808,6 +9856,27 @@ function buildTemplates() {
     { category: "Picks", pack: "Picks", size: "small", design: { name: "Lock Countdown", kind: "lock", lockStyle: "rect", fontStyle: "rounded", textColorHex: "#FFFFFF", lockRows: [
       { kind: "text", text: "Christmas 🎄" }, { kind: "countdown", dateISO: "2026-12-25" }
     ] } },
+    // 🔒 Lock Screen — row-based widgets for the strip under the clock. With
+    // iOS 27's compact clock the strip is the Lock Screen's main text, so
+    // these carry a headline + one live line, never a redundant time.
+    { category: "Lock Screen", pack: "Lock", size: "small", design: { name: "Up Next", kind: "lock", lockStyle: "rect", fontStyle: "rounded", textColorHex: "#FFFFFF", lockRows: [
+      { kind: "text", text: "UP NEXT" }, { kind: "reminder" }, { kind: "weather" }
+    ] } },
+    { category: "Lock Screen", pack: "Lock", size: "small", design: { name: "Outside", kind: "lock", lockStyle: "rect", fontStyle: "avenir", textColorHex: "#FFFFFF", lockRows: [
+      { kind: "text", text: "OUTSIDE" }, { kind: "weather" }, { kind: "date" }
+    ] } },
+    { category: "Lock Screen", pack: "Lock", size: "small", design: { name: "Mantra", kind: "lock", lockStyle: "rect", fontStyle: "serif", textColorHex: "#FFFFFF", lockRows: [
+      { kind: "text", text: "Breathe." }, { kind: "text", text: "One thing at a time." }
+    ] } },
+    { category: "Lock Screen", pack: "Lock", size: "small", design: { name: "Trip Days", kind: "lock", lockStyle: "circle", fontStyle: "rounded", textColorHex: "#FFFFFF", lockRows: [
+      { kind: "countdown", dateISO: "2027-03-15" }, { kind: "text", text: "Tokyo ✈" }
+    ] } },
+    { category: "Lock Screen", pack: "Lock", size: "small", design: { name: "Power", kind: "lock", lockStyle: "circle", fontStyle: "rounded", textColorHex: "#FFFFFF", lockRows: [
+      { kind: "battery" }
+    ] } },
+    { category: "Lock Screen", pack: "Lock", size: "small", design: { name: "Focus", kind: "lock", lockStyle: "circle", fontStyle: "futura", textColorHex: "#FFFFFF", lockRows: [
+      { kind: "text", text: "FOCUS" }, { kind: "reminder" }
+    ] } },
     { category: "Live", pack: "Live", design: { name: "Weather Glass", kind: "freestyle", background: "glass", glassTint: "dark", themeID: "navy", fontStyle: "rounded", textColorHex: "#FFFFFF", canvasElements: [
       { kind: "weather", x: 0.5, y: 0.4, size: 30, colorHex: "#FFFFFF", opacity: 1, unit: "f" },
       { kind: "date", x: 0.5, y: 0.63, size: 12, colorHex: "#FFFFFF", opacity: 0.85 }
@@ -9993,7 +10062,7 @@ function buildTemplates() {
   ];
 }
 let activePack = "all";
-const PACK_CHIPS = [["all", "✨ All"], ["Picks", "👑 WidgetKing Picks"], ["Bento", "🍱 Bento"], ["Glass", "🫧 Glass"], ["ClearLook", "🪟 Clear look"], ["Cute", "🌸 Cute"], ["Minimal", "▫️ Minimal"],
+const PACK_CHIPS = [["all", "✨ All"], ["Picks", "👑 WidgetKing Picks"], ["Bento", "🍱 Bento"], ["Glass", "🫧 Glass"], ["ClearLook", "🪟 Clear look"], ["Lock", "🔒 Lock Screen"], ["Cute", "🌸 Cute"], ["Minimal", "▫️ Minimal"],
   ["Zen", "🍃 Zen"], ["Sports", "🏈 Sports"], ["Work", "💼 Work"],
   ["Neon", "⚡ Neon"], ["Live", "🌤 Live"], ["Designer", "💎 Designer"]];
 function renderTemplates(rowEl, chipEl) {
@@ -10264,6 +10333,15 @@ function renderControls() {
       button.onclick = function () { current.lockStyle = value; renderAll(); };
       styleRow.appendChild(button);
     }
+    const clockRow = document.getElementById("lockClockRow");
+    clockRow.innerHTML = "";
+    for (const [value, label] of [["full", "Full-size clock"], ["compact", "Compact clock (iOS 27)"]]) {
+      const button = document.createElement("button");
+      button.textContent = label;
+      if (lockClockMode === value) button.className = "active";
+      button.onclick = function () { setLockClockMode(value); };
+      clockRow.appendChild(button);
+    }
     const rowsBox = document.getElementById("lockRowsBox");
     rowsBox.innerHTML = "";
     const maxRows = current.lockStyle === "circle" ? 2 : 3;
@@ -10458,7 +10536,11 @@ function renderControls() {
     };
     sizeButtons.appendChild(button);
   }
+  // Lock Screen designs have one physical size and never get the stencil
+  // treatment (Apple already draws them monochrome): hide both rows.
+  sizeButtons.style.display = current.kind === "lock" ? "none" : "";
   const lookButtons = document.getElementById("lookButtons");
+  lookButtons.style.display = current.kind === "lock" ? "none" : "";
   lookButtons.innerHTML = "";
   const lbl = document.createElement("span");
   lbl.className = "lbl";
