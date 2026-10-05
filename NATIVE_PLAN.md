@@ -55,6 +55,21 @@ iPhone — needs the Apple Developer membership and is explicitly deferred.
    `systemExtraLargePortrait` (iOS 27). The design picker intent stays.
    Live data (weather, calendar, reminders, battery, stocks, astro,
    sleeper, news) ported from the Scriptable template.
+   *Status (Oct 5):* the extension renders from the App Group library with
+   `WKRenderer` at the widget's real container size (so any family the OS
+   offers gets a pixel-exact image), lists small/medium/large/extraLarge +
+   the three accessory families, bakes clocks per minute, and fetches live
+   data through `Shared/WKLiveFetch.swift` (Open-Meteo, Yahoo, Google News
+   RSS, Sleeper, EventKit, battery; App Group caches with the template's
+   freshness windows; parsers unit-tested). The app asks for location,
+   calendar and reminders access the first time the library needs them
+   (`WidgetKing/WKPermissions.swift`) and stores the location for the
+   extension. Stock art reaches the extension through the containing app's
+   bundle. Old model files deleted. Still open in M3: listing
+   `.systemExtraLargePortrait` (needs an Xcode 27 SDK on the runner), live
+   native clock overlays (`Text(date, style: .time)`) instead of per-minute
+   baked entries, wallpaper slices for glass/clear, real App Store icons,
+   and the alternate-icon bridge.
 4. **Full-page (M4)** — the web designer gains an XL canvas (4×6 page) and
    Page Studio can export a page as ONE full-page widget.
 5. **Signing (M5, paid)** — Apple Developer enrollment, TestFlight,

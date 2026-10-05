@@ -52,7 +52,9 @@ struct WebShellView: UIViewRepresentable {
     final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             guard message.name == "widgetking" else { return }
-            _ = WKBridge.handle(message.body)
+            if case .saved = WKBridge.handle(message.body) {
+                WKPermissions.shared.requestWhatTheLibraryNeeds()
+            }
         }
 
         // Links that leave the bundled page open in the system (App Store,

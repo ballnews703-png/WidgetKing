@@ -47,14 +47,25 @@ struct WKRenderer {
     var appIcons: (String) -> UIImage? = { _ in nil }
     /// Wallpaper slice for glass/clear backgrounds (M3); nil → placeholder.
     var wallpaper: ((WKFamily) -> UIImage?)? = nil
+    /// Previews paint the frosted Lock Screen tile themselves; inside WidgetKit
+    /// iOS supplies that background, so the extension turns this off.
+    var lockBackdrop: Bool = true
 
     static let wallpaperHint = "Set your wallpaper: open the WidgetKing script"
 
     // MARK: entry
 
     func render(_ designIn: WKDesign, family: WKFamily) -> UIImage {
+        return render(designIn, family: family, pointSize: family.points)
+    }
+
+    /// Same, at an explicit point size — the widget extension passes the
+    /// real container size so any family (even one newer than this build's
+    /// SDK, like iOS 27's full-page widget) gets a pixel-exact image.
+    func render(_ designIn: WKDesign, family: WKFamily, pointSize: CGSize) -> UIImage {
         var design = designIn
-        if family.isAccessory { return renderLock(design, family: family) }
+        let pts = CGSize(width: max(8, pointSize.width), height: max(8, pointSize.height))
+        if family.isAccessory { return renderLock(design, family: family, pointSize: pts) }
         if design.kind == "playlist" {
             if let target = resolvePlaylist(design, now) { design = target }
             else {
@@ -68,7 +79,6 @@ struct WKRenderer {
                                "primaryText": "“" + design.name + "” is a Lock Screen design.\nAdd it there: hold the Lock Screen → Customize → tap the widget strip."])
         }
         if design.kind == "freestyle" { design = design.applyingSizeLayout(family.rawValue) }
-        let pts = family.points
         let W = (pts.width * scale).rounded(), H = (pts.height * scale).rounded()
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
@@ -870,8 +880,8 @@ struct WKRenderer {
 
     // MARK: Lock Screen (accessory families)
 
-    func renderLock(_ design: WKDesign, family: WKFamily) -> UIImage {
-        let pts = family.points
+    func renderLock(_ design: WKDesign, family: WKFamily, pointSize: CGSize? = nil) -> UIImage {
+        let pts = pointSize ?? family.points
         let W = (pts.width * scale).rounded(), H = (pts.height * scale).rounded()
         let circle = family == .accessoryCircular || design.lockStyle == "circle"
         var rows: [WKElement] = design.kind == "lock" ? Array(design.lockRows.prefix(circle ? 2 : 3)) : []
@@ -890,12 +900,14 @@ struct WKRenderer {
         return UIGraphicsImageRenderer(size: CGSize(width: W, height: H), format: format).image { rc in
             let ctx = rc.cgContext
             // iOS supplies the frosted background; the stand-in matches the designer preview.
-            ctx.setFillColor(WKColor.color("#FFFFFF", 0.22).cgColor)
-            let side: CGFloat = min(W, H)
-            let ovalRect = CGRect(x: (W - side) / 2, y: 0, width: side, height: side)
-            let shape: UIBezierPath = circle ? UIBezierPath(ovalIn: ovalRect)
-                                             : UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: W, height: H), cornerRadius: 16 * scale)
-            ctx.addPath(shape.cgPath); ctx.fillPath()
+            if lockBackdrop {
+                ctx.setFillColor(WKColor.color("#FFFFFF", 0.22).cgColor)
+                let side: CGFloat = min(W, H)
+                let ovalRect = CGRect(x: (W - side) / 2, y: 0, width: side, height: side)
+                let shape: UIBezierPath = circle ? UIBezierPath(ovalIn: ovalRect)
+                                                 : UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: W, height: H), cornerRadius: 16 * scale)
+                ctx.addPath(shape.cgPath); ctx.fillPath()
+            }
             var lines: [Line] = []
             for (i, row) in rows.enumerated() {
                 let big = rows.count == 1 || (i == 0 && circle)

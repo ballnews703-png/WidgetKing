@@ -9,14 +9,6 @@
 /* Begin PBXBuildFile section */
 		000000000000000000000201 /* WidgetKingApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000101 /* WidgetKingApp.swift */; };
 		000000000000000000000204 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000104 /* Assets.xcassets */; };
-		000000000000000000000211 /* WidgetDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000111 /* WidgetDesign.swift */; };
-		000000000000000000000212 /* DesignStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000112 /* DesignStore.swift */; };
-		000000000000000000000213 /* WidgetTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000113 /* WidgetTheme.swift */; };
-		000000000000000000000214 /* WidgetRenderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000114 /* WidgetRenderView.swift */; };
-		000000000000000000000311 /* WidgetDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000111 /* WidgetDesign.swift */; };
-		000000000000000000000312 /* DesignStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000112 /* DesignStore.swift */; };
-		000000000000000000000313 /* WidgetTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000113 /* WidgetTheme.swift */; };
-		000000000000000000000314 /* WidgetRenderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000114 /* WidgetRenderView.swift */; };
 		000000000000000000000321 /* WidgetKingWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000121 /* WidgetKingWidgets.swift */; };
 		000000000000000000000322 /* SelectDesignIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000122 /* SelectDesignIntent.swift */; };
 		000000000000000000000323 /* DesignProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000123 /* DesignProvider.swift */; };
@@ -36,6 +28,10 @@
 		000000000000000000000319 /* WKStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000119 /* WKStore.swift */; };
 		000000000000000000000205 /* web in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000106 /* web */; };
 		000000000000000000000243 /* WKStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000143 /* WKStoreTests.swift */; };
+		000000000000000000000220 /* WKLiveFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000120 /* WKLiveFetch.swift */; };
+		000000000000000000000320 /* WKLiveFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000120 /* WKLiveFetch.swift */; };
+		000000000000000000000239 /* WKPermissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000139 /* WKPermissions.swift */; };
+		000000000000000000000244 /* WKLiveFetchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000144 /* WKLiveFetchTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -75,10 +71,6 @@
 		000000000000000000000101 /* WidgetKingApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetKingApp.swift; sourceTree = "<group>"; };
 		000000000000000000000104 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		000000000000000000000105 /* WidgetKing.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WidgetKing.entitlements; sourceTree = "<group>"; };
-		000000000000000000000111 /* WidgetDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetDesign.swift; sourceTree = "<group>"; };
-		000000000000000000000112 /* DesignStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignStore.swift; sourceTree = "<group>"; };
-		000000000000000000000113 /* WidgetTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetTheme.swift; sourceTree = "<group>"; };
-		000000000000000000000114 /* WidgetRenderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetRenderView.swift; sourceTree = "<group>"; };
 		000000000000000000000121 /* WidgetKingWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetKingWidgets.swift; sourceTree = "<group>"; };
 		000000000000000000000122 /* SelectDesignIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectDesignIntent.swift; sourceTree = "<group>"; };
 		000000000000000000000123 /* DesignProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignProvider.swift; sourceTree = "<group>"; };
@@ -95,6 +87,9 @@
 		000000000000000000000119 /* WKStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WKStore.swift; sourceTree = "<group>"; };
 		000000000000000000000106 /* web */ = {isa = PBXFileReference; lastKnownFileType = folder; name = web; path = web; sourceTree = SOURCE_ROOT; };
 		000000000000000000000143 /* WKStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WKStoreTests.swift; sourceTree = "<group>"; };
+		000000000000000000000120 /* WKLiveFetch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WKLiveFetch.swift; sourceTree = "<group>"; };
+		000000000000000000000139 /* WKPermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WKPermissions.swift; sourceTree = "<group>"; };
+		000000000000000000000144 /* WKLiveFetchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WKLiveFetchTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -148,6 +143,7 @@
 			children = (
 				000000000000000000000101 /* WidgetKingApp.swift */,
 				000000000000000000000138 /* WebShellView.swift */,
+				000000000000000000000139 /* WKPermissions.swift */,
 				000000000000000000000106 /* web */,
 				000000000000000000000104 /* Assets.xcassets */,
 				000000000000000000000105 /* WidgetKing.entitlements */,
@@ -158,15 +154,12 @@
 		000000000000000000000041 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000000111 /* WidgetDesign.swift */,
-				000000000000000000000112 /* DesignStore.swift */,
-				000000000000000000000113 /* WidgetTheme.swift */,
-				000000000000000000000114 /* WidgetRenderView.swift */,
 				000000000000000000000115 /* WKDesign.swift */,
 				000000000000000000000116 /* WKRenderer.swift */,
 				000000000000000000000117 /* WKLiveData.swift */,
 				000000000000000000000118 /* WKData.swift */,
 				000000000000000000000119 /* WKStore.swift */,
+				000000000000000000000120 /* WKLiveFetch.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -188,6 +181,7 @@
 			children = (
 				000000000000000000000141 /* WKRendererTests.swift */,
 				000000000000000000000143 /* WKStoreTests.swift */,
+				000000000000000000000144 /* WKLiveFetchTests.swift */,
 				000000000000000000000142 /* designs.json */,
 			);
 			path = WidgetKingTests;
@@ -326,15 +320,13 @@
 			files = (
 				000000000000000000000201 /* WidgetKingApp.swift in Sources */,
 				000000000000000000000238 /* WebShellView.swift in Sources */,
-				000000000000000000000211 /* WidgetDesign.swift in Sources */,
-				000000000000000000000212 /* DesignStore.swift in Sources */,
-				000000000000000000000213 /* WidgetTheme.swift in Sources */,
-				000000000000000000000214 /* WidgetRenderView.swift in Sources */,
+				000000000000000000000239 /* WKPermissions.swift in Sources */,
 				000000000000000000000215 /* WKDesign.swift in Sources */,
 				000000000000000000000216 /* WKRenderer.swift in Sources */,
 				000000000000000000000217 /* WKLiveData.swift in Sources */,
 				000000000000000000000218 /* WKData.swift in Sources */,
 				000000000000000000000219 /* WKStore.swift in Sources */,
+				000000000000000000000220 /* WKLiveFetch.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -345,15 +337,12 @@
 				000000000000000000000321 /* WidgetKingWidgets.swift in Sources */,
 				000000000000000000000322 /* SelectDesignIntent.swift in Sources */,
 				000000000000000000000323 /* DesignProvider.swift in Sources */,
-				000000000000000000000311 /* WidgetDesign.swift in Sources */,
-				000000000000000000000312 /* DesignStore.swift in Sources */,
-				000000000000000000000313 /* WidgetTheme.swift in Sources */,
-				000000000000000000000314 /* WidgetRenderView.swift in Sources */,
 				000000000000000000000315 /* WKDesign.swift in Sources */,
 				000000000000000000000316 /* WKRenderer.swift in Sources */,
 				000000000000000000000317 /* WKLiveData.swift in Sources */,
 				000000000000000000000318 /* WKData.swift in Sources */,
 				000000000000000000000319 /* WKStore.swift in Sources */,
+				000000000000000000000320 /* WKLiveFetch.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -363,6 +352,7 @@
 			files = (
 				000000000000000000000241 /* WKRendererTests.swift in Sources */,
 				000000000000000000000243 /* WKStoreTests.swift in Sources */,
+				000000000000000000000244 /* WKLiveFetchTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -513,7 +503,10 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Calendar pieces in your widgets show your next events.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 WidgetKing. All rights reserved.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Weather and sun & moon pieces need your approximate location.";
+				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Reminder pieces in your widgets show your next to-do.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -544,7 +537,10 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Calendar pieces in your widgets show your next events.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 WidgetKing. All rights reserved.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Weather and sun & moon pieces need your approximate location.";
+				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Reminder pieces in your widgets show your next to-do.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
