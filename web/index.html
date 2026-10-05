@@ -1286,7 +1286,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 131;
+const WK_VERSION = 132;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -5289,12 +5289,27 @@ function loadDesigns() {
     return (Array.isArray(parsed) ? parsed : []).map(normalizeDesign);
   } catch (e) { return []; }
 }
+// v132: inside the native app (a WKWebView shell), the designer hands its
+// library to the app on every save so the widget extension renders from the
+// same bytes. No-op in a plain browser. The shell marks itself with
+// document.documentElement.classList "wk-native" and window.wkNative.
+function wkNativeSend(type, payload) {
+  try {
+    const mh = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.widgetking;
+    if (!mh) return false;
+    mh.postMessage(Object.assign({ type: type }, payload || {}));
+    return true;
+  } catch (e) { return false; }
+}
+function isNativeShell() { return !!(window.wkNative && window.wkNative.platform); }
 function persist() {
   try {
-    localStorage.setItem("widgetking.designs", JSON.stringify(designs));
+    const json = JSON.stringify(designs);
+    localStorage.setItem("widgetking.designs", json);
     localStorage.setItem("widgetking.libstamp", String(Date.now()));
     updateCopyButtons();
     scheduleSync();
+    wkNativeSend("designs", { json: json });
   } catch (e) {
     toast("⚠️ Storage is full — photos take space. Delete a design or use smaller photos.");
   }

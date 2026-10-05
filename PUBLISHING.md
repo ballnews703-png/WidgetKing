@@ -1,17 +1,17 @@
 # WidgetKing — Publishing / Native App Plan
 
-Status: **native app scaffolded, never signed or shipped.** The SwiftUI/WidgetKit
-project in this repo (`WidgetKing.xcodeproj`, `WidgetKing/`, `WidgetKingWidgets/`,
-`Shared/`) is a **from-scratch native rewrite, not a wrapper around the web
-app** — it loads no web content. Today it renders 6 of the web's 10 design kinds
-and 5 of its 25 element kinds, has 12 of 22 themes, hardcodes the expensive
-`claude-opus-5` model (the web moved to Sonnet/Haiku in v121), and cannot decode
-a web design (lowercase `kind`, string dates). Closing that gap — or replacing
-the native UI with a web view around `web/index.html` — is the first decision of
-this phase. Building and shipping either way requires an Apple Developer
-membership ($99/yr) and CI builds on macOS runners — a spend decision that is
-parked until explicitly approved. The project also has no shared Xcode scheme
-committed yet, which any CI build needs.
+Status: **native shell + native renderer, built on free CI, never signed.**
+The Xcode project (`WidgetKing.xcodeproj`, `WidgetKing/`, `WidgetKingWidgets/`,
+`Shared/`) now follows NATIVE_PLAN.md: the app is a `WKWebView` shell around
+the bundled `web/index.html` (the same file the site serves, offline), and
+`Shared/WKRenderer.swift` paints the real web design format natively — every
+kind, every element, all 22 themes, per-size layouts — with a Simulator test
+battery that renders every template on every push (`.github/workflows/ios.yml`,
+GitHub's free macOS runners). The widget extension still runs on the old
+from-scratch model until milestone 3 swaps it onto the App Group library the
+shell writes. Installing on a real iPhone, TestFlight and the App Store need
+the Apple Developer membership ($99/yr) — a spend decision parked until
+explicitly approved.
 
 ## Why native (what the web app can't do)
 
@@ -41,15 +41,16 @@ committed yet, which any CI build needs.
 
 ## Native-day-one feature notes
 
-- Alternate icons: DONE in the native project — the 8 v69 colorways (royal,
-  noir, glass, cream, ocean, sunset, neon, pastel) are bundled and the picker
-  in native Settings switches them.
-- Migration: NOT BUILT. The web share-link payload round-trips full libraries
-  between web devices, but the native app has no link importer and its decoder
-  rejects web designs. Needs a web-format decoding shim before it can be
-  claimed.
-- Sign-in + design sync: shipped on web in v124 (dark until keys); not built
-  natively.
+- Alternate icons: the 8 v69 colorways (royal, noir, glass, cream, ocean,
+  sunset, neon, pastel) are bundled as app icon sets; the shell's SwiftUI
+  picker retired with the old screens, so the designer's icon picker needs a
+  bridge message (`setIcon`) to drive `UIApplication.setAlternateIconName` —
+  a milestone-3 item.
+- Migration: solved by construction — the shell runs the web designer, so
+  share links, backups and sync work exactly as on the web, and the native
+  renderer decodes the web format as-is (`Shared/WKDesign.swift`).
+- Sign-in + design sync: the web implementation (v124/v128) runs unchanged
+  inside the shell.
 - Keep the web designer alive as the desktop/companion editor — same design
   format everywhere.
 

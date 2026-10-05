@@ -42,6 +42,14 @@ iPhone — needs the Apple Developer membership and is explicitly deferred.
    small bridge: the designer hands the design library to native storage
    (App Group) whenever it saves; native hands back the device's widget
    sizes. The existing SwiftUI screens retire.
+   *Status (Oct 5):* `WidgetKing/WebShellView.swift` hosts the bundled `web/`
+   folder (index, privacy, stock art) in a `WKWebView`; `persist()` in the
+   designer posts the library over `webkit.messageHandlers.widgetking` and
+   `Shared/WKStore.swift` writes it to the App Group and reloads widgets.
+   The page gets `document.documentElement.classList` "wk-native" and
+   `window.wkNative` at document start. Old SwiftUI screens deleted.
+   `WidgetKingTests/WKStoreTests.swift` covers the bridge and the bundle.
+   Device widget sizes → page: M3.
 3. **Widgets (M3)** — the extension renders from the App Group store at
    small, medium, large, the Lock Screen accessory families, and
    `systemExtraLargePortrait` (iOS 27). The design picker intent stays.
