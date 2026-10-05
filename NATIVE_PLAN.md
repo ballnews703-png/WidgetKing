@@ -25,6 +25,18 @@ iPhone — needs the Apple Developer membership and is explicitly deferred.
    kinds, ISO date strings, string ids). A test target renders every
    template from `tests/fixtures/designs.json` in the Simulator and fails
    on any crash or empty render — the native twin of `tests/renderer.mjs`.
+   *Status (Oct 5):* `Shared/WKDesign.swift` (lenient model of the web
+   JSON), `Shared/WKLiveData.swift` (live values + the template's text
+   formatters), `Shared/WKRenderer.swift` (CoreGraphics renderer: every
+   kind, every element, themes, fonts, backgrounds, patterns, per-size
+   layouts, launcher tiles incl. vector glyphs, Lock Screen rows) and
+   `Shared/WKData.swift` (generated from the template by
+   `tools/gen_wkdata.mjs` — run it after editing THEMES / FONT_NAMES /
+   ICON_THEMES / VGLYPHS in `web/index.html`). `WidgetKingTests` renders
+   every fixture design at six families with and without live data, plus
+   hostile inputs, in the Simulator on every push. Still M1-open: nothing —
+   real icons, stickers from the bundle, wallpaper slices and live clocks
+   are M3 hooks (closures on `WKRenderer`) that return nil today.
 2. **Shell (M2)** — the app becomes a `WKWebView` hosting `web/index.html`
    from the bundle (offline-capable, same file the site serves), with a
    small bridge: the designer hands the design library to native storage

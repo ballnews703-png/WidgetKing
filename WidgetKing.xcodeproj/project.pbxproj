@@ -30,6 +30,16 @@
 		000000000000000000000322 /* SelectDesignIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000122 /* SelectDesignIntent.swift */; };
 		000000000000000000000323 /* DesignProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000123 /* DesignProvider.swift */; };
 		000000000000000000000032 /* WidgetKingWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 000000000000000000000021 /* WidgetKingWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		000000000000000000000215 /* WKDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000115 /* WKDesign.swift */; };
+		000000000000000000000315 /* WKDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000115 /* WKDesign.swift */; };
+		000000000000000000000216 /* WKRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000116 /* WKRenderer.swift */; };
+		000000000000000000000316 /* WKRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000116 /* WKRenderer.swift */; };
+		000000000000000000000217 /* WKLiveData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000117 /* WKLiveData.swift */; };
+		000000000000000000000317 /* WKLiveData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000117 /* WKLiveData.swift */; };
+		000000000000000000000218 /* WKData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000118 /* WKData.swift */; };
+		000000000000000000000318 /* WKData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000118 /* WKData.swift */; };
+		000000000000000000000241 /* WKRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000141 /* WKRendererTests.swift */; };
+		000000000000000000000242 /* designs.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000142 /* designs.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -39,6 +49,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 000000000000000000000020;
 			remoteInfo = WidgetKingWidgetsExtension;
+		};
+		000000000000000000000056 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000000000010;
+			remoteInfo = WidgetKing;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -80,6 +97,13 @@
 		000000000000000000000123 /* DesignProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignProvider.swift; sourceTree = "<group>"; };
 		000000000000000000000124 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		000000000000000000000125 /* WidgetKingWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WidgetKingWidgets.entitlements; sourceTree = "<group>"; };
+		000000000000000000000115 /* WKDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WKDesign.swift; sourceTree = "<group>"; };
+		000000000000000000000116 /* WKRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WKRenderer.swift; sourceTree = "<group>"; };
+		000000000000000000000117 /* WKLiveData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WKLiveData.swift; sourceTree = "<group>"; };
+		000000000000000000000118 /* WKData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WKData.swift; sourceTree = "<group>"; };
+		000000000000000000000141 /* WKRendererTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WKRendererTests.swift; sourceTree = "<group>"; };
+		000000000000000000000142 /* designs.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = designs.json; path = tests/fixtures/designs.json; sourceTree = SOURCE_ROOT; };
+		000000000000000000000051 /* WidgetKingTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WidgetKingTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -97,6 +121,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		000000000000000000000053 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -106,6 +137,7 @@
 				000000000000000000000040 /* WidgetKing */,
 				000000000000000000000041 /* Shared */,
 				000000000000000000000042 /* WidgetKingWidgets */,
+				000000000000000000000043 /* WidgetKingTests */,
 				000000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -115,6 +147,7 @@
 			children = (
 				000000000000000000000011 /* WidgetKing.app */,
 				000000000000000000000021 /* WidgetKingWidgetsExtension.appex */,
+				000000000000000000000051 /* WidgetKingTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -145,6 +178,10 @@
 				000000000000000000000112 /* DesignStore.swift */,
 				000000000000000000000113 /* WidgetTheme.swift */,
 				000000000000000000000114 /* WidgetRenderView.swift */,
+				000000000000000000000115 /* WKDesign.swift */,
+				000000000000000000000116 /* WKRenderer.swift */,
+				000000000000000000000117 /* WKLiveData.swift */,
+				000000000000000000000118 /* WKData.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -159,6 +196,15 @@
 				000000000000000000000125 /* WidgetKingWidgets.entitlements */,
 			);
 			path = WidgetKingWidgets;
+			sourceTree = "<group>";
+		};
+		000000000000000000000043 /* WidgetKingTests */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000141 /* WKRendererTests.swift */,
+				000000000000000000000142 /* designs.json */,
+			);
+			path = WidgetKingTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -200,6 +246,24 @@
 			productReference = 000000000000000000000021 /* WidgetKingWidgetsExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		000000000000000000000050 /* WidgetKingTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000000000059 /* Build configuration list for PBXNativeTarget "WidgetKingTests" */;
+			buildPhases = (
+				000000000000000000000052 /* Sources */,
+				000000000000000000000053 /* Frameworks */,
+				000000000000000000000054 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				000000000000000000000055 /* PBXTargetDependency */,
+			);
+			name = WidgetKingTests;
+			productName = WidgetKingTests;
+			productReference = 000000000000000000000051 /* WidgetKingTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -215,6 +279,10 @@
 					};
 					000000000000000000000020 = {
 						CreatedOnToolsVersion = 15.0;
+					};
+					000000000000000000000050 = {
+						CreatedOnToolsVersion = 15.0;
+						TestTargetID = 000000000000000000000010;
 					};
 				};
 			};
@@ -233,6 +301,7 @@
 			targets = (
 				000000000000000000000010 /* WidgetKing */,
 				000000000000000000000020 /* WidgetKingWidgetsExtension */,
+				000000000000000000000050 /* WidgetKingTests */,
 			);
 		};
 /* End PBXProject section */
@@ -250,6 +319,14 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		000000000000000000000054 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				000000000000000000000242 /* designs.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -274,6 +351,10 @@
 				000000000000000000000212 /* DesignStore.swift in Sources */,
 				000000000000000000000213 /* WidgetTheme.swift in Sources */,
 				000000000000000000000214 /* WidgetRenderView.swift in Sources */,
+				000000000000000000000215 /* WKDesign.swift in Sources */,
+				000000000000000000000216 /* WKRenderer.swift in Sources */,
+				000000000000000000000217 /* WKLiveData.swift in Sources */,
+				000000000000000000000218 /* WKData.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -288,6 +369,18 @@
 				000000000000000000000312 /* DesignStore.swift in Sources */,
 				000000000000000000000313 /* WidgetTheme.swift in Sources */,
 				000000000000000000000314 /* WidgetRenderView.swift in Sources */,
+				000000000000000000000315 /* WKDesign.swift in Sources */,
+				000000000000000000000316 /* WKRenderer.swift in Sources */,
+				000000000000000000000317 /* WKLiveData.swift in Sources */,
+				000000000000000000000318 /* WKData.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		000000000000000000000052 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				000000000000000000000241 /* WKRendererTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -298,6 +391,11 @@
 			isa = PBXTargetDependency;
 			target = 000000000000000000000020 /* WidgetKingWidgetsExtension */;
 			targetProxy = 000000000000000000000030 /* PBXContainerItemProxy */;
+		};
+		000000000000000000000055 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000000000010 /* WidgetKing */;
+			targetProxy = 000000000000000000000056 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -535,6 +633,40 @@
 			};
 			name = Release;
 		};
+		000000000000000000000057 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.widgetking.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WidgetKing.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/WidgetKing";
+			};
+			name = Debug;
+		};
+		000000000000000000000058 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.widgetking.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WidgetKing.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/WidgetKing";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -561,6 +693,15 @@
 			buildConfigurations = (
 				000000000000000000000026 /* Debug */,
 				000000000000000000000027 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		000000000000000000000059 /* Build configuration list for PBXNativeTarget "WidgetKingTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000000000057 /* Debug */,
+				000000000000000000000058 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

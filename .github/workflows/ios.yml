@@ -61,11 +61,12 @@ jobs:
 
       - name: Run tests (if a test target exists)
         run: |
+          set -o pipefail
           if grep -q 'WidgetKingTests' WidgetKing.xcodeproj/project.pbxproj; then
             DEVNAME=$(xcrun simctl list devices available | grep -E 'iPhone 1[5-9]|iPhone 2' | head -1 | sed -E 's/^ *(.*) \([0-9A-F-]{36}\).*/\1/')
             xcodebuild test -project WidgetKing.xcodeproj -scheme WidgetKing \
               -destination "platform=iOS Simulator,name=$DEVNAME" -derivedDataPath build \
-              CODE_SIGNING_ALLOWED=NO | tee test.log | grep -E 'Test Case|error:|TEST' | tail -80
+              CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO | tee test.log | grep -E 'Test Case|error:|TEST|Executed' | tail -120
           else
             echo "no test target yet (milestone 1 adds it)"
           fi
