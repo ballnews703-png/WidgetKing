@@ -18,6 +18,10 @@ What makes it different:
   reminders, news, stocks, world clocks, sun & moon, battery, sports), photos,
   a 129-piece sticker library, glass and see-through backgrounds, month grids,
   gauges, and 21 fonts.
+- **🪟 Home Screen look aware** — set Clear or Tinted (iOS 26+) once and every
+  preview shows the one-color stencil iOS will draw, templates say which ones
+  survive it, and the AI designs for it. A Clear-look template pack ships
+  built for exactly that rendering.
 - **☁️ Optional account sync** — sign in with an emailed code and your designs
   follow you between devices; nothing is required to use the app without it.
 - **📱 App icon styling** — real App Store icons restyled into cohesive packs

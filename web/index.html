@@ -255,6 +255,19 @@
   }
   @keyframes pop { from { transform: scale(.96); } to { transform: scale(1); } }
   #canvas.pop { animation: pop .25s ease; }
+  /* v130: Home Screen look simulation. iOS Clear/Tinted redraw a widget as a
+     one-color stencil (brightness -> opacity, hue dropped) over system glass.
+     The design renders normally inside .look-layer, is desaturated, and is
+     screened onto the glass backdrop; Tinted multiplies the accent in first. */
+  .look-wrap { position: relative; overflow: hidden; isolation: isolate; flex: none; }
+  .look-layer { position: absolute; inset: 0; isolation: isolate; filter: grayscale(1); mix-blend-mode: screen; }
+  .look-tint { position: absolute; inset: 0; mix-blend-mode: multiply; pointer-events: none; }
+  #studioLookBtn { position: absolute; top: 8px; right: 8px; z-index: 6; min-height: 34px;
+    padding: 4px 10px; font-size: 12px; background: var(--card); box-shadow: 0 6px 18px var(--shadow); }
+  #studioLookBtn.active { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  #studioLookOverlay { position: absolute; z-index: 5; overflow: hidden; cursor: pointer; }
+  #lookButtons { margin-top: 2px; }
+  #lookButtons .lbl { font-size: 11px; color: var(--muted); align-self: center; }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition: none !important; animation: none !important; }
     html { scroll-behavior: auto !important; }
@@ -616,7 +629,7 @@
     <button id="studioUndoBtn" disabled aria-label="Undo" title="Undo"><svg class="ic ic-sm" aria-hidden="true" style="margin:0"><use href="#i-undo"/></svg></button>
     <button id="studioRedoBtn" disabled aria-label="Redo" title="Redo"><svg class="ic ic-sm" aria-hidden="true" style="margin:0"><use href="#i-redo"/></svg></button>
   </div>
-  <div id="studioStage"><div id="studioCanvas"></div><div id="studioQuickbar" style="display:none"></div></div>
+  <div id="studioStage"><div id="studioCanvas"></div><div id="studioQuickbar" style="display:none"></div><button id="studioLookBtn" style="display:none" aria-label="Preview this design in your Home Screen look"></button></div>
   <div id="studioPanel">
     <div id="studioEditPane" style="display:none">
       <div id="studioInspector" style="display:none"></div>
@@ -633,6 +646,8 @@
   <div id="previewDock">
     <div id="canvas"></div>
     <div class="row size-buttons" id="sizeButtons"></div>
+    <div class="row size-buttons" id="lookButtons" style="justify-content:center"></div>
+    <p class="hint" id="lookHint" style="display:none;text-align:center;margin:2px 0 6px"></p>
     <div class="row" style="justify-content:center">
       <button id="undoBtn" disabled><svg class="ic ic-sm" aria-hidden="true"><use href="#i-undo"/></svg> Undo</button>
       <button id="redoBtn" disabled><svg class="ic ic-sm" aria-hidden="true"><use href="#i-redo"/></svg> Redo</button>
@@ -959,6 +974,7 @@
   <details class="wk-sec" id="appSettings" open>
     <summary><span style="display:flex;align-items:center;gap:9px"><span class="icchip" style="background:#8E8E93"><svg class="ic" aria-hidden="true"><use href="#i-gear"/></svg></span>App</span></summary>
     <button class="settings-row" id="appearanceRow" style="width:100%;text-align:left"><span class="icchip" style="background:#5E5CE6"><svg class="ic" aria-hidden="true"><use href="#i-moonsun"/></svg></span> Appearance <span class="val" id="appearanceVal">Auto</span></button>
+    <button class="settings-row" id="lookRow" style="width:100%;text-align:left"><span class="icchip" style="background:#30B0C7"><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg></span> Home Screen look <span class="val" id="lookVal">Default</span></button>
     <button class="settings-row" id="replayTourRow" style="width:100%;text-align:left"><span class="icchip" style="background:#0A84FF"><svg class="ic" aria-hidden="true"><use href="#i-compass"/></svg></span> Welcome tour <span class="val">Replay</span></button>
     <a class="settings-row" href="privacy.html" style="text-decoration:none;color:inherit"><span class="icchip" style="background:#64748B"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span> Privacy policy <span class="val">↗</span></a>
     <div class="settings-row"><span class="icchip" style="background:#F0B429"><svg class="ic" aria-hidden="true"><use href="#i-crown"/></svg></span> WidgetKing <span class="val" id="settingsVersion"></span></div>
@@ -1267,7 +1283,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 129;
+const WK_VERSION = 130;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -5962,6 +5978,8 @@ function aiSystemPromptVariable(requestText) {
       return "Reference [" + ex.tags.slice(0, 3).join(", ") + "]: " + JSON.stringify(ex.spec);
     }).join("\n") + "\n" +
     "VARIETY: similar requests must NOT produce similar widgets. Rotate archetypes, pick a fresh palette (never a reference's), vary the hero (clock vs date vs ring vs type), and add one unexpected-but-tasteful touch per design — an unusual font pairing, an off-center anchor, a two-tone capsule, a wildcard accent.\n" +
+    (homeLook === "default" ? "" :
+      "HOME SCREEN LOOK: the user's iPhone Home Screen uses the iOS " + LOOK_LABELS[homeLook] + " look. iOS redraws every widget as a ONE-COLOR STENCIL: pixel brightness becomes opacity, hue is discarded, and the widget's own background is replaced by system glass. Design for the stencil: background near-black (themeID custom with backgroundColors like #050507 to #15151C), EVERY text, number, ring and line white or near-white (#FFFFFF, #F2F2F6), accents expressed by OPACITY (0.5-0.7) and WEIGHT, never by hue. background gradient only (NOT glass, clear or mesh), bgOpacity 1, bgPattern empty, no photos. Bold shapes, thin hairlines and big type read beautifully as a stencil; soft mid-gray fills and busy gradients turn to mush. Compose for silhouette: a crisp white line drawing on black is the target.\n") +
     "Today is " + today + ". Resolve relative dates to yyyy-MM-dd. Names under 24 chars. Fill unused fields with empty strings, 0, or empty arrays. Compose like a designer, not a form-filler: every element should earn its place.";
 }
 // v114: a serialized SVG foreignObject carries NONE of the page's
@@ -6376,6 +6394,111 @@ const WALLPAPER_STANDIN =
   "radial-gradient(circle at 22% 24%, #7b6cf6, transparent 55%)" +
   ", radial-gradient(circle at 80% 18%, #f672b5, transparent 50%)" +
   ", radial-gradient(circle at 60% 82%, #4dd0e1, transparent 55%), #191922";
+// ---- v130: Home Screen look (iOS 26+ Clear / Tinted) ----
+// Those looks redraw every third-party widget as a one-color stencil: pixel
+// brightness becomes opacity, hue is thrown away, and the widget's own
+// background is swapped for system glass. Scriptable can't opt out, so the
+// designer shows that rendering everywhere a design is drawn (preview,
+// thumbnails, template gallery) and the AI designs for it when it's set.
+const LOOKS = ["default", "clear", "tinted"];
+const LOOK_LABELS = { default: "Default", clear: "Clear", tinted: "Tinted" };
+const LOOK_TINT = "#A9BEFF";
+let homeLook = (function () {
+  const saved = localStorage.getItem("widgetking.look");
+  return LOOKS.indexOf(saved) > 0 ? saved : "default";
+})();
+function setHomeLook(look) {
+  homeLook = LOOKS.indexOf(look) >= 0 ? look : "default";
+  localStorage.setItem("widgetking.look", homeLook);
+  updateLookUI();
+  if (current) renderAll();
+  renderTemplates();
+  renderLibrary();
+}
+function updateLookUI() {
+  const val = document.getElementById("lookVal");
+  if (val) val.textContent = LOOK_LABELS[homeLook];
+}
+// Wrap a rendered design node (its own background + content, sized dims) in
+// the stencil-over-glass simulation. Returns the node untouched on Default.
+function lookWrap(designNode, dims, look) {
+  look = look || homeLook;
+  if (look === "default") return designNode;
+  const wrap = document.createElement("div");
+  wrap.className = "look-wrap look-" + look;
+  wrap.style.width = dims[0] + "px";
+  wrap.style.height = dims[1] + "px";
+  wrap.style.background = (look === "clear"
+    ? "linear-gradient(135deg, rgba(255,255,255,.30), rgba(255,255,255,.12))"
+    : "linear-gradient(135deg, rgba(14,18,40,.78), rgba(14,18,40,.62))") + ", " + WALLPAPER_STANDIN;
+  const layer = document.createElement("div");
+  layer.className = "look-layer";
+  designNode.style.transform = "";
+  layer.appendChild(designNode);
+  if (look === "tinted") {
+    const tint = document.createElement("div");
+    tint.className = "look-tint";
+    tint.style.background = LOOK_TINT;
+    layer.appendChild(tint);
+  }
+  wrap.appendChild(layer);
+  return wrap;
+}
+// How a design survives the stencil: dark base + bright strokes keep their
+// shape; light bases become a bright slab; photos turn to gray mush.
+function lookReadiness(design) {
+  if (!design || design.kind === "lock") return null;
+  if (design.kind === "playlist") {
+    const target = resolvePlaylist(design);
+    return target ? lookReadiness(target) : null;
+  }
+  const lum = function (hex) {
+    return typeof hex === "string" && /^#[0-9a-f]{6}$/i.test(hex) ? luminanceOf(hex) : 0.5;
+  };
+  let bg;
+  if (design.background === "clear") bg = 0.5;
+  else if (design.background === "glass") bg = design.glassTint === "light" ? 0.62 : 0.28;
+  else {
+    const theme = themeOf(design);
+    bg = (lum(theme[0]) + lum(theme[1])) / 2;
+    if (design.gradientDir === "mesh") bg += 0.18;
+    const op = bgOpacityOf(design);
+    if (op < 1) bg = bg * op + 0.5 * (1 - op);
+  }
+  const fg = [];
+  let photos = design.kind === "photo" ? 1 : 0;
+  if (design.kind === "freestyle") {
+    for (const el of design.canvasElements || []) {
+      if (el.kind === "photo") { photos++; continue; }
+      if (el.kind === "sticker" || el.kind === "app" || el.kind === "emoji" || el.kind === "art") continue;
+      if (el.kind === "shape" && Number(el.opacity) < 0.3) continue;
+      fg.push(lum(el.colorHex || design.textColorHex));
+    }
+  } else {
+    fg.push(lum(design.textColorHex));
+  }
+  const fgMin = fg.length ? Math.min.apply(null, fg) : 1;
+  let level;
+  if (photos > 0 || bg >= 0.5 || fgMin - bg < 0.25) level = "washed";
+  else if (bg <= 0.3 && fgMin >= 0.6) level = "ready";
+  else level = "ok";
+  const badge = level === "ready" ? "\u2713 Clear-ready" : level === "ok" ? "fades a little" : "washes out";
+  const note = level === "ready"
+    ? "Clear-ready \u2014 dark base, bright strokes. iOS keeps the shape when it turns this into a stencil."
+    : level === "ok"
+      ? "Mostly survives Clear and Tinted \u2014 the softer parts fade. Push text toward white and the background darker to sharpen it."
+      : photos > 0
+        ? "Washes out on Clear and Tinted \u2014 photos become gray mush. Keep this one for the Default look, or swap the photo for shapes and type."
+        : "Washes out on Clear and Tinted \u2014 a light background becomes a bright slab and the details vanish. Darken the background and brighten the text.";
+  return { level: level, badge: badge, note: note, bg: bg, fg: fgMin };
+}
+function showLookPreview(canvas, design, dims) {
+  canvas.style.background = "none";
+  canvas.innerHTML = "";
+  const stage = renderDesignNode(normalizeDesign(JSON.parse(JSON.stringify(design))), previewSize);
+  canvas.appendChild(lookWrap(stage, dims));
+  upgradeRealPreviews(canvas);
+}
 function bgOpacityOf(design) {
   const op = Number(design.bgOpacity);
   return isFinite(op) && op >= 0.1 && op < 1 ? op : 1;
@@ -6952,9 +7075,12 @@ function renderPreview() {
       canvas.innerHTML = '<div style="font-size:12px;opacity:.85;padding:14px;text-align:center">Pick a design for each time of day below 🔄</div>';
       return;
     }
-    applyDesignBackground(canvas, target);
-    if (target.kind === "freestyle") renderFreestyleInto(canvas, target, dims[0], dims[1], false);
-    else canvas.innerHTML = designPreviewHTML(target, previewSize);
+    if (homeLook !== "default") showLookPreview(canvas, target, dims);
+    else {
+      applyDesignBackground(canvas, target);
+      if (target.kind === "freestyle") renderFreestyleInto(canvas, target, dims[0], dims[1], false);
+      else canvas.innerHTML = designPreviewHTML(target, previewSize);
+    }
     const badge = document.createElement("div");
     badge.style.cssText = "position:absolute;left:50%;transform:translateX(-50%);bottom:6px;font-size:9px;" +
       "background:rgba(0,0,0,.45);color:#fff;padding:2px 8px;border-radius:8px;pointer-events:none;z-index:5";
@@ -6963,6 +7089,7 @@ function renderPreview() {
     canvas.appendChild(badge);
     return;
   }
+  if (homeLook !== "default") { showLookPreview(canvas, current, dims); return; }
   applyDesignBackground(canvas, current);
   if (current.kind === "freestyle") {
     renderFreestyleInto(canvas, current, dims[0], dims[1], true);
@@ -7011,7 +7138,14 @@ function makeThumb(design, scale) {
   } else {
     inner.innerHTML = designPreviewHTML(design, "small");
   }
-  outer.appendChild(inner);
+  if (homeLook !== "default" && design.kind !== "lock" && design.kind !== "playlist") {
+    const shown = lookWrap(inner, dims);
+    shown.style.transform = "scale(" + scale + ")";
+    shown.style.transformOrigin = "top left";
+    outer.appendChild(shown);
+  } else {
+    outer.appendChild(inner);
+  }
   return outer;
 }
 
@@ -8784,7 +8918,51 @@ function renderStudioCanvas() {
   canvas.style.borderRadius = Math.round(28 * scale * 0.75) + "px";
   applyDesignBackground(canvas, current);
   renderFreestyleInto(canvas, current, w, h, true);
+  renderStudioLook();
 }
+// v130: the Studio canvas stays full-color and editable; when a Home Screen
+// look is set, a corner button peeks at the stencil-over-glass rendering as
+// a tap-to-dismiss overlay of the live design.
+let studioLookPeek = false;
+function renderStudioLook() {
+  const btn = document.getElementById("studioLookBtn");
+  const old = document.getElementById("studioLookOverlay");
+  if (old) old.remove();
+  if (!studioOpen || homeLook === "default" || !current || current.kind !== "freestyle") {
+    btn.style.display = "none";
+    studioLookPeek = false;
+    return;
+  }
+  btn.style.display = "";
+  btn.textContent = studioLookPeek ? "Back to editing" : "See it on " + LOOK_LABELS[homeLook];
+  btn.classList.toggle("active", studioLookPeek);
+  if (!studioLookPeek) return;
+  const canvas = document.getElementById("studioCanvas");
+  const dims = SIZES[studioSize];
+  const scale = studioScaleFor(dims);
+  const overlay = document.createElement("div");
+  overlay.id = "studioLookOverlay";
+  overlay.style.left = canvas.offsetLeft + "px";
+  overlay.style.top = canvas.offsetTop + "px";
+  overlay.style.width = canvas.style.width;
+  overlay.style.height = canvas.style.height;
+  overlay.style.borderRadius = canvas.style.borderRadius;
+  const stage = lookWrap(renderDesignNode(normalizeDesign(JSON.parse(JSON.stringify(current))), studioSize), dims);
+  stage.style.transform = "scale(" + scale + ")";
+  stage.style.transformOrigin = "top left";
+  overlay.appendChild(stage);
+  overlay.title = "Tap to go back to editing";
+  overlay.onclick = function () { studioLookPeek = false; renderStudioLook(); };
+  canvas.parentNode.appendChild(overlay);
+}
+document.getElementById("studioLookBtn").onclick = function () {
+  studioLookPeek = !studioLookPeek;
+  renderStudioLook();
+  if (studioLookPeek) {
+    const ready = lookReadiness(current);
+    if (ready) toast(ready.note);
+  }
+};
 // v89: the sheet + rail replace the old three studio tool tabs. The legacy
 // setStudioTool names map onto sheet tools so existing logic keeps working.
 let studioTool = "add";
@@ -9555,6 +9733,49 @@ function buildTemplates() {
       { kind: "app", label: "Camera", url: "camera://", x: 0.61, y: 0.5, size: 34, opacity: 1 },
       { kind: "app", label: "Music", url: "music://", x: 0.83, y: 0.5, size: 34, opacity: 1 }
     ] } },
+    // 🪟 Clear look — built for the iOS Clear/Tinted Home Screen looks, which
+    // redraw widgets as one-color stencils by brightness. Near-black base,
+    // white strokes, accents by opacity and weight only: these keep their
+    // shape as stencils and read as OLED-minimal on the Default look.
+    { category: "Clear look", pack: "ClearLook", size: "small", design: { name: "Stencil Clock", kind: "freestyle", themeID: "custom", customColors: ["#050507", "#15151C"], fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.5, w: 0.9, h: 0.9, radius: 22, colorHex: "#FFFFFF", opacity: 0.04, border: 1.5, borderHex: "#FFFFFF" },
+      { kind: "clock", x: 0.5, y: 0.44, size: 30, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "date", x: 0.5, y: 0.66, size: 10, colorHex: "#FFFFFF", opacity: 0.7 },
+      { kind: "shape", shape: "pill", x: 0.5, y: 0.82, w: 0.26, h: 0.025, colorHex: "#FFFFFF", opacity: 0.9 }
+    ] } },
+    { category: "Clear look", pack: "ClearLook", size: "small", design: { name: "Ink Weather", kind: "freestyle", themeID: "custom", customColors: ["#050507", "#15151C"], fontStyle: "avenir", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "weather", wmode: "cond", unit: "f", x: 0.5, y: 0.2, size: 11, colorHex: "#FFFFFF", opacity: 0.75 },
+      { kind: "weather", wmode: "now", unit: "f", x: 0.5, y: 0.46, size: 36, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "weather", wmode: "hilo", unit: "f", x: 0.5, y: 0.7, size: 11, colorHex: "#FFFFFF", opacity: 0.8 },
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.8, w: 0.5, h: 0.006, colorHex: "#FFFFFF", opacity: 0.5 },
+      { kind: "weather", wmode: "tomorrow", unit: "f", x: 0.5, y: 0.89, size: 9, colorHex: "#FFFFFF", opacity: 0.7 }
+    ] } },
+    { category: "Clear look", pack: "ClearLook", size: "medium", design: { name: "Mono Brief", kind: "freestyle", themeID: "custom", customColors: ["#050507", "#15151C"], fontStyle: "avenir", textColorHex: "#FFFFFF", fitSize: "medium", canvasElements: [
+      { kind: "greeting", name: "", emoji: false, x: 0.27, y: 0.2, size: 14, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "date", x: 0.27, y: 0.38, size: 10, colorHex: "#FFFFFF", opacity: 0.7 },
+      { kind: "calendar", count: 2, x: 0.27, y: 0.66, size: 10, colorHex: "#FFFFFF", opacity: 0.9 },
+      { kind: "shape", shape: "rect", x: 0.52, y: 0.5, w: 0.004, h: 0.7, colorHex: "#FFFFFF", opacity: 0.5 },
+      { kind: "weather", wmode: "now", unit: "f", x: 0.76, y: 0.3, size: 30, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "weather", wmode: "hilo", unit: "f", x: 0.76, y: 0.56, size: 11, colorHex: "#FFFFFF", opacity: 0.8 },
+      { kind: "weather", wmode: "rain", unit: "f", x: 0.76, y: 0.74, size: 10, colorHex: "#FFFFFF", opacity: 0.65 },
+      { kind: "week", x: 0.76, y: 0.88, size: 9, colorHex: "#FFFFFF", opacity: 0.5 }
+    ] } },
+    { category: "Clear look", pack: "ClearLook", size: "small", design: { name: "Halo Battery", kind: "freestyle", themeID: "custom", customColors: ["#050507", "#15151C"], fontStyle: "rounded", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "ring", source: "battery", x: 0.5, y: 0.46, w: 0.66, size: 7, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "battery", x: 0.5, y: 0.46, size: 16, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "text", text: "BATTERY", x: 0.5, y: 0.86, size: 9, colorHex: "#FFFFFF", opacity: 0.6 }
+    ] } },
+    { category: "Clear look", pack: "ClearLook", size: "small", design: { name: "Day Stamp", kind: "freestyle", themeID: "custom", customColors: ["#050507", "#15151C"], fontStyle: "futura", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "shape", shape: "rect", x: 0.5, y: 0.5, w: 0.86, h: 0.86, radius: 8, colorHex: "#FFFFFF", opacity: 0.03, border: 2, borderHex: "#FFFFFF" },
+      { kind: "text", text: "NEW YEAR", x: 0.5, y: 0.3, size: 9, colorHex: "#FFFFFF", opacity: 0.75 },
+      { kind: "countdown", dateISO: "2027-01-01", x: 0.5, y: 0.52, size: 32, colorHex: "#FFFFFF", opacity: 1, bold: true },
+      { kind: "text", text: "days", x: 0.5, y: 0.73, size: 10, colorHex: "#FFFFFF", opacity: 0.7 }
+    ] } },
+    { category: "Clear look", pack: "ClearLook", size: "small", design: { name: "Night Line", kind: "freestyle", themeID: "custom", customColors: ["#050507", "#15151C"], fontStyle: "optima", textColorHex: "#FFFFFF", fitSize: "small", canvasElements: [
+      { kind: "icon", text: "☾", x: 0.5, y: 0.36, size: 38, colorHex: "#FFFFFF", opacity: 1 },
+      { kind: "astro", mode: "moon", x: 0.5, y: 0.66, size: 10, colorHex: "#FFFFFF", opacity: 0.85 },
+      { kind: "week", x: 0.5, y: 0.86, size: 9, colorHex: "#FFFFFF", opacity: 0.5 }
+    ] } },
     { category: "Picks", pack: "Picks", size: "small", design: { name: "Sun & Moon", kind: "freestyle", themeID: "cosmos", fontStyle: "optima", textColorHex: "#F5EFFF", canvasElements: [
       { kind: "astro", mode: "moonicon", x: 0.5, y: 0.34, size: 44, colorHex: "#FFFFFF", opacity: 1 },
       { kind: "astro", mode: "moon", x: 0.5, y: 0.6, size: 11, colorHex: "#D8C9F5", opacity: 0.95 },
@@ -9772,7 +9993,7 @@ function buildTemplates() {
   ];
 }
 let activePack = "all";
-const PACK_CHIPS = [["all", "✨ All"], ["Picks", "👑 WidgetKing Picks"], ["Bento", "🍱 Bento"], ["Glass", "🫧 Glass"], ["Cute", "🌸 Cute"], ["Minimal", "▫️ Minimal"],
+const PACK_CHIPS = [["all", "✨ All"], ["Picks", "👑 WidgetKing Picks"], ["Bento", "🍱 Bento"], ["Glass", "🫧 Glass"], ["ClearLook", "🪟 Clear look"], ["Cute", "🌸 Cute"], ["Minimal", "▫️ Minimal"],
   ["Zen", "🍃 Zen"], ["Sports", "🏈 Sports"], ["Work", "💼 Work"],
   ["Neon", "⚡ Neon"], ["Live", "🌤 Live"], ["Designer", "💎 Designer"]];
 function renderTemplates(rowEl, chipEl) {
@@ -9805,7 +10026,7 @@ function renderTemplates(rowEl, chipEl) {
     const thumbWrap = document.createElement("div");
     thumbWrap.style.cssText = "width:" + thumbW + "px;height:87px;overflow:hidden;" +
       "border-radius:" + Math.round(24 * scale) + "px;margin:0 auto";
-    const inner = renderDesignNode(design, sizeKey);
+    const inner = lookWrap(renderDesignNode(design, sizeKey), dims);
     inner.style.transform = "scale(" + scale + ")";
     inner.style.transformOrigin = "top left";
     thumbWrap.appendChild(inner);
@@ -9815,7 +10036,8 @@ function renderTemplates(rowEl, chipEl) {
     name.textContent = template.design.name;
     const cat = document.createElement("div");
     cat.className = "tpl-cat";
-    cat.textContent = template.category + (sizeKey !== "small" ? " · " + sizeKey : "");
+    const ready = homeLook !== "default" ? lookReadiness(design) : null;
+    cat.textContent = template.category + (sizeKey !== "small" ? " · " + sizeKey : "") + (ready ? " · " + ready.badge : "");
     card.append(name, cat);
     card.onclick = function () {
       recordRecent("templates", template.design.name);
@@ -10236,6 +10458,23 @@ function renderControls() {
     };
     sizeButtons.appendChild(button);
   }
+  const lookButtons = document.getElementById("lookButtons");
+  lookButtons.innerHTML = "";
+  const lbl = document.createElement("span");
+  lbl.className = "lbl";
+  lbl.textContent = "Home Screen look";
+  lookButtons.appendChild(lbl);
+  for (const look of LOOKS) {
+    const button = document.createElement("button");
+    button.textContent = LOOK_LABELS[look];
+    if (homeLook === look) button.className = "active";
+    button.onclick = function () { setHomeLook(look); };
+    lookButtons.appendChild(button);
+  }
+  const lookHint = document.getElementById("lookHint");
+  const ready = homeLook !== "default" ? lookReadiness(current) : null;
+  lookHint.style.display = ready ? "block" : "none";
+  lookHint.textContent = ready ? ready.note : "";
 }
 // Folders are just a `folder` string on each design (rides through save,
 // backup, and sync links untouched); sorting is a stored preference.
@@ -10492,7 +10731,8 @@ function renderAll() {
 }
 function updateMagicHint() {
   document.getElementById("magicHint").textContent =
-    "Tell WidgetKing what you want — a launcher with your top apps, a countdown, a weather clock, a quote — and it designs the widget for you.";
+    "Tell WidgetKing what you want — a launcher with your top apps, a countdown, a weather clock, a quote — and it designs the widget for you." +
+    (homeLook === "default" ? "" : " Designing for your " + LOOK_LABELS[homeLook] + " Home Screen look.");
 }
 
 // ==================== Wiring ====================
@@ -12620,6 +12860,13 @@ document.getElementById("appearanceRow").onclick = function () {
   updateAppearanceVal();
 };
 document.getElementById("replayTourRow").onclick = showWelcomeTour;
+document.getElementById("lookRow").onclick = function () {
+  setHomeLook(LOOKS[(LOOKS.indexOf(homeLook) + 1) % LOOKS.length]);
+  toast(homeLook === "default"
+    ? "Previews show full color again."
+    : "Previews now show the " + LOOK_LABELS[homeLook] + " look \u2014 and the AI designs for it.");
+};
+updateLookUI();
 updateAppearanceVal();
 document.querySelectorAll("#tabbar button").forEach(function (b) {
   b.onclick = function () { switchTab(b.dataset.tab); };
@@ -14275,7 +14522,7 @@ const GUIDES = [
       "Long-press your Home Screen → <b>Edit → Add Widget</b> → search <b>Scriptable</b> and add one.",
       "Long-press the new widget → <b>Edit Widget</b> → pick which design it shows by its slot number.",
       "The first time live data runs, iOS asks permission inside Scriptable — that's normal and happens once.",
-      "Widgets looking washed-out or monochrome? Your Home Screen look is set to <b>Clear</b> or <b>Tinted</b> — iOS recolors every app's widgets to match. For full-color WidgetKing widgets, long-press the Home Screen → <b>Edit → Customize</b> and choose <b>Default</b> or <b>Dark</b>."
+      "Widgets looking washed-out or monochrome? Your Home Screen look is set to <b>Clear</b> or <b>Tinted</b> — iOS recolors every app's widgets to match. For full-color WidgetKing widgets, long-press the Home Screen → <b>Edit → Customize</b> and choose <b>Default</b> or <b>Dark</b>. Prefer the glassy look? Set <b>Home Screen look</b> (under the preview, or in Settings → App) to Clear or Tinted: every preview shows what iOS will do, templates say which ones survive it, and the AI designs for it."
     ],
     action: { ic: "i-wand", label: "Open the setup wizard", run: function () { closeGuide(); document.getElementById("wizardBtn").onclick(); } } },
   { ic: "i-palette", tint: "#E8567C", title: "Make it yours", promise: "Colors, fonts, textures — your taste on every pixel.",

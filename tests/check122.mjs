@@ -20,12 +20,12 @@ const r = await pg.evaluate(async () => {
   // Settings: every section summary + app row has an icchip, no emoji text
   const settings = document.getElementById('settingsSection');
   const summaries = [...settings.querySelectorAll('details > summary')];
-  // v124 added the Account & sync section (4th summary, 5th row) — it must
+  // v124 added the Account & sync section (4th summary); v130 added the Home Screen look row (6th row) — they must
   // follow the same icchip design this check enforces.
   out.summaryChips = summaries.length === 4 && summaries.every(s => s.querySelector('.icchip svg use'));
   out.summariesPlain = summaries.every(s => !EMOJI.test(s.textContent));
   const rows = [...settings.querySelectorAll('.settings-row')];
-  out.rowChips = rows.length === 5 && rows.every(x => x.querySelector('.icchip svg use'));
+  out.rowChips = rows.length === 6 && rows.every(x => x.querySelector('.icchip svg use'));
   out.rowsPlain = rows.every(x => !EMOJI.test(x.textContent));
   out.aiLabelsPlain = ![...settings.querySelectorAll('label')].some(l => EMOJI.test(l.textContent));
 
