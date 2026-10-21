@@ -954,13 +954,13 @@
   <details class="wk-sec" id="accountSec" open style="display:none">
     <summary><span style="display:flex;align-items:center;gap:9px"><span class="icchip" style="background:#0A84FF"><svg class="ic" aria-hidden="true"><use href="#i-key"/></svg></span>Account &amp; sync</span></summary>
     <div id="acctOut">
-      <p class="hint" style="margin-top:8px">One account, every device — your designs follow you. Sign in with your email: we send a 6-digit code, no password to remember.</p>
+      <p class="hint" style="margin-top:8px">One account, every device — your designs follow you. Sign in with your email: we send a one-time code, no password to remember.</p>
       <div class="row" style="margin-top:8px">
         <input type="email" id="acctEmail" placeholder="you@example.com" autocomplete="email" style="flex:1">
         <button id="acctSendBtn">Email me a code</button>
       </div>
       <div class="row" id="acctCodeRow" style="display:none;margin-top:8px">
-        <input type="text" id="acctCode" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" style="flex:1">
+        <input type="text" id="acctCode" inputmode="numeric" autocomplete="one-time-code" placeholder="Code from the email" maxlength="10" style="flex:1">
         <button class="primary" id="acctVerifyBtn">Sign in</button>
       </div>
       <p class="hint" id="acctHint" style="display:none;margin-top:6px"></p>
@@ -1292,7 +1292,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 133;
+const WK_VERSION = 134;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -11243,7 +11243,8 @@ document.getElementById("acctSendBtn").onclick = async function () {
 document.getElementById("acctVerifyBtn").onclick = async function () {
   const email = (document.getElementById("acctEmail").value || "").trim();
   const code = (document.getElementById("acctCode").value || "").trim();
-  if (!/^\d{6}$/.test(code)) { toast("The code is the 6 digits from the email"); return; }
+  // Supabase projects send 6- or 8-digit codes depending on their settings.
+  if (!/^\d{6,10}$/.test(code)) { toast("The code is the number from the email"); return; }
   this.disabled = true;
   try {
     await acctVerify(email, code);

@@ -54,7 +54,7 @@ becomes the visible limit.
 
 ## Sign-in & abuse prevention
 
-- **Email + 6-digit code** sign-in (email OTP — magic-link security delivered as
+- **Email + one-time code** sign-in (email OTP — magic-link security delivered as
   digits; iPhone auto-suggests the code above the keyboard). No passwords to
   create, forget, reset, or leak. Users stay signed in; login is roughly a
   once-per-phone event.

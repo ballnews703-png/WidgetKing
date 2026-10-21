@@ -55,7 +55,7 @@ their own rows — enforced by the database itself, not by app code.
 ## 3. Auth settings (dashboard → Authentication)
 
 - **Sign In / Up → Email**: ON (it is by default). Turn **Confirm email**
-  OFF if present — the 6-digit code IS the confirmation.
+  OFF if present — the emailed code IS the confirmation.
 - **Email OTP length**: 6 (default). **OTP expiry: set to 600 seconds** (the
   default is an hour; ten minutes is plenty and limits a leaked code's life).
 - Rate limits: defaults are fine to start (Supabase's built-in email sender
@@ -64,7 +64,7 @@ their own rows — enforced by the database itself, not by app code.
   arrive instantly and reliably).
 - **The sign-in email must contain the code.** Supabase's default "Magic
   Link" email only carries a link (to the Site URL, which defaults to
-  localhost — "site cannot be reached"). The app asks for a typed 6-digit
+  localhost — "site cannot be reached"). The app asks for a typed
   code, so the template has to print it. Dashboard → **Authentication →
   Emails** (templates) → **Magic Link** → replace the body with:
 
@@ -94,7 +94,7 @@ and `localStorage.setItem("widgetking.sync.key", "<anon key>")`, reload.
 
 ## What the client does (already built)
 
-- **Sign-in**: email → `POST /auth/v1/otp` → 6-digit code →
+- **Sign-in**: email → `POST /auth/v1/otp` → emailed code (6 or 8 digits) →
   `POST /auth/v1/verify` → session stored locally, auto-refreshed via
   refresh token. No passwords anywhere.
 - **Sync**: on every save (debounced 4s) all designs upsert to `designs`
