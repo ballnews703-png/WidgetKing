@@ -62,6 +62,24 @@ their own rows — enforced by the database itself, not by app code.
   allows ~2 emails/hour per address on free tier — enough for testing; before
   launch we plug in a real sender via SMTP, e.g. Resend's free tier, so codes
   arrive instantly and reliably).
+- **The sign-in email must contain the code.** Supabase's default "Magic
+  Link" email only carries a link (to the Site URL, which defaults to
+  localhost — "site cannot be reached"). The app asks for a typed 6-digit
+  code, so the template has to print it. Dashboard → **Authentication →
+  Emails** (templates) → **Magic Link** → replace the body with:
+
+  ```html
+  <h2>Your WidgetKing sign-in code</h2>
+  <p style="font-size:32px;letter-spacing:6px;font-weight:700">{{ .Token }}</p>
+  <p>Enter this code in WidgetKing within 10 minutes. If you didn't ask for it, ignore this email.</p>
+  ```
+
+  and set the subject to `Your WidgetKing code: {{ .Token }}`. (The same
+  `{{ .Token }}` line can be added to the **Confirm sign up** template too,
+  in case Confirm email is ever turned back on.)
+- **Authentication → URL Configuration → Site URL**:
+  `https://ballnews703-png.github.io/WidgetKing/` so any link in any auth
+  email lands on the designer instead of localhost.
 
 ## 4. Light it up (Claude) — DONE in v128
 
