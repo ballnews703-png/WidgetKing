@@ -70,8 +70,19 @@ iPhone — needs the Apple Developer membership and is explicitly deferred.
    native clock overlays (`Text(date, style: .time)`) instead of per-minute
    baked entries, wallpaper slices for glass/clear, real App Store icons,
    and the alternate-icon bridge.
+   *Update (Oct 21):* live clock overlays, real App Store icons
+   (WKIconCache), wallpaper slices (WKWallpaper + bridge) and lean mode
+   (v135) shipped. Still open: `.systemExtraLargePortrait` (SDK), the
+   alternate-icon bridge, native live clocks for the simple "clock" kind
+   and Lock Screen time rows (still per-minute baked entries).
 4. **Full-page (M4)** — the web designer gains an XL canvas (4×6 page) and
    Page Studio can export a page as ONE full-page widget.
+   *Status (Oct 21):* done in v136 — XL (338×540) in the dock and Studio,
+   AI schema/doctrine, "Make it one full-page widget" in Page Studio,
+   per-size key "xl" mapped from the extraLargePortrait family in both
+   renderers. The extension lists the family the day the runner's Xcode
+   SDK names `.systemExtraLargePortrait` (the view already renders at any
+   container size).
 5. **Signing (M5, paid)** — Apple Developer enrollment, TestFlight,
    App Store. Not before Andrew says go.
 
