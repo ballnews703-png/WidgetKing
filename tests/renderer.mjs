@@ -36,6 +36,10 @@ else {
 const el = (kind, extra) => Object.assign({ id: 'e' + Math.random().toString(36).slice(2, 7), kind, x: 0.5, y: 0.5, size: 14, colorHex: '#FFFFFF', opacity: 1 }, extra || {});
 const free = (name, els, extra) => Object.assign({ id: 'syn-' + name.replace(/\W+/g, '-').toLowerCase(), name, kind: 'freestyle', themeID: 'midnight', fontStyle: 'rounded', textColorHex: '#FFFFFF', background: 'gradient', fitSize: 'small', canvasElements: els, apps: [] }, extra || {});
 const synthetic = [
+  // v136: an iOS 27 full-page design with a per-size "xl" layout
+  free('Syn Full Page', [el('clock', { y: 0.12, size: 30 }), el('weather', { wmode: 'full', y: 0.3 }), el('calendar', { count: 4, y: 0.55, size: 11 }),
+    el('month', { y: 0.82, w: 0.7 }), el('ring', { source: 'day', x: 0.8, y: 0.12, w: 0.2 })],
+    { fitSize: 'xl', sizes: { large: [{ id: 'keep', x: 0.5, y: 0.5 }] } }),
   free('Syn Weather', ['now', 'hilo', 'full', 'cond', 'rain', 'tomorrow', 'hourly', 'icon'].map((m, i) => el('weather', { wmode: m, y: 0.1 + i * 0.11, size: 10 }))),
   free('Syn Astro', ['sun', 'sunrise', 'sunset', 'moon', 'next'].map((m, i) => el('astro', { mode: m, y: 0.1 + i * 0.15, size: 10 })).concat([el('astro', { mode: 'moonicon', y: 0.9, size: 30 }), el('astro', { mode: 'moonicon', moonPack: 'moon-cozy', x: 0.8, y: 0.85, size: 30 })])),
   free('Syn Battery', [el('battery', { y: 0.3 }), el('battery', { mode: 'icon', y: 0.7, size: 30 })]),
@@ -108,6 +112,7 @@ const designsJson = JSON.stringify(all.concat([
 const program = tpl.replace('"__DESIGNS__"', designsJson).replace('"__PAGE_URL__"', '""');
 if (program.includes('__DESIGNS__') || program.includes('__PAGE_URL__')) throw new Error('placeholders not replaced');
 const familiesFor = d => d.kind === 'lock' ? ['accessoryRectangular', 'accessoryCircular', 'accessoryInline']
+  : d.fitSize === 'xl' ? ['extraLargePortrait', 'large', 'medium', 'small']
   : d.fitSize === 'large' ? ['large', 'medium', 'small'] : ['small', 'medium', 'large'];
 const findings = [];
 // v127 targeted expectations, checked inside runOne via env.texts

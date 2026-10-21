@@ -116,7 +116,9 @@ struct WKDesign {
     /// v113 per-size layouts: a design can carry the layout the user authored
     /// for a given family. Applied once so every element shares the same
     /// coordinates for that size. Returns a copy; the stored design is untouched.
-    func applyingSizeLayout(_ family: String) -> WKDesign {
+    func applyingSizeLayout(_ familyIn: String) -> WKDesign {
+        // The designer keys the iOS 27 full-page layout as "xl".
+        let family = familyIn == "extraLargePortrait" ? "xl" : familyIn
         guard let sizes = raw["sizes"] as? [String: Any],
               let snaps = sizes[family] as? [Any],
               fitSize != family else { return self }

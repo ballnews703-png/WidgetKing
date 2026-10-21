@@ -32,8 +32,8 @@
 		000000000000000000000320 /* WKLiveFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000120 /* WKLiveFetch.swift */; };
 		000000000000000000000239 /* WKPermissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000139 /* WKPermissions.swift */; };
 		000000000000000000000244 /* WKLiveFetchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000144 /* WKLiveFetchTests.swift */; };
-		000000000000000000000221 /* WKWallpaper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000121 /* WKWallpaper.swift */; };
-		000000000000000000000321 /* WKWallpaper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000121 /* WKWallpaper.swift */; };
+		000000000000000000000226 /* WKWallpaper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000126 /* WKWallpaper.swift */; };
+		000000000000000000000326 /* WKWallpaper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000126 /* WKWallpaper.swift */; };
 		000000000000000000000245 /* WKWallpaperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000145 /* WKWallpaperTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -93,7 +93,7 @@
 		000000000000000000000120 /* WKLiveFetch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WKLiveFetch.swift; sourceTree = "<group>"; };
 		000000000000000000000139 /* WKPermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WKPermissions.swift; sourceTree = "<group>"; };
 		000000000000000000000144 /* WKLiveFetchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WKLiveFetchTests.swift; sourceTree = "<group>"; };
-		000000000000000000000121 /* WKWallpaper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WKWallpaper.swift; sourceTree = "<group>"; };
+		000000000000000000000126 /* WKWallpaper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WKWallpaper.swift; sourceTree = "<group>"; };
 		000000000000000000000145 /* WKWallpaperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WKWallpaperTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -165,7 +165,7 @@
 				000000000000000000000118 /* WKData.swift */,
 				000000000000000000000119 /* WKStore.swift */,
 				000000000000000000000120 /* WKLiveFetch.swift */,
-				000000000000000000000121 /* WKWallpaper.swift */,
+				000000000000000000000126 /* WKWallpaper.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -334,7 +334,7 @@
 				000000000000000000000218 /* WKData.swift in Sources */,
 				000000000000000000000219 /* WKStore.swift in Sources */,
 				000000000000000000000220 /* WKLiveFetch.swift in Sources */,
-				000000000000000000000221 /* WKWallpaper.swift in Sources */,
+				000000000000000000000226 /* WKWallpaper.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -351,7 +351,7 @@
 				000000000000000000000318 /* WKData.swift in Sources */,
 				000000000000000000000319 /* WKStore.swift in Sources */,
 				000000000000000000000320 /* WKLiveFetch.swift in Sources */,
-				000000000000000000000321 /* WKWallpaper.swift in Sources */,
+				000000000000000000000326 /* WKWallpaper.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

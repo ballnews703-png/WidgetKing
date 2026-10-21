@@ -657,6 +657,7 @@
     <div id="canvas"></div>
     <div class="row size-buttons" id="sizeButtons"></div>
     <div class="row size-buttons" id="lookButtons" style="justify-content:center"></div>
+    <p class="hint" id="xlHint" style="display:none;text-align:center;margin:2px 0 6px">XL = the iOS 27 full-page widget (a whole Home Screen page). It shows in the WidgetKing app; Scriptable shows this design at Large.</p>
     <p class="hint" id="lookHint" style="display:none;text-align:center;margin:2px 0 6px"></p>
     <div class="row" style="justify-content:center">
       <button id="undoBtn" disabled><svg class="ic ic-sm" aria-hidden="true"><use href="#i-undo"/></svg> Undo</button>
@@ -1244,6 +1245,8 @@
       <button id="pageAIBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-sparkle"/></svg> Design my page</button>
     </div>
     <button class="primary" id="pageSaveBtn" style="width:100%;margin-top:12px"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-save"/></svg> Save page &amp; get the placement checklist</button>
+    <button id="pageXlBtn" style="width:100%;margin-top:8px"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-frames"/></svg> Make it one full-page widget (iOS 27)</button>
+    <p class="hint">One full-page widget = the whole page as a single XL widget in the WidgetKing app on iOS 27 — no placement, no gaps. Every piece stays editable.</p>
     <div id="pageChecklist" style="margin-top:12px"></div>
   </div>
 </div>
@@ -1302,7 +1305,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 135;
+const WK_VERSION = 136;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -2360,6 +2363,7 @@ function drawBgPattern(ctx, design, W, H) {
 // (v125: applied ONCE in buildWidget so the baked image AND the native
 // overlays — app icons, clocks — share the same per-size coordinates.)
 function applySizeLayout(design, family) {
+  if (family === "extraLargePortrait") family = "xl";
   if (!(design.sizes && design.sizes[family] && design.fitSize !== family)) return design;
   design = JSON.parse(JSON.stringify(design));
   const snapList = design.sizes[family];
@@ -3903,8 +3907,12 @@ function resolvePlaylist(design) {
   return designs.find(function (d) { return d.id === wanted && d.kind !== "playlist"; }) || null;
 }
 const SIZES = { small: [158, 158], medium: [338, 158], large: [338, 354],
+  // iOS 27 full-page widget (the whole 4×6 icon grid). Needs the WidgetKing
+  // app; Scriptable shows an XL design at Large.
+  xl: [338, 540],
   // Lock Screen canvases (accessory widgets): element sizes on these are real points.
   lockRect: [172, 76], lockCircle: [76, 76] };
+const SIZE_LABELS = { small: "Small", medium: "Medium", large: "Large", xl: "XL · full page" };
 // Freestyle element sizes are relative to the 158pt small-widget short side;
 // Lock Screen canvases use their own 76pt short side so a size reads as points.
 function freestyleBase(design) { return design && design.kind === "lock" ? 76 : 158; }
@@ -5767,7 +5775,7 @@ const AI_SCHEMA = {
   type: "object",
   properties: {
     name: { type: "string", description: "Short widget name, max 24 characters" },
-    size: { type: "string", "enum": ["small", "medium", "large"], description: "The widget size this layout is designed for. small unless the user asks for a wider/bigger widget or the content needs the room" },
+    size: { type: "string", "enum": ["small", "medium", "large", "xl"], description: "The widget size this layout is designed for (xl = iOS 27 full-page, only when the user asks for a full page). small unless the user asks for a wider/bigger widget or the content needs the room" },
     kind: { type: "string", "enum": ["clock", "date", "countdown", "quote", "note", "launcher", "battery", "freestyle"] },
     themeID: { type: "string", "enum": Object.keys(THEMES) },
     fontStyle: { type: "string", "enum": Object.keys(FONT_CSS) },
@@ -6026,7 +6034,7 @@ function aiSystemPromptStable() {
     "- Font pairing: ONE display font (didot, script, futura, marker, copperplate) for the hero element only via its font field; classic/avenir/optima for data and captions. Never three fonts.\n" +
     "- Color discipline: ONE accent color used 2-3 times (ring, caption, glyph); everything else white/near-black at varied opacities. Text must contrast the background.\n" +
     "SPACING: keep everything inside x/y .08-.92; give the hero room; captions sit .12-.16 below their hero; fewer, larger elements beat many small ones.\n" +
-    "SIZE: set the top-level size field to the widget size the layout is drawn for — small 158x158pt, medium 338x158, large 338x354. x/y fractions map onto THAT canvas; a row of three columns or a launcher of 6+ apps needs medium, a full dashboard large.\n" +
+    "SIZE: set the top-level size field to the widget size the layout is drawn for — small 158x158pt, medium 338x158, large 338x354, xl 338x540 (iOS 27 full-page, only when asked). x/y fractions map onto THAT canvas; a row of three columns or a launcher of 6+ apps needs medium, a full dashboard large.\n" +
     "FIT — nothing may spill past an edge. Multi-line lists (calendar/reminders/news count 2-4) grow DOWNWARD ~0.11 per extra line on small/medium (0.05 large): anchor y + span must stay under .84, and a label above a list needs a y-gap of at least .14. Two texts in one column need a y-gap of at least (sizeA+sizeB)/280. a text's width in x-fraction is roughly fontPt × 0.55 × charCount / 158 (so a 44pt clock spans ~0.8 — it MUST sit at x .5). Any text over 30pt stays centered at x .45-.55; on medium widgets cap the hero at 40pt unless it is very short. LIVE STRINGS ARE LONG: astro sun/next/sunrise/sunset (~10-20 chars), worldclock, stock, and weather full/hourly lines must stay at size 9-16 — they are captions and data rows, NEVER the hero (a 30pt astro line overflows every widget). If the moment deserves a hero, use a clock, a short text, or a moonicon+moonPack instead. Dividers/bars w ≤ .7 centered under their text.\n" +
     "Fonts (fontStyle or per-element font): " + Object.keys(FONT_CSS).join(", ") + ".\n" +
     "Themes: " + Object.keys(THEMES).join(", ") + ". 'paper' is light (use dark text #333333); others are dark (use light text). For specific moods prefer TWO custom backgroundColors (e.g. dusk plum #2A1A34 to terracotta #B0626A) over presets.\n" +
@@ -9154,11 +9162,11 @@ function renderStudioUI() {
   const sizeRow = document.getElementById("studioSizeButtons");
   sizeRow.innerHTML = "";
   const lockCanvas = isLockCanvas(current);
-  const sizeKeys = lockCanvas ? ["lockRect", "lockCircle"] : ["small", "medium", "large"];
+  const sizeKeys = lockCanvas ? ["lockRect", "lockCircle"] : ["small", "medium", "large", "xl"];
   for (const key of sizeKeys) {
     const button = document.createElement("button");
-    button.textContent = key === "small" ? "S" : key === "medium" ? "M" : key === "large" ? "L" : key === "lockRect" ? "▭" : "◯";
-    button.title = key === "lockRect" ? "Rectangular" : key === "lockCircle" ? "Circular" : "";
+    button.textContent = key === "small" ? "S" : key === "medium" ? "M" : key === "large" ? "L" : key === "xl" ? "XL" : key === "lockRect" ? "▭" : "◯";
+    button.title = key === "lockRect" ? "Rectangular" : key === "lockCircle" ? "Circular" : key === "xl" ? "iOS 27 full-page widget (WidgetKing app)" : "";
     button.className = studioSize === key ? "active" : "";
     button.onclick = function () {
       if (lockCanvas) {
@@ -10866,9 +10874,10 @@ function renderControls() {
 
   const sizeButtons = document.getElementById("sizeButtons");
   sizeButtons.innerHTML = "";
-  for (const size of ["small", "medium", "large"]) {
+  for (const size of ["small", "medium", "large", "xl"]) {
     const button = document.createElement("button");
-    button.textContent = size[0].toUpperCase() + size.slice(1);
+    button.textContent = SIZE_LABELS[size];
+    if (size === "xl") button.title = "iOS 27 full-page widget (WidgetKing app)";
     if (previewSize === size) button.className = "active";
     button.onclick = function () {
       switchDesignSize(current, previewSize, size);
@@ -10894,6 +10903,7 @@ function renderControls() {
     button.onclick = function () { setHomeLook(look); };
     lookButtons.appendChild(button);
   }
+  document.getElementById("xlHint").style.display = previewSize === "xl" && current.kind !== "lock" ? "block" : "none";
   const lookHint = document.getElementById("lookHint");
   const ready = homeLook !== "default" ? lookReadiness(current) : null;
   lookHint.style.display = ready ? "block" : "none";
@@ -14151,6 +14161,71 @@ function renderPageStudio() {
   document.getElementById("pageAIRow").style.display = getApiKey() ? "flex" : "none";
   renderPageFrame();
 }
+// v136 (M4): the page as ONE XL design. Each placed widget becomes a card on
+// the full-page canvas: its background as a rounded shape, its pieces
+// re-mapped into the slot. Sizes stay the same on screen (freestyle sizes
+// are relative to the canvas's short side; XL's short side equals large's).
+function exportPageAsWidget() {
+  const flow = flowItems(pageState.items);
+  const g = PAGE_GEO;
+  const X0 = g.left, Y0 = g.top, PW = g.medW, PH = (g.bottom + g.smallH) - g.top;
+  const xl = SIZES.xl;
+  const els = [];
+  let count = 0;
+  for (const p of flow.placed) {
+    const src = designs.find(function (d) { return d.id === p.item.id; });
+    if (!src) continue;
+    const d = normalizeDesign(JSON.parse(JSON.stringify(src)));
+    if (d.kind === "lock" || d.kind === "playlist") continue;
+    if (d.kind !== "freestyle") convertToFreestyle(d);
+    const r = slotRect(p.slot);
+    // slot rect as fractions of the XL canvas
+    const sx = (r.x - X0) / PW, sy = (r.y - Y0) / PH, sw = r.w / PW, sh = r.h / PH;
+    const slotW = sw * xl[0], slotH = sh * xl[1];
+    const slotScale = Math.min(slotW, slotH) / 158;      // how big a 158-based size draws inside this slot
+    const xlScale = Math.min(xl[0], xl[1]) / 158;        // how big it would draw on the XL canvas
+    const theme = themeOf(d);
+    if (d.background !== "clear") {
+      els.push({ id: uid(), kind: "shape", shape: "rect", x: sx + sw / 2, y: sy + sh / 2, w: sw, h: sh, radius: 22,
+        colorHex: theme[0], opacity: d.background === "glass" ? 0.35 : 1 });
+      if (d.themeID !== "custom" || theme[0] !== theme[1]) {
+        els.push({ id: uid(), kind: "shape", shape: "rect", x: sx + sw / 2, y: sy + sh * 0.75, w: sw, h: sh / 2, radius: 22,
+          colorHex: theme[1], opacity: d.background === "glass" ? 0.25 : 0.55 });
+      }
+    }
+    for (const el of d.canvasElements) {
+      const e = JSON.parse(JSON.stringify(el));
+      e.id = uid();
+      e.x = sx + el.x * sw;
+      e.y = sy + el.y * sh;
+      if (typeof el.size === "number") e.size = Math.max(4, Math.round(el.size * slotScale / xlScale * 10) / 10);
+      const relMin = el.kind === "ring" || el.kind === "month" || el.kind === "sticker" ||
+        (el.kind === "photo" && el.shape === "circle") || (el.kind === "shape" && el.shape === "circle");
+      if (typeof el.w === "number") e.w = relMin ? el.w * Math.min(slotW, slotH) / Math.min(xl[0], xl[1]) : el.w * sw;
+      if (typeof el.h === "number") e.h = el.h * sh;
+      els.push(e);
+    }
+    count++;
+  }
+  if (!count) { toast("Add a widget or two to the page first"); return null; }
+  const first = designs.find(function (d) { return d.id === (flow.placed[0] || {}).item.id; }) || {};
+  const page = normalizeDesign({ name: (pageState.name || "My Page") + " — full page", kind: "freestyle", fitSize: "xl",
+    themeID: "custom", customColors: ["#0B0B10", "#15151D"], background: "clear",
+    fontStyle: first.fontStyle || "rounded", textColorHex: "#FFFFFF", canvasElements: els });
+  page.id = uid();
+  return page;
+}
+document.getElementById("pageXlBtn").onclick = function () {
+  const page = exportPageAsWidget();
+  if (!page) return;
+  designs.push(page);
+  persist();
+  document.getElementById("pageCloseBtn").click();
+  previewSize = "xl";
+  loadIntoEditor(page);
+  switchTab("editor");
+  toast("🧩 Full-page widget made — every piece is editable. Shows in the WidgetKing app on iOS 27.");
+};
 document.getElementById("pageStudioBtn").onclick = function () {
   pageSnapCache = {}; // designs may have changed since the last open
   document.getElementById("pageStudio").classList.add("open");

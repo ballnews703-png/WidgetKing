@@ -29,7 +29,7 @@ const DESIGNS = [
     "apps": []
   }
 ];
-const WK_VERSION = 135;
+const WK_VERSION = 136;
 const WK_PAGE_URL = "";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -1087,6 +1087,7 @@ function drawBgPattern(ctx, design, W, H) {
 // (v125: applied ONCE in buildWidget so the baked image AND the native
 // overlays — app icons, clocks — share the same per-size coordinates.)
 function applySizeLayout(design, family) {
+  if (family === "extraLargePortrait") family = "xl";
   if (!(design.sizes && design.sizes[family] && design.fitSize !== family)) return design;
   design = JSON.parse(JSON.stringify(design));
   const snapList = design.sizes[family];
