@@ -33,7 +33,7 @@ enum WKWallpaper {
     static let offsetYKey = "widgetking.wallpaper.offsetY"
 
     static var fileURL: URL? {
-        return FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: WKStore.groupID)?.appendingPathComponent(fileName)
+        return WKStore.containerURL?.appendingPathComponent(fileName)
     }
 
     /// Accepts a data: URL or raw base64 (PNG/JPEG) from the designer.

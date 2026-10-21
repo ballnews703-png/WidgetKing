@@ -14,6 +14,17 @@ enum WKStore {
         return UserDefaults(suiteName: groupID) ?? .standard
     }
 
+    /// Where shared files live: the App Group container when the build is
+    /// entitled for it, otherwise Application Support (unsigned Simulator
+    /// test runs have no App Group; the files still need a home).
+    static var containerURL: URL? {
+        if let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupID) { return group }
+        guard let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
+        let dir = base.appendingPathComponent("WidgetKing", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
     static func designsJSON() -> String? {
         return defaults.string(forKey: designsKey)
     }

@@ -25,7 +25,7 @@ enum WKLiveFetch {
     // MARK: cache (App Group container, JSON per key)
 
     static func cacheURL(_ key: String) -> URL? {
-        guard let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: WKStore.groupID) else { return nil }
+        guard let dir = WKStore.containerURL else { return nil }
         let safe = key.replacingOccurrences(of: "[^A-Za-z0-9._-]", with: "_", options: .regularExpression)
         return dir.appendingPathComponent("widgetking-" + safe + ".json")
     }
@@ -312,7 +312,7 @@ enum WKAssets {
 /// prefetches whatever its design references before rendering.
 enum WKIconCache {
     static func fileURL(for url: String) -> URL? {
-        guard let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: WKStore.groupID) else { return nil }
+        guard let dir = WKStore.containerURL else { return nil }
         var h: UInt64 = 5381
         for b in url.utf8 { h = (h &* 33) &+ UInt64(b) }
         return dir.appendingPathComponent("icon-" + String(h, radix: 36) + ".img")
