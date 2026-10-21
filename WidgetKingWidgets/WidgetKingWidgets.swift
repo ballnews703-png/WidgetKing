@@ -52,7 +52,10 @@ struct DesignWidgetView: View {
         r.now = entry.date
         r.scale = displayScale
         r.lockBackdrop = false
+        r.bakeClocks = false
         r.stickers = { WKAssets.stockArt($0) }
+        r.appIcons = { WKIconCache.cached($0) }
+        r.wallpaper = { design, fam in WKWallpaper.slice(for: design, family: fam, screenHeightPx: Double(UIScreen.main.nativeBounds.height)) }
         r.resolvePlaylist = { design, now in
             let hr = Calendar.current.component(.hour, from: now)
             let slot = hr >= 5 && hr < 11 ? "morning" : hr >= 11 && hr < 16 ? "midday" : hr >= 16 && hr < 21 ? "evening" : "night"
@@ -64,12 +67,34 @@ struct DesignWidgetView: View {
         return r
     }
 
+    /// Freestyle clock elements, laid out for this family, drawn as live
+    /// SwiftUI time text over the baked image — they tick on their own.
+    func liveClocks(_ size: CGSize) -> [(WKElement, CGFloat)] {
+        guard entry.design.kind == "freestyle", !wkFamily.isAccessory else { return [] }
+        let laid = entry.design.applyingSizeLayout(wkFamily.rawValue)
+        let s = min(size.width, size.height) / 158
+        return laid.elements.filter { $0.kind == "clock" }.map { ($0, s) }
+    }
+
     var body: some View {
         GeometryReader { geo in
             let image = renderer.render(entry.design, family: wkFamily, pointSize: geo.size)
-            Image(uiImage: image)
-                .resizable()
-                .frame(width: geo.size.width, height: geo.size.height)
+            ZStack(alignment: .topLeading) {
+                Image(uiImage: image)
+                    .resizable()
+                    .frame(width: geo.size.width, height: geo.size.height)
+                ForEach(Array(liveClocks(geo.size).enumerated()), id: \.offset) { item in
+                    let el = item.element.0
+                    let fs = CGFloat(el.size) * item.element.1
+                    Text(entry.date, style: .time)
+                        .font(Font(renderer.font(el.font ?? entry.design.fontStyle, fs, bold: el.bold)))
+                        .foregroundColor(Color(WKColor.color(el.colorHex, el.opacity)))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.4)
+                        .frame(width: geo.size.width, alignment: .center)
+                        .position(x: CGFloat(el.x) * geo.size.width, y: CGFloat(el.y) * geo.size.height)
+                }
+            }
         }
         .widgetURL(URL(string: entry.design.tapUrl))
         .containerBackground(for: .widget) { Color.clear }

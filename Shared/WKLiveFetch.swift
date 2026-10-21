@@ -306,3 +306,38 @@ enum WKAssets {
         return out
     }
 }
+
+/// Real App Store icons for launcher tiles, cached in the App Group so the
+/// widget extension can draw them synchronously. The timeline provider
+/// prefetches whatever its design references before rendering.
+enum WKIconCache {
+    static func fileURL(for url: String) -> URL? {
+        guard let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: WKStore.groupID) else { return nil }
+        var h: UInt64 = 5381
+        for b in url.utf8 { h = (h &* 33) &+ UInt64(b) }
+        return dir.appendingPathComponent("icon-" + String(h, radix: 36) + ".img")
+    }
+    static var memory: [String: UIImage] = [:]
+    static func cached(_ url: String) -> UIImage? {
+        if url.isEmpty { return nil }
+        if let m = memory[url] { return m }
+        guard let f = fileURL(for: url), let data = try? Data(contentsOf: f), let img = UIImage(data: data) else { return nil }
+        memory[url] = img
+        return img
+    }
+    static func prefetch(_ urls: [String]) async {
+        for raw in Set(urls) where !raw.isEmpty && cached(raw) == nil {
+            guard let u = URL(string: raw), u.scheme == "https", let f = fileURL(for: raw) else { continue }
+            var req = URLRequest(url: u); req.timeoutInterval = 10
+            if let result = try? await URLSession.shared.data(for: req), UIImage(data: result.0) != nil {
+                try? result.0.write(to: f, options: .atomic)
+            }
+        }
+    }
+    static func urls(in design: WKDesign) -> [String] {
+        var out: [String] = []
+        for a in design.apps { out.append(a.str("iconUrl")) }
+        for el in design.elements where el.kind == "app" { out.append(el.str("iconUrl")) }
+        return out.filter { !$0.isEmpty }
+    }
+}

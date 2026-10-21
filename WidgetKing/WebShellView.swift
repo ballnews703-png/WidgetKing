@@ -17,8 +17,9 @@ struct WebShellView: UIViewRepresentable {
         controller.add(context.coordinator, name: "widgetking")
         let boot = """
         (function () {
-          document.documentElement.classList.add('wk-native');
           window.wkNative = { platform: 'ios', version: 1 };
+          var tag = function () { if (document.documentElement) { document.documentElement.classList.add('wk-native'); return true; } return false; };
+          if (!tag()) document.addEventListener('readystatechange', tag, { once: true });
         })();
         """
         controller.addUserScript(WKUserScript(source: boot, injectionTime: .atDocumentStart, forMainFrameOnly: true))

@@ -52,7 +52,7 @@ enum WKStore {
 /// (`window.webkit.messageHandlers.widgetking`). Kept free of WebKit types so
 /// the unit tests can feed it plain dictionaries.
 enum WKBridge {
-    enum Result: Equatable { case saved(Int), ignored, rejected }
+    enum Result: Equatable { case saved(Int), ignored, rejected, wallpaper(Bool) }
 
     static func handle(_ body: Any) -> Result {
         guard let dict = body as? [String: Any], let type = dict["type"] as? String else { return .ignored }
@@ -61,6 +61,15 @@ enum WKBridge {
             guard let json = dict["json"] as? String else { return .rejected }
             let n = WKStore.save(json: json)
             return n >= 0 ? .saved(n) : .rejected
+        case "wallpaper":
+            guard let dataUrl = dict["dataUrl"] as? String else { return .rejected }
+            let ok = WKWallpaper.save(dataURL: dataUrl)
+            if ok { WidgetCenter.shared.reloadAllTimelines() }
+            return .wallpaper(ok)
+        case "clearWallpaper":
+            WKWallpaper.clear()
+            WidgetCenter.shared.reloadAllTimelines()
+            return .wallpaper(true)
         default:
             return .ignored
         }

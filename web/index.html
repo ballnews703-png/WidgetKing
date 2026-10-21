@@ -267,6 +267,12 @@
   #studioLookBtn.active { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
   #studioLookOverlay { position: absolute; z-index: 5; overflow: hidden; cursor: pointer; }
   #lookButtons { margin-top: 2px; }
+  /* v135 lean mode: inside the native app (html.wk-native) the Scriptable
+     install path disappears and native-only controls appear. */
+  .wk-native .sc-only { display: none !important; }
+  .nat-only { display: none !important; }
+  .wk-native .nat-only { display: revert !important; }
+  .wk-native button.nat-only, .wk-native div.nat-only { display: flex !important; }
   #lookButtons .lbl { font-size: 11px; color: var(--muted); align-self: center; }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition: none !important; animation: none !important; }
@@ -694,7 +700,7 @@
         <p class="hint" id="lockCanvasHint" style="display:none">Canvas mode: compose the widget with any piece — rings, bars, icons, weather, countdowns. iOS draws Lock Screen widgets in one color on its own frosted tile, so the canvas shows it that way. Sizes here are real points: the tile is 172×76 (rectangular) or 76×76 (circular).</p>
         <label style="margin-top:10px">Your Lock Screen clock (preview only)</label>
         <div class="row" id="lockClockRow" style="margin-bottom:6px"></div>
-        <p class="hint">Apple draws Lock Screen widgets in frosted monochrome — that's normal. Time and Countdown rows stay live on their own. To add it: hold your Lock Screen → Customize → tap the widget strip → Scriptable → set Script to WidgetKing and Parameter to this design's name.</p>
+        <p class="hint">Apple draws Lock Screen widgets in frosted monochrome — that's normal. Time and Countdown rows stay live on their own. <span class="sc-only">To add it: hold your Lock Screen → Customize → tap the widget strip → Scriptable → set Script to WidgetKing and Parameter to this design's name.</span><span class="nat-only">To add it: hold your Lock Screen → Customize → tap the widget strip → WidgetKing → pick this design.</span></p>
         <p class="hint">iOS 27 can shrink the clock into the top row (Customize → tap the clock → the two-bars icon). Your wallpaper breathes and the widget row becomes the star — flip the preview above to design for that layout.</p>
       </div>
       <div class="field" id="fLauncher" style="display:none">
@@ -748,7 +754,7 @@
 
         </div>
         <div class="hint" id="shortcutHint" style="display:none;margin-top:8px"></div>
-        <p class="hint" style="margin-top:6px">Taps work per-icon on <b>Medium/Large</b> (Small opens the first app) and flash through Scriptable for a moment — an iOS rule. For instant taps:</p>
+        <p class="hint" style="margin-top:6px">Taps work per-icon on <b>Medium/Large</b> (Small opens the first app)<span class="sc-only"> and flash through Scriptable for a moment — an iOS rule. For instant taps:</span><span class="nat-only">.</span></p>
         <button id="toIconMakerBtn" style="width:100%"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-bolt"/></svg> Make these zero-flash Home Screen icons instead</button>
       </div>
       <details class="dcard" open id="dcardStyle"><summary><svg class="ic ic-sm" aria-hidden="true" style="vertical-align:-3px;margin-right:4px"><use href="#i-palette"/></svg>Colors &amp; style</summary><div class="dbody">
@@ -893,7 +899,7 @@
 </div>
 
 <section id="librarySection" class="pane pane-widgets">
-  <div id="installChecklist" class="status-card" style="display:none">
+  <div id="installChecklist" class="status-card sc-only" style="display:none">
     <div class="grow"><svg class="ic ic-sm" aria-hidden="true" style="vertical-align:-3px;margin-right:3px"><use href="#i-phone"/></svg> <b>New phone?</b> Put your widgets on your Home Screen — the wizard walks you through it once.</div>
     <button class="primary" id="checklistWizardBtn">Set up</button>
     <button id="checklistDismissBtn" aria-label="Dismiss setup reminder">✕</button>
@@ -909,10 +915,10 @@
   <div class="row" id="libSortRow" style="margin-bottom:8px"></div>
   <div id="library"></div>
   <div class="row" style="margin-top:12px">
-    <button class="primary" id="pushUpdateBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-refresh"/></svg> Update phone (one tap)</button>
-    <button id="copyScriptBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-copy"/></svg> Copy Scriptable Script</button>
-    <button id="installScriptBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-bolt"/></svg> Install in Scriptable (first time)</button>
-    <button id="downloadScriptBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-save"/></svg> Download Script</button>
+    <button class="primary sc-only" id="pushUpdateBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-refresh"/></svg> Update phone (one tap)</button>
+    <button class="sc-only" id="copyScriptBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-copy"/></svg> Copy Scriptable Script</button>
+    <button class="sc-only" id="installScriptBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-bolt"/></svg> Install in Scriptable (first time)</button>
+    <button class="sc-only" id="downloadScriptBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-save"/></svg> Download Script</button>
     <button id="backupBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-save"/></svg> Back up all designs</button>
     <button id="importJsonBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-folder"/></svg> Restore / Import</button>
     <button id="syncAllBtn"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-phone"/></svg> Send all to my other device</button>
@@ -984,13 +990,15 @@
     <summary><span style="display:flex;align-items:center;gap:9px"><span class="icchip" style="background:#8E8E93"><svg class="ic" aria-hidden="true"><use href="#i-gear"/></svg></span>App</span></summary>
     <button class="settings-row" id="appearanceRow" style="width:100%;text-align:left"><span class="icchip" style="background:#5E5CE6"><svg class="ic" aria-hidden="true"><use href="#i-moonsun"/></svg></span> Appearance <span class="val" id="appearanceVal">Auto</span></button>
     <button class="settings-row" id="lookRow" style="width:100%;text-align:left"><span class="icchip" style="background:#30B0C7"><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg></span> Home Screen look <span class="val" id="lookVal">Default</span></button>
+    <button class="settings-row nat-only" id="wallpaperRow" style="width:100%;text-align:left"><span class="icchip" style="background:#2FB56B"><svg class="ic" aria-hidden="true"><use href="#i-photo"/></svg></span> Wallpaper photo <span class="val" id="wallpaperVal">Not set</span></button>
+    <input type="file" id="wallpaperInput" accept="image/*" style="display:none">
     <button class="settings-row" id="replayTourRow" style="width:100%;text-align:left"><span class="icchip" style="background:#0A84FF"><svg class="ic" aria-hidden="true"><use href="#i-compass"/></svg></span> Welcome tour <span class="val">Replay</span></button>
     <a class="settings-row" href="privacy.html" style="text-decoration:none;color:inherit"><span class="icchip" style="background:#64748B"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span> Privacy policy <span class="val">↗</span></a>
     <div class="settings-row"><span class="icchip" style="background:#F0B429"><svg class="ic" aria-hidden="true"><use href="#i-crown"/></svg></span> WidgetKing <span class="val" id="settingsVersion"></span></div>
   </details>
 </section>
 
-<section id="installSection" class="pane pane-settings">
+<section id="installSection" class="pane pane-settings sc-only">
   <div class="sec-label">Install &amp; setup help</div>
   <button class="primary" id="wizardBtn" style="width:100%;font-size:16px;padding:14px"><svg class="ic ic-sm" aria-hidden="true"><use href="#i-wand"/></svg> Set up my iPhone — step by step</button>
   <p class="hint" style="margin-top:8px">💡 Make this designer feel like an app: in Safari tap <b>Share → Add to Home Screen</b> — you'll get a WidgetKing 👑 icon that opens full-screen.</p>
@@ -1113,8 +1121,10 @@
     <h2>How it reaches your Home Screen.</h2>
     <div class="wt-rows">
       <div><b>1 · Design here</b><br>Templates, drag &amp; drop, or the AI.</div>
-      <div><b>2 · Scriptable shows it</b><br>A free app renders your designs as real widgets.</div>
-      <div><b>3 · One tap updates</b><br>Change a design, tap <b>Update phone</b>, your phone catches up.</div>
+      <div class="sc-only"><b>2 · Scriptable shows it</b><br>A free app renders your designs as real widgets.</div>
+      <div class="sc-only"><b>3 · One tap updates</b><br>Change a design, tap <b>Update phone</b>, your phone catches up.</div>
+      <div class="nat-only"><b>2 · Save it</b><br>It's a real widget the moment you save.</div>
+      <div class="nat-only"><b>3 · Add it</b><br>Long-press your Home Screen → Edit → Add Widget → WidgetKing.</div>
     </div>
   </div>
   <div class="wt-pane" data-p="4" style="display:none">
@@ -1292,7 +1302,7 @@
 // Widget "Parameter" = design name chooses which design a widget shows.
 
 const DESIGNS = "__DESIGNS__";
-const WK_VERSION = 134;
+const WK_VERSION = 135;
 const WK_PAGE_URL = "__PAGE_URL__";
 
 // The script can update ITSELF: fetch the deployed designer page, extract
@@ -10797,13 +10807,19 @@ function renderControls() {
   }
   if (current.background === "gradient" && bgOpacityOf(current) < 1) {
     bgHint.style.display = "block";
-    bgHint.innerHTML = "🎨 With opacity under 100%, your gradient blends over <b>your wallpaper</b> like tinted glass. Needs the same one-time wallpaper setup as Glass (run the script in Scriptable → <b>Set wallpaper photo…</b>); without it, the widget falls back to a solid gradient.";
+    bgHint.innerHTML = isNativeShell()
+      ? "🎨 With opacity under 100%, your gradient blends over <b>your wallpaper</b> like tinted glass. Set your wallpaper photo once in Settings → App; without it, the widget falls back to a solid gradient."
+      : "🎨 With opacity under 100%, your gradient blends over <b>your wallpaper</b> like tinted glass. Needs the same one-time wallpaper setup as Glass (run the script in Scriptable → <b>Set wallpaper photo…</b>); without it, the widget falls back to a solid gradient.";
   } else if (current.background === "glass") {
     bgHint.style.display = "block";
-    bgHint.innerHTML = "🧊 Glass = a frosted slice of <b>your wallpaper</b> (preview shows a stand-in). Opacity sets frost strength. Needs the one-time wallpaper setup — see the ✨ step in the setup wizard.";
+    bgHint.innerHTML = isNativeShell()
+      ? "🧊 Glass = a frosted slice of <b>your wallpaper</b> (preview shows a stand-in). Opacity sets frost strength. Set your wallpaper photo once in Settings → App."
+      : "🧊 Glass = a frosted slice of <b>your wallpaper</b> (preview shows a stand-in). Opacity sets frost strength. Needs the one-time wallpaper setup — see the ✨ step in the setup wizard.";
   } else if (current.background === "clear") {
     bgHint.style.display = "block";
-    bgHint.innerHTML = "🫥 Clear = the exact wallpaper slice, fully transparent. Needs the one-time wallpaper setup (✨ step in the setup wizard). Pick the spot above once — the Parameter then only needs the design's name.";
+    bgHint.innerHTML = isNativeShell()
+      ? "🫥 Clear = the exact wallpaper slice, fully transparent. Set your wallpaper photo once in Settings → App, and pick the widget's spot above so the slice lines up."
+      : "🫥 Clear = the exact wallpaper slice, fully transparent. Needs the one-time wallpaper setup (✨ step in the setup wizard). Pick the spot above once — the Parameter then only needs the design's name.";
   } else {
     bgHint.style.display = "none";
   }
@@ -11193,7 +11209,7 @@ document.getElementById("saveBtn").onclick = function () {
   // An edit only reaches the phone after a fresh copy+paste — say so every
   // time an existing design changes, or edits look like they "didn't work".
   toast(index >= 0
-    ? "Saved “" + current.name + "” ✓ — tap Update phone to send it to your phone"
+    ? (isNativeShell() ? "Saved “" + current.name + "” ✓ — your widgets update on their own" : "Saved “" + current.name + "” ✓ — tap Update phone to send it to your phone")
     : "Saved “" + current.name + "”");
 };
 document.getElementById("newBtn").onclick = function () { loadIntoEditor(newDesign()); };
@@ -13217,7 +13233,7 @@ function renderStatusCard() {
   const dirty = Number(localStorage.getItem("widgetking.libstamp") || 0) >
     Number(localStorage.getItem("widgetking.lastcopy") || 0);
   let html = "", act = "";
-  if (designs.length && dirty) {
+  if (designs.length && dirty && !isNativeShell()) {
     html = '<div class="grow">Your designs changed since the last phone update.</div><button class="primary" id="statusActBtn">Update</button>';
     act = "push";
   } else if (designs.length && !getApiKey()) {
@@ -13268,6 +13284,31 @@ document.getElementById("appearanceRow").onclick = function () {
   updateAppearanceVal();
 };
 document.getElementById("replayTourRow").onclick = showWelcomeTour;
+// v135: the native app keeps one wallpaper photo for Glass/Clear slices.
+function updateWallpaperVal() {
+  const el = document.getElementById("wallpaperVal");
+  if (!el) return;
+  const at = Number(localStorage.getItem("widgetking.wallpaper.at") || 0);
+  el.textContent = at ? "Set " + new Date(at).toLocaleDateString([], { month: "short", day: "numeric" }) : "Not set";
+}
+function wkWallpaperChosen(dataUrl) {
+  if (!dataUrl || dataUrl.indexOf("data:image/") !== 0) { toast("That file isn't an image"); return false; }
+  if (!wkNativeSend("wallpaper", { dataUrl: dataUrl })) { toast("Wallpaper photos are for the WidgetKing app"); return false; }
+  localStorage.setItem("widgetking.wallpaper.at", String(Date.now()));
+  updateWallpaperVal();
+  toast("🖼 Wallpaper saved — Glass and Clear widgets now show the real thing");
+  return true;
+}
+document.getElementById("wallpaperRow").onclick = function () { document.getElementById("wallpaperInput").click(); };
+document.getElementById("wallpaperInput").onchange = function (e) {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function () { wkWallpaperChosen(String(reader.result || "")); };
+  reader.readAsDataURL(file);
+};
+updateWallpaperVal();
 document.getElementById("lookRow").onclick = function () {
   setHomeLook(LOOKS[(LOOKS.indexOf(homeLook) + 1) % LOOKS.length]);
   toast(homeLook === "default"
@@ -14230,7 +14271,8 @@ document.getElementById("pageSaveBtn").onclick = function () {
   persist();
   const list = document.getElementById("pageChecklist");
   let html = '<h2 style="font-size:15px">📋 Placement checklist</h2>' +
-    '<p class="hint">Tap <b>Update phone</b> first (your designs ride inside the script — each now remembers its spot), then add each widget:</p>';
+    (isNativeShell() ? '<p class="hint">Add each widget from the Home Screen (long-press → Edit → Add Widget → WidgetKing → size), then pick its design:</p>'
+      : '<p class="hint">Tap <b>Update phone</b> first (your designs ride inside the script — each now remembers its spot), then add each widget:</p>');
   filled.forEach(function (slot, index) {
     const design = designs.find(function (d) { return d.id === designAtSlot[slotKey(slot)]; });
     const param = design.name;
@@ -14595,7 +14637,7 @@ document.getElementById("iconsToWidgetBtn").onclick = async function () {
   }
   loadIntoEditor(design);
   switchTab("editor");
-  toast("🧩 Launcher built — save it, then Update phone. No Shortcuts needed ✓");
+  toast(isNativeShell() ? "🧩 Launcher built — save it and it's on your widgets ✓" : "🧩 Launcher built — save it, then Update phone. No Shortcuts needed ✓");
 };
 document.getElementById("iconsToHomeBtn").onclick = function () {
   iconHomeFlowOpen = !iconHomeFlowOpen;
@@ -14923,6 +14965,14 @@ const GUIDES = [
       "Tap <b>Save</b>. It's now in My Widgets, ready for your phone."
     ],
     action: { ic: "i-refresh", label: "Replay the welcome tour", run: function () { closeGuide(); showWelcomeTour(); } } },
+  isNativeShell() ? { ic: "i-phone", tint: "#0A84FF", title: "Put it on your Home Screen", promise: "Save a design, add the widget, done.",
+    steps: [
+      "Long-press your Home Screen → <b>Edit → Add Widget</b> → search <b>WidgetKing</b> → pick a size.",
+      "Long-press the new widget → <b>Edit Widget</b> → choose which design it shows.",
+      "Lock Screen: hold the Lock Screen → <b>Customize</b> → tap the widget strip → <b>WidgetKing</b>.",
+      "The first time a design needs weather, calendar or reminders, iOS asks permission once.",
+      "Widgets looking washed-out or monochrome? Your Home Screen look is set to <b>Clear</b> or <b>Tinted</b> — set <b>Home Screen look</b> under the preview to match and the previews, templates and AI design for it."
+    ] } :
   { ic: "i-phone", tint: "#0A84FF", title: "Put it on your Home Screen", promise: "One-time setup, then updates are one tap.",
     steps: [
       "Install the free <b>Scriptable</b> app from the App Store — it's what draws your widgets on the Home Screen.",
@@ -14953,8 +15003,16 @@ const GUIDES = [
       "Open the <b>Data</b> tool: weather, calendar, reminders, news, stocks, battery, astronomy, world clocks and more.",
       "Drop a piece on the canvas — the preview shows sample data so you can design the layout now.",
       "On your phone, the real numbers appear and refresh on Apple's widget schedule.",
-      "iOS asks permission (calendar, location…) inside Scriptable the first time — grant it once and you're set."
+      isNativeShell() ? "iOS asks permission (calendar, location…) the first time a design needs it — grant it once and you're set."
+        : "iOS asks permission (calendar, location…) inside Scriptable the first time — grant it once and you're set."
     ] },
+  isNativeShell() ? { ic: "i-layers", tint: "#14B8A6", title: "Clear & glass backgrounds", promise: "Widgets that melt into your wallpaper.",
+    steps: [
+      "Pick <b>Clear</b> or <b>Glass</b> in the Background tool.",
+      "Set your wallpaper photo once: Settings → App → <b>Wallpaper photo</b>. Use a screenshot of an empty Home Screen page — iOS shades wallpapers, so a screenshot matches perfectly.",
+      "Pick the widget's spot in the Background tool (top-left, middle…) so the slice lines up.",
+      "Glass blurs that slice; Clear shows it exactly."
+    ] } :
   { ic: "i-layers", tint: "#14B8A6", title: "Clear & glass backgrounds", promise: "Widgets that melt into your wallpaper.",
     steps: [
       "Pick <b>Clear</b> or <b>Glass</b> in the Background tool.",
@@ -14962,6 +15020,13 @@ const GUIDES = [
       "Run the WidgetKing script inside Scriptable once and pick <b>iPhone model</b> from its menu so the slice lines up.",
       "Glass needs no setup — it blurs whatever is behind it."
     ] },
+  isNativeShell() ? { ic: "i-refresh", tint: "#0EA5E9", title: "Keep everything fresh", promise: "Save, and your widgets follow.",
+    steps: [
+      "Edit any design and Save — every widget showing it redraws within a few minutes.",
+      "Live pieces (weather, calendar, stocks…) refresh on Apple's widget schedule, about every 15 minutes.",
+      "Sign in once (Settings → Account) and your designs follow you to every device.",
+      "Back up from My Widgets now and then — one file holds every design."
+    ] } :
   { ic: "i-refresh", tint: "#0EA5E9", title: "Keep everything fresh", promise: "Edit here, tap once, done on your phone.",
     steps: [
       "Edit any design and Save — My Widgets shows an update is waiting.",

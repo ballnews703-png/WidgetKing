@@ -45,8 +45,11 @@ struct WKRenderer {
     var resolvePlaylist: (WKDesign, Date) -> WKDesign? = { _, _ in nil }
     /// Real App Store icons by URL (cached on device, M3). nil → emoji tile.
     var appIcons: (String) -> UIImage? = { _ in nil }
-    /// Wallpaper slice for glass/clear backgrounds (M3); nil → placeholder.
-    var wallpaper: ((WKFamily) -> UIImage?)? = nil
+    /// Wallpaper slice for glass/clear backgrounds; nil → placeholder.
+    var wallpaper: ((WKDesign, WKFamily) -> UIImage?)? = nil
+    /// The widget extension overlays live SwiftUI clocks on freestyle
+    /// designs, so it asks the renderer to leave clock elements out.
+    var bakeClocks: Bool = true
     /// Previews paint the frosted Lock Screen tile themselves; inside WidgetKit
     /// iOS supplies that background, so the extension turns this off.
     var lockBackdrop: Bool = true
@@ -104,13 +107,13 @@ struct WKRenderer {
 
     func wallpaperMissing(_ design: WKDesign, family: WKFamily) -> Bool {
         guard design.background == "clear" || design.background == "glass" else { return false }
-        return wallpaper?(family) == nil
+        return wallpaper?(design, family) == nil
     }
 
     func paintBackground(_ ctx: CGContext, _ design: WKDesign, family: WKFamily, W: CGFloat, H: CGFloat) {
         let colors = design.themeColors
         let op = design.bgOpacity
-        let slice = wallpaper?(family)
+        let slice = wallpaper?(design, family)
         if design.background == "clear" || design.background == "glass" || (design.background == "gradient" && op < 1) {
             if let img = slice {
                 img.draw(in: CGRect(x: 0, y: 0, width: W, height: H))
@@ -529,6 +532,7 @@ struct WKRenderer {
             let px = CGFloat(el.x) * W, py = CGFloat(el.y) * H
             let fs = CGFloat(el.size) * s
             let op = el.opacity
+            if el.kind == "clock" && !bakeClocks { continue }
             switch el.kind {
             case "shape":
                 drawShape(ctx, el, px: px, py: py, W: W, H: H, s: s, op: op)

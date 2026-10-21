@@ -24,6 +24,7 @@ struct DesignProvider: AppIntentTimelineProvider {
     func timeline(for configuration: SelectDesignIntent, in context: Context) async -> Timeline<DesignEntry> {
         let design = resolveDesign(for: configuration)
         let live = await WKLiveFetch.liveData(for: design)
+        await WKIconCache.prefetch(WKIconCache.urls(in: design))
         let now = Date()
         let cal = Calendar.current
         if Self.showsClock(design) {
@@ -41,10 +42,12 @@ struct DesignProvider: AppIntentTimelineProvider {
         return Timeline(entries: [DesignEntry(date: now, design: design, live: live)], policy: .after(refresh))
     }
 
+    /// Designs whose time is baked into the image need per-minute entries.
+    /// Freestyle clock elements are live SwiftUI text now, so they don't.
     static func showsClock(_ design: WKDesign) -> Bool {
         if design.kind == "clock" { return true }
-        if design.kind == "lock" { return design.lockRows.contains { $0.kind == "time" } }
-        return design.elements.contains { $0.kind == "clock" || $0.kind == "worldclock" }
+        if design.kind == "lock" { return design.lockRows.contains { $0.kind == "time" } || design.elements.contains { $0.kind == "clock" } }
+        return design.elements.contains { $0.kind == "worldclock" }
     }
 
     static func usesLiveData(_ design: WKDesign) -> Bool {
