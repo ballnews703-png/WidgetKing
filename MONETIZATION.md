@@ -1,18 +1,51 @@
 # WidgetKing — Monetization Plan
 
-Status: **agreed; build-order step 1 shipped (v124, dark), steps 2–3 not built.**
-Nothing in the app enforces any of this today. The client side of accounts —
-email-code sign-in, design sync, and the AI-build meter — is in the app but
-invisible until the backend keys are filled in (see ACCOUNTS_SETUP.md).
-Enforcement of free-tier caps and payments remain future phases with their own
-go decision. This document is the source of truth for that build.
+Status: **decided Nov 9, 2026 — pricing, AI-in-Pro, limits, no trial. Backend
+not built yet.** The client side of accounts — email-code sign-in and design
+sync — is live (Supabase + Resend; see ACCOUNTS_SETUP.md). The AI still runs on
+a pasted access key. The Pro/AI server piece and payments are the next build
+phases; this document is the source of truth for them.
 
 Note on the existing dollar budget: today the AI runs on the user's own access
 key, so the app shows a **spend budget in dollars** (Settings → AI designer).
 That is a bring-your-own-key safety rail, not the free-tier counter below.
-When Pro ships, subscribers use WidgetKing's key and the dollar budget UI goes
-away for them; the "AI builds per month" counter (already recorded per device)
-becomes the visible limit.
+When Pro ships, everyone uses WidgetKing's key through the proxy below and the
+paste-your-key screen leaves the normal flow (it stays as a developer option).
+The "AI builds per month" counter (already recorded per device) becomes the
+visible limit.
+
+## Decision record (Nov 9, 2026)
+
+Agreed with Andrew in discussion. Everything below in this document is kept in
+step with these points; where older text disagrees, this record wins.
+
+- **AI is a Pro feature, with limits.** Andrew: "the AI should be part of the
+  Pro tool, but we also need limits so someone doesn't blow through money."
+- **Free tier keeps 3 AI builds per month** on the best quality setting, with
+  review passes included — a real taste of the product, not a crippled one.
+- **Pro is marketed as unlimited AI**, enforced by fair-use caps nobody
+  legitimate hits: **150 builds per month, 30 per day soft cap** (a friendly
+  "come back tomorrow" message, never an error). A review pass counts as half a
+  build. Fast mode may keep going at a lower cap after the daily soft cap.
+- **Global daily spend breaker** on WidgetKing's own key: if the whole app's
+  AI spend in a day crosses the breaker, AI pauses for everyone until midnight
+  and Andrew gets an email. Amount to confirm with Andrew (proposal: ~$20/day).
+- **The key never ships in the app.** AI calls go through a Supabase Edge
+  Function proxy that holds the Anthropic key, checks the caller's Pro status,
+  counts the build, and forwards the request. The "paste your access key"
+  screen is removed for normal users (developer option remains).
+- **No free trial.** Andrew: "you can churn a lot of your widgets in a week …
+  the 3 free kind of cover that." The 3 free builds are the trial.
+- **Price: $2.99/month, $24.99/year.** Yearly is the default-selected option
+  ("2 months free"). No struck-through fake "regular" prices — the price is the
+  price.
+- **Possible launch price:** $19.99 yearly for the first stretch, shown
+  honestly as a launch price with an end date. To confirm with Andrew.
+- **Lifetime unlock: not at launch.** Revisit once real usage shows what AI
+  actually costs per user.
+- **Pro keeps paying for itself after the AI novelty fades:** design sync
+  across phones, unlimited active widgets, full Explore access, future style
+  packs, and no promo cards.
 
 ## Philosophy
 
@@ -42,15 +75,32 @@ becomes the visible limit.
     rejected: six mediums/larges dress 2–3 pages.)
 
 ### Pro (subscription)
-- Unlimited AI builds — marketed as unlimited, backed by a generous fair-use
-  daily cap (e.g. 100/day) to prevent scripted abuse
+- **AI designer** — marketed as unlimited, enforced at 150 builds/month and a
+  30/day soft cap (review passes count half; Fast mode may continue at a lower
+  cap after the daily soft cap). These numbers are far above real use and exist
+  only to stop scripted abuse.
 - Unlimited active widgets
+- Design sync across every phone signed into the account
 - Full Explore access (published designs and icon packs)
 - No promo cards, ever
-- Pricing: monthly in the $2–4 range + discounted yearly framed as "2 months
-  free." Web payments via Stripe (~3% fees). If a native App Store build ships
-  later, in-app subscriptions must use Apple IAP (15% small-business rate).
-- Optional add-on for non-subscribers: one-time AI build top-up pack
+- **Pricing: $2.99/month or $24.99/year**, yearly selected by default and
+  framed as "2 months free." No fake struck-through prices. Possible honest
+  launch price of $19.99/year with a stated end date (to confirm).
+- **No free trial** — the 3 free builds are the trial.
+- Payments: the native app uses Apple In-App Purchase (15% small-business
+  rate); the web designer can sell the same subscription via Stripe (~3%).
+- Lifetime unlock and AI top-up packs: not at launch; revisit with real cost
+  data.
+
+### Cost protection (all tiers)
+- **Per-user counters** on the server (builds this month, builds today), keyed
+  by account for Pro and by device for free.
+- **Global daily spend breaker** on WidgetKing's key — pauses AI for everyone
+  until midnight ET and emails Andrew when tripped. Amount: ~$20/day proposed,
+  to confirm.
+- **Supabase Edge Function proxy** holds the Anthropic key, verifies the
+  caller (Supabase session → Pro status), enforces the counters, and forwards
+  the request. The client never sees the key.
 
 ## Sign-in & abuse prevention
 
@@ -95,10 +145,11 @@ our numbers — reference only, not a template:
   widgets, looser on AI). Their upsell screen leads with the free-tier limits in
   plain language before listing Pro benefits — worth keeping.
 - Pro: **$2.99/month or $24.99/year**, both displayed against struck-through
-  "regular" prices ($9.99 / $119.99) as a permanent "70% off." Our agreed
-  $2–4 monthly band sits exactly at market. The fake-discount anchoring is a
-  dark pattern — App Store review increasingly flags it, and it reads as
-  distrust; we frame yearly as "2 months free" instead (already agreed above).
+  "regular" prices ($9.99 / $119.99) as a permanent "70% off." Our decided
+  price matches theirs exactly — at market, not under it. The fake-discount
+  anchoring is a dark pattern — App Store review increasingly flags it, and it
+  reads as distrust; we show the real price and frame yearly as "2 months
+  free" (decision record above).
 - Their paywall sells feature *outcomes* ("iterate without hitting the wall")
   rather than feature names; their footer covers auto-renew terms + restore
   purchases + a real "Not now" escape. All three are the standard to meet.
@@ -111,10 +162,14 @@ our numbers — reference only, not a template:
   with a bullet list of what you get) rather than a wall of limits — the free
   tier is presented with the same dignity as Pro. Keep that.
 
-## Build order (when greenlit)
+## Build order
 
-1. Accounts backend (email OTP, design sync) — also unlocks Explore publishing;
-   starts on free-tier infrastructure (Supabase-class) at ~$0 until real traffic
-2. Usage metering (AI builds, active-widget count) built in from day one
-3. Stripe + Pro entitlement — monetization becomes a switch to flip, not a
-   rebuild
+1. ✅ Accounts backend (email OTP, design sync) — live on Supabase + Resend
+2. **AI proxy + metering** (next): Supabase Edge Function holding the key,
+   per-user build counters, global daily spend breaker, Pro-status check;
+   remove the paste-your-key screen from the normal flow
+3. **Pro entitlement + payments**: Apple In-App Purchase in the native app
+   (needs the Apple Developer membership), Stripe on the web; Pro status synced
+   to the account so either purchase unlocks both
+4. Paywall screen per the standards above (outcomes, honest prices, auto-renew
+   terms, restore purchases, a real "Not now")

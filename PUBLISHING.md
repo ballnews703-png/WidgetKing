@@ -32,8 +32,12 @@ explicitly approved.
 
 - Free: full designer forever, 3 AI builds/month, 4 active widgets per device
   (home + lock combined)
-- Pro: unlimited fair-use AI, unlimited widgets, full Explore, no promos
-- Sign-in: email + 6-digit code; device-tied free counters; account-synced
+- Pro: $2.99/month or $24.99/year (yearly default, no fake discounts, no free
+  trial); AI included — marketed unlimited, enforced at 150/month + 30/day
+  soft cap; unlimited widgets, sync, full Explore, no promos
+- AI key lives in a Supabase Edge Function proxy with per-user counters and a
+  global daily spend breaker; no paste-your-key screen for normal users
+- Sign-in: email + one-time code; device-tied free counters; account-synced
   designs; no widget lockouts
 - Promos: house cards only, 1/day + 1 on new-widget save, max 2/day
 - Explore publishing (user-submitted widgets + icon packs, tagged by vibe and
