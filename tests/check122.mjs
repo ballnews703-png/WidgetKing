@@ -19,7 +19,9 @@ const r = await pg.evaluate(async () => {
 
   // Settings: every section summary + app row has an icchip, no emoji text
   const settings = document.getElementById('settingsSection');
-  const summaries = [...settings.querySelectorAll('details > summary')];
+  // Section summaries only — v137's "Advanced: use my own access key" is a
+  // plain text disclosure inside the AI section, not a section.
+  const summaries = [...settings.querySelectorAll('details.wk-sec > summary')];
   // v124 added the Account & sync section (4th summary); v130 added the Home Screen look row, v135 the native-only Wallpaper photo row (7 rows) — they must
   // follow the same icchip design this check enforces.
   out.summaryChips = summaries.length === 4 && summaries.every(s => s.querySelector('.icchip svg use'));

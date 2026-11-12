@@ -101,8 +101,12 @@ and `localStorage.setItem("widgetking.sync.key", "<anon key>")`, reload.
   (photos stripped, same as share links — they never leave the device);
   on launch and on "Sync now" the client pulls and merges — newest
   `updatedAt` wins per design, local photo data grafted back.
-- **Metering** (recording only, nothing enforced): AI builds counted per
-  month in `widgetking.meter.ai`, device-local per MONETIZATION.md.
+- **AI through the proxy (v137)**: with no key on the device, every AI build
+  goes to `/functions/v1/ai-proxy` with the user's session token, a device
+  id, and a build id (one per Build press, so the review pass rides on the
+  same build). The proxy's `x-wk-*` headers feed the allowance readout in
+  Settings → AI designer; 402/429/503 come back as plain-English messages.
+  A pasted key (Advanced) still goes straight to the model.
 
 ## Before flipping the switch
 
@@ -112,10 +116,47 @@ and `localStorage.setItem("widgetking.sync.key", "<anon key>")`, reload.
   and relies on the `delete_own_account()` function from step 2 — run the
   whole SQL block, not just the table.
 
+## 5. AI proxy (phase 2 — Andrew, ~10 minutes)
+
+The app no longer asks people for an access key. AI builds go through a
+small server function that holds WidgetKing's key, checks the plan, and
+meters each build (rules in MONETIZATION.md; code in
+`supabase/functions/ai-proxy/`). Three steps in the Supabase dashboard:
+
+1. **Tables.** SQL Editor → New query → paste all of `supabase/ai-proxy.sql`
+   → Run. Safe to run twice.
+2. **The function.** Edge Functions → Deploy a new function → "Via Editor".
+   Name it exactly `ai-proxy`. Replace the editor's contents with all of
+   `supabase/functions/ai-proxy/index.ts` (one file; it is generated from
+   `index.src.ts` + `policy.js` by `node tools/gen_ai_proxy.mjs`). Deploy.
+   Leave "Verify JWT" on — the app sends each user's sign-in token.
+3. **The key.** Edge Functions → Secrets → Add new secret:
+   `ANTHROPIC_API_KEY` = your Anthropic key (console.anthropic.com → API
+   keys; make a new key named "WidgetKing proxy" so it can be revoked on
+   its own). Never paste the key anywhere else — not in the app, not in
+   chat, not in this repo.
+
+Optional, for the daily spend breaker email: secrets `RESEND_API_KEY`
+(the same Resend key as the SMTP setup), `ALERT_EMAIL` (where to send it),
+and `ALERT_FROM` (a sender on your verified Resend domain). Without them
+the breaker still pauses the AI; it just doesn't email.
+
+To give an account Pro by hand (yourself, testers): Authentication → Users
+→ copy the user's id, then in the SQL editor:
+
+```sql
+insert into public.pro_status (user_id, active, source) values ('<user id>', true, 'manual')
+on conflict (user_id) do update set active = true, updated_at = now();
+```
+
+Check it worked: sign in on a device with no key pasted, open Settings →
+AI designer — the readout shows "about 20 High-quality builds left this
+month" (Pro) or "3 of 3 free AI builds left" (free). Build something.
+
 ## Build order per MONETIZATION.md
 
-1. ✅ Accounts backend + design sync client — shipped v124 (dark).
-2. Enforcement UI: free-tier caps (3 AI builds/mo, 4 active widgets) with
-   the upsell card — ships together with payments, never before.
-3. Stripe checkout + `pro` entitlement column; Explore publishing rides on
-   the same accounts.
+1. ✅ Accounts backend + design sync client — shipped v124, live v128.
+2. ✅ AI proxy + metering — client shipped v137; server pieces in
+   `supabase/` await step 5 above.
+3. Pro entitlement + payments (Apple IAP in the native app, Stripe on the
+   web) writing `pro_status`; paywall screen.

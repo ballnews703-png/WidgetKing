@@ -1,10 +1,10 @@
 # WidgetKing — Monetization Plan
 
-Status: **decided Nov 9, 2026 — pricing, AI-in-Pro, limits, no trial. Backend
-not built yet.** The client side of accounts — email-code sign-in and design
-sync — is live (Supabase + Resend; see ACCOUNTS_SETUP.md). The AI still runs on
-a pasted access key. The Pro/AI server piece and payments are the next build
-phases; this document is the source of truth for them.
+Status: **decided Nov 9, 2026 — pricing, AI-in-Pro, limits, no trial. AI
+proxy built Nov 12 (v137), awaiting Andrew's dashboard setup; payments not
+built.** The client side of accounts — email-code sign-in and design sync — is
+live (Supabase + Resend; see ACCOUNTS_SETUP.md). This document is the source
+of truth for the Pro build.
 
 Note on the existing dollar budget: today the AI runs on the user's own access
 key, so the app shows a **spend budget in dollars** (Settings → AI designer).
@@ -179,9 +179,12 @@ our numbers — reference only, not a template:
 ## Build order
 
 1. ✅ Accounts backend (email OTP, design sync) — live on Supabase + Resend
-2. **AI proxy + metering** (next): Supabase Edge Function holding the key,
-   per-user build counters, global daily spend breaker, Pro-status check;
-   remove the paste-your-key screen from the normal flow
+2. ✅ **AI proxy + metering** — built v137 (Nov 12): Supabase Edge Function
+   holding the key, per-account dollar budgets with the Fast-mode downshift,
+   per-build call cap, global daily breaker, Pro-status check; the
+   paste-your-key screen is now an "Advanced" disclosure. Rules live in
+   `supabase/functions/ai-proxy/policy.js` (tested by check137). Needs
+   Andrew's three dashboard steps (ACCOUNTS_SETUP.md §5) to go live.
 3. **Pro entitlement + payments**: Apple In-App Purchase in the native app
    (needs the Apple Developer membership), Stripe on the web; Pro status synced
    to the account so either purchase unlocks both
