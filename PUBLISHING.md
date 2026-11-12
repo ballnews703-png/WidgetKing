@@ -33,8 +33,9 @@ explicitly approved.
 - Free: full designer forever, 3 AI builds/month, 4 active widgets per device
   (home + lock combined)
 - Pro: $2.99/month or $24.99/year (yearly default, no fake discounts, no free
-  trial); AI included — marketed unlimited, enforced at 150/month + 30/day
-  soft cap; unlimited widgets, sync, full Explore, no promos
+  trial); unlimited AI builds — about 20 High-quality builds a month
+  ($1.50 cost budget), then Fast mode; fair-use ceiling 30/day, $3/month;
+  unlimited widgets, sync, full Explore, no promos
 - AI key lives in a Supabase Edge Function proxy with per-user counters and a
   global daily spend breaker; no paste-your-key screen for normal users
 - Sign-in: email + one-time code; device-tied free counters; account-synced

@@ -23,13 +23,25 @@ step with these points; where older text disagrees, this record wins.
   Pro tool, but we also need limits so someone doesn't blow through money."
 - **Free tier keeps 3 AI builds per month** on the best quality setting, with
   review passes included — a real taste of the product, not a crippled one.
-- **Pro is marketed as unlimited AI**, enforced by fair-use caps nobody
-  legitimate hits: **150 builds per month, 30 per day soft cap** (a friendly
-  "come back tomorrow" message, never an error). A review pass counts as half a
-  build. Fast mode may keep going at a lower cap after the daily soft cap.
-- **Global daily spend breaker** on WidgetKing's own key: if the whole app's
-  AI spend in a day crosses the breaker, AI pauses for everyone until midnight
-  and Andrew gets an email. Amount to confirm with Andrew (proposal: ~$20/day).
+- **Pro is unlimited; heavy use downshifts to Fast mode.** (Revised Nov 12 —
+  Andrew: the breaker "should probably be per account," and "keep unlimited,
+  but shift to fast mode if they exceed certain usage.") Each Pro account has a
+  **$1.50/month High-quality budget**, tracked in dollars on the server
+  because a Fast build costs about a third of a High build. That is roughly
+  **20 High-quality builds a month**; most people use a fraction of it. When
+  it is spent, builds keep working in **Fast mode** (Haiku, ~$0.02 each) for
+  the rest of the month — the quality picker shows High as "back on the 1st"
+  rather than greying the Build button. Users never see dollars; the app
+  shows "about 6 High builds left this month" once under half.
+- **Fair-use ceiling, far above real use:** 30 builds/day soft cap (friendly
+  "come back tomorrow") and a $3.00/month total cost ceiling per account
+  (≈ 20 High + 60 Fast builds). Only scripted abuse reaches it. Disclosed on
+  the paywall in one line: "Unlimited builds. After about 20 High-quality
+  builds a month, builds continue in Fast mode."
+- **Global daily spend breaker, set high (~$25/day), as a backstop for bugs**,
+  not users: if a loop in the app or a bad deploy hammers the proxy, per-account
+  budgets will not catch it fast enough. Trips → AI pauses for everyone until
+  midnight ET and Andrew gets an email.
 - **The key never ships in the app.** AI calls go through a Supabase Edge
   Function proxy that holds the Anthropic key, checks the caller's Pro status,
   counts the build, and forwards the request. The "paste your access key"
@@ -39,8 +51,8 @@ step with these points; where older text disagrees, this record wins.
 - **Price: $2.99/month, $24.99/year.** Yearly is the default-selected option
   ("2 months free"). No struck-through fake "regular" prices — the price is the
   price.
-- **Possible launch price:** $19.99 yearly for the first stretch, shown
-  honestly as a launch price with an end date. To confirm with Andrew.
+- **Launch price:** $24.99/year from day one (decided Nov 12 — no launch
+  discount; the price is the price).
 - **Lifetime unlock: not at launch.** Revisit once real usage shows what AI
   actually costs per user.
 - **Pro keeps paying for itself after the AI novelty fades:** design sync
@@ -75,17 +87,18 @@ step with these points; where older text disagrees, this record wins.
     rejected: six mediums/larges dress 2–3 pages.)
 
 ### Pro (subscription)
-- **AI designer** — marketed as unlimited, enforced at 150 builds/month and a
-  30/day soft cap (review passes count half; Fast mode may continue at a lower
-  cap after the daily soft cap). These numbers are far above real use and exist
-  only to stop scripted abuse.
+- **Unlimited AI builds** — a $1.50/month High-quality budget per account
+  (about 20 High builds), then the rest of the month continues in Fast mode;
+  fair-use ceiling of 30/day and $3.00/month total. Paywall line: "Unlimited
+  builds. After about 20 High-quality builds a month, builds continue in Fast
+  mode."
 - Unlimited active widgets
 - Design sync across every phone signed into the account
 - Full Explore access (published designs and icon packs)
 - No promo cards, ever
 - **Pricing: $2.99/month or $24.99/year**, yearly selected by default and
-  framed as "2 months free." No fake struck-through prices. Possible honest
-  launch price of $19.99/year with a stated end date (to confirm).
+  framed as "2 months free." No fake struck-through prices, no launch
+  discount.
 - **No free trial** — the 3 free builds are the trial.
 - Payments: the native app uses Apple In-App Purchase (15% small-business
   rate); the web designer can sell the same subscription via Stripe (~3%).
@@ -93,13 +106,14 @@ step with these points; where older text disagrees, this record wins.
   data.
 
 ### Cost protection (all tiers)
-- **Per-user counters** on the server (builds this month, builds today), keyed
-  by account for Pro and by device for free.
-- **Global daily spend breaker** on WidgetKing's key — pauses AI for everyone
-  until midnight ET and emails Andrew when tripped. Amount: ~$20/day proposed,
-  to confirm.
+- **Per-account budgets** on the server, in dollars (free: 3 builds on High,
+  per device; Pro: $1.50/month High budget → Fast mode → $3.00/month total
+  ceiling), plus a 30/day soft cap. Each call's cost is computed from the
+  response's token usage × model price.
+- **Global daily spend breaker** on WidgetKing's key — $25/day; pauses AI for
+  everyone until midnight ET and emails Andrew when tripped. A bug backstop.
 - **Supabase Edge Function proxy** holds the Anthropic key, verifies the
-  caller (Supabase session → Pro status), enforces the counters, and forwards
+  caller (Supabase session → Pro status), enforces the budgets, and forwards
   the request. The client never sees the key.
 
 ## Sign-in & abuse prevention
